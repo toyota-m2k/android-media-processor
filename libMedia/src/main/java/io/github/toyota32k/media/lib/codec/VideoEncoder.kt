@@ -13,11 +13,10 @@ class VideoEncoder(format:MediaFormat):BaseEncoder(format) {
     // Encoder側はMediaCodec.configureでsurfaceを設定しない
     // override val surface: Surface? get() = inputSurface.surface
 
-    override fun start() {
+    override fun configure() {
         encoder.configure(mediaFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
         inputSurface = InputSurface(encoder.createInputSurface())
         inputSurface.makeCurrent()
-        encoder.start()
     }
 
     override fun close() {

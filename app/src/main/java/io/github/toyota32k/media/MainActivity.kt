@@ -15,11 +15,13 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import io.github.toyota32k.media.lib.Transcoder
-import io.github.toyota32k.media.lib.Transcoder.Companion.logger
+import io.github.toyota32k.media.lib.Converter
+import io.github.toyota32k.media.lib.Converter.Companion.logger
 import io.github.toyota32k.media.lib.misc.MediaFile
 import io.github.toyota32k.media.ui.theme.AndroidMediaProcessorTheme
-import java.io.File
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import java.util.concurrent.Future
 import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
@@ -53,17 +55,23 @@ class MainActivity : ComponentActivity() {
 
     private fun onOutputFileSelected(outputUri: Uri) {
         val inputUri = sourceUri ?: return
-        future = executor.submit {
-            try {
-                Transcoder(MediaFile(inputUri, this@MainActivity), MediaFile(outputUri, this@MainActivity)).use { transcoder ->
-                    transcoder.convert()
-                    future = null
-                }
-            } catch(e:Throwable) {
-                logger.stackTrace(e)
-                future = null
+        CoroutineScope(Dispatchers.Default).launch {
+            Converter(MediaFile(inputUri, this@MainActivity), MediaFile(outputUri, this@MainActivity)).use { transcoder ->
+                transcoder.trimming(1000, 2500)
             }
         }
+
+//        future = executor.submit {
+//            try {
+//                Converter(MediaFile(inputUri, this@MainActivity), MediaFile(outputUri, this@MainActivity)).use { transcoder ->
+//                    transcoder.transcode()
+//                    future = null
+//                }
+//            } catch(e:Throwable) {
+//                logger.stackTrace(e)
+//                future = null
+//            }
+//        }
 
     }
 

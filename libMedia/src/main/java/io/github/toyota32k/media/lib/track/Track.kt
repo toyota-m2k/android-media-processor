@@ -9,12 +9,13 @@ import io.github.toyota32k.media.lib.utils.Chronos
 import io.github.toyota32k.media.lib.utils.UtLog
 import java.io.Closeable
 
-abstract class Track(val extractor:Extractor, val inputFormat:MediaFormat?, val outputFormat:MediaFormat, val trackIdx:Int) : Closeable {
+abstract class Track(val extractor:Extractor, val inputFormat:MediaFormat?, val outputFormat:MediaFormat, val trackIdx:Int, type:Muxer.SampleType) : Closeable {
+    val logger:UtLog
     init {
-        extractor.selectTrack(trackIdx)
+        extractor.selectTrack(trackIdx, type)
+        logger = UtLog("Track($type)", null, "io.github.toyota32k.")
     }
     companion object {
-        val logger = UtLog("Track")
         fun findTrackIdx(extractor: MediaExtractor, type: String): Int {
             for (idx in 0 until extractor.trackCount) {
                 val format = extractor.getTrackFormat(idx)
@@ -37,19 +38,17 @@ abstract class Track(val extractor:Extractor, val inputFormat:MediaFormat?, val 
         get() = extractor.eos && decoder.eos && encoder.eos
 
     fun next(muxer: Muxer) : Boolean {
-        return Chronos(logger).measure {
-            var effected = false
-            if (extractor.chainTo(decoder)==true) {
-                effected = true
-            }
-            if (decoder.chainTo(encoder)) {
-                effected = true
-            }
-            if (encoder.chainTo(muxer)) {
-                effected = true
-            }
-            effected
+        var effected = false
+        if (extractor.chainTo(decoder)==true) {
+            effected = true
         }
+        if (decoder.chainTo(encoder)) {
+            effected = true
+        }
+        if (encoder.chainTo(muxer)) {
+            effected = true
+        }
+        return effected
     }
 
     private var disposed = false

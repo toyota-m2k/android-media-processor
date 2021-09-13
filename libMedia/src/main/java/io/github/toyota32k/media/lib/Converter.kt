@@ -18,7 +18,7 @@ import java.util.concurrent.LinkedBlockingQueue
 import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.TimeUnit
 
-class Transcoder(inPath:MediaFile, outPath: MediaFile, videoStrategy:IVideoStrategy=HD720VideoStrategy, audioStrategy:IAudioStrategy=DefaultAudioStrategy) : Closeable {
+class Converter(inPath:MediaFile, outPath: MediaFile, videoStrategy:IVideoStrategy=HD720VideoStrategy, audioStrategy:IAudioStrategy=DefaultAudioStrategy) : Closeable {
     companion object {
         val logger = UtLog("Transcoder", null, "io.github.toyota32k.")
     }
@@ -57,7 +57,7 @@ class Transcoder(inPath:MediaFile, outPath: MediaFile, videoStrategy:IVideoStrat
     val eos:Boolean
         get() = videoTrack.eos && audioTrack?.eos?:true
 
-    fun convert() {
+    fun transcode() {
         Chronos(logger).measure {
             var tick = -1L
             var count:Int = 0
@@ -78,6 +78,31 @@ class Transcoder(inPath:MediaFile, outPath: MediaFile, videoStrategy:IVideoStrat
             }
         }
     }
+
+    fun trimming(startMs:Long, endMs:Long) {
+        Chronos(logger).measure {
+            videoTrack.extractor.setTrimmingRange(startMs, endMs)
+            audioTrack?.extractor?.setTrimmingRange(startMs, endMs)
+            var tick = -1L
+            var count:Int = 0
+            while (!eos) {
+                val ve = videoTrack.next(muxer)
+                val ae = audioTrack?.next(muxer) ?: false
+                if(!ve&&!ae) {
+                    count++
+                    if(tick<0) {
+                        tick = System.currentTimeMillis()
+                    } else if(System.currentTimeMillis()-tick>5000 && count>100) {
+                        break
+                    }
+                } else {
+                    tick = -1
+                    count=0
+                }
+            }
+        }
+    }
+
 
     private var disposed = false
     override fun close() {

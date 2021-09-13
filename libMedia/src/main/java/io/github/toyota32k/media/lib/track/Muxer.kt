@@ -39,6 +39,7 @@ class Muxer(inPath:MediaFile, outPath:MediaFile, val hasAudio:Boolean): Closeabl
         val rotation = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull()
         if (rotation != null) {
             muxer.setOrientationHint(rotation)
+            logger.info("metadata: rotation=$rotation")
         }
 
         val locationString = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_LOCATION)
@@ -46,13 +47,15 @@ class Muxer(inPath:MediaFile, outPath:MediaFile, val hasAudio:Boolean): Closeabl
             val location: FloatArray? = ISO6709LocationParser.parse(locationString)
             if (location != null) {
                 muxer.setLocation(location[0], location[1])
+                logger.info("metadata: latitude=${location[0]}, longitude=${location[1]}")
             } else {
-                logger.error("Failed to parse the location metadata: $locationString")
+                logger.error("metadata: failed to parse the location metadata: $locationString")
             }
         }
 
         val duration = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()?.also {
             durationUs = it * 1000
+            logger.info("metadata: duration=${durationUs/1000} ms")
         }
     }
 
