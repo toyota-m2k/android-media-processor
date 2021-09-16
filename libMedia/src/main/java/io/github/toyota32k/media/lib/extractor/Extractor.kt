@@ -5,9 +5,9 @@ import android.media.MediaExtractor
 import android.media.MediaFormat
 import io.github.toyota32k.media.lib.codec.BaseCodec
 import io.github.toyota32k.media.lib.codec.BaseDecoder
-import io.github.toyota32k.media.lib.misc.AndroidFile
+import io.github.toyota32k.media.lib.converter.AndroidFile
 import io.github.toyota32k.media.lib.track.Muxer
-import io.github.toyota32k.media.lib.misc.TrimmingRange
+import io.github.toyota32k.media.lib.converter.TrimmingRange
 import io.github.toyota32k.media.lib.utils.UtLog
 import java.io.Closeable
 import java.nio.ByteBuffer
@@ -25,11 +25,12 @@ class Extractor(inPath: AndroidFile) : Closeable {
         private set
     var trimmingRange = TrimmingRange.Empty
         set(v) {
+            val org = field
             field = v
             if(v.hasStart) {
                 extractor.seekTo(v.startUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
                 logger.debug("SeekTo: ${trimmingRange.startUs/1000L} result: ${extractor.sampleTime/1000L}")
-            } else {
+            } else if(org.hasStart) {
                 logger.assert(false, "don't set trimmingRange twice.")
                 extractor.seekTo(0L, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
             }
@@ -68,7 +69,7 @@ class Extractor(inPath: AndroidFile) : Closeable {
             if(sampleSize>0) {
                 val sampleTime = extractor.sampleTime
 //                logger.debug("read $sampleSize bytes at ${sampleTime/1000} ms")
-                decoder.queueInputBuffer(inputBufferIdx, 0, sampleSize, extractor.sampleTime, extractor.sampleFlags)
+                decoder.queueInputBuffer(inputBufferIdx, 0, sampleSize, sampleTime, extractor.sampleFlags)
             } else {
                 logger.error("zero byte read.")
             }

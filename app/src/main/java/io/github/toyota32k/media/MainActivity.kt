@@ -10,33 +10,21 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.*
 import androidx.compose.runtime.*
+import androidx.compose.runtime.livedata.observeAsState
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
-import io.github.toyota32k.media.lib.converter.Converter
-import io.github.toyota32k.media.lib.misc.AndroidFile
-import io.github.toyota32k.media.ui.theme.AndroidMediaProcessorTheme
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.launch
-import java.util.concurrent.Future
-import java.util.concurrent.LinkedBlockingQueue
-import java.util.concurrent.ThreadPoolExecutor
-import java.util.concurrent.TimeUnit
-import androidx.compose.runtime.livedata.observeAsState
-import androidx.compose.runtime.saveable.rememberSaveable
-import androidx.compose.runtime.getValue
-import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.TextFieldValue
 import androidx.lifecycle.*
+import io.github.toyota32k.media.lib.converter.ConvertResult
+import io.github.toyota32k.media.lib.converter.Converter
+import io.github.toyota32k.media.lib.converter.IAwaiter
 import io.github.toyota32k.media.lib.converter.IProgress
 import io.github.toyota32k.media.lib.utils.UtLog
-import io.github.toyota32k.media.lib.utils.UtLogger
-import kotlinx.coroutines.Job
+import io.github.toyota32k.media.ui.theme.AndroidMediaProcessorTheme
+import kotlinx.coroutines.launch
 
-class MainViewModel(val savedStateHandle: SavedStateHandle): ViewModel() {
+class MainViewModel(savedStateHandle: SavedStateHandle): ViewModel() {
     val inputUri = savedStateHandle.getLiveData<Uri>("inputUri", Uri.EMPTY)
     val outputUri = savedStateHandle.getLiveData<Uri>("outputUri", Uri.EMPTY)
     val trimStart = savedStateHandle.getLiveData<Long>("trimStart", 0L)
@@ -45,12 +33,19 @@ class MainViewModel(val savedStateHandle: SavedStateHandle): ViewModel() {
     val processing = MutableLiveData<Boolean>(false)
     val progress = MutableLiveData<String>()
     val message = MutableLiveData<String>("")
-    var job: Converter.Awaiter? = null
+    var job: IAwaiter<ConvertResult>? = null
 
     private fun onProgress(p: IProgress) {
-        val percent = p.percent
+        val percent = p.percentage
+        val remain = p.remainingTime / 1000
+        val min = remain / 60
+        val sec = remain % 60
         progress.value = if(percent>0) {
-             "$percent %"
+            if(remain>0) {
+                "$percent % (ramain = $min min $sec sec)"
+            } else {
+                "$percent %"
+            }
         } else {
             (p.current / 1000L).toString() + " ms"
         }
@@ -64,15 +59,14 @@ class MainViewModel(val savedStateHandle: SavedStateHandle): ViewModel() {
         message.value = "Processing..."
 
         viewModelScope.launch {
-            val awaiter = Converter.factory
+            val result = Converter.factory
                 .input(input, context)
                 .output(output, context)
                 .setProgressHandler(this@MainViewModel::onProgress)
                 .trimmingStartFrom(trimStart.value?:0L)
                 .trimmingEndTo(trimEnd.value?:0L)
-                .executeAsync()
-            job = awaiter
-            val result = awaiter.await()
+                .executeAsync(viewModelScope).apply { job = this }
+                .await()
             processing.value = false
             progress.value = ""
             job = null
@@ -102,7 +96,6 @@ class MainViewModel(val savedStateHandle: SavedStateHandle): ViewModel() {
 
 class MainActivity : ComponentActivity() {
     companion object {
-        var sourceUri:Uri? = null
         val logger = UtLog("Main")
     }
     lateinit var viewModel: MainViewModel
@@ -116,10 +109,6 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
-    }
-
-    private fun convertNow() {
-        viewModel.convert(this)
     }
 
     private val openInputFile = registerForActivityResult(ActivityResultContracts.GetContent()) { uri->
@@ -214,7 +203,7 @@ class MainActivity : ComponentActivity() {
                     viewModel.trimEnd.value = try { it.toLong() } catch (_:Throwable) { 0L }
                 }
                 Spacer(modifier = Modifier.height(5.dp))
-                Button(onClick={viewModel.convert(this@MainActivity)}) {
+                Button(onClick={viewModel.convert(this@MainActivity)}, enabled = processing==false) {
                     Text("Convert")
                 }
             }

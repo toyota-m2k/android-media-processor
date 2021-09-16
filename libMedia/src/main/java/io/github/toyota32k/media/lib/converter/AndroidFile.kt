@@ -1,4 +1,4 @@
-package io.github.toyota32k.media.lib.misc
+package io.github.toyota32k.media.lib.converter
 
 import android.content.Context
 import android.media.MediaExtractor
@@ -8,6 +8,12 @@ import java.io.File
 import java.io.FileDescriptor
 import java.io.RandomAccessFile
 
+/**
+ * Androidのファイルパス指定を抽象化するためのクラス
+ * java.io.Fileによる指定と、android.net.Uri (+Context) による指定をサポート
+ * ただし、Uriによる指定は、 android.provider.DocumentsProvider ベースのuri、すなわち、
+ * Intent.ACTION_OPEN_DOCUMENTなどによって、取得されたuriであることを前提としている。
+ */
 class AndroidFile {
     val uri:Uri?
     val context:Context?

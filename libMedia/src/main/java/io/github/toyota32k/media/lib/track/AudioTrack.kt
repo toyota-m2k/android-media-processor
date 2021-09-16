@@ -3,10 +3,10 @@ package io.github.toyota32k.media.lib.track
 import android.media.MediaFormat
 import io.github.toyota32k.media.lib.codec.AudioDecoder
 import io.github.toyota32k.media.lib.codec.AudioEncoder
+import io.github.toyota32k.media.lib.converter.AndroidFile
 import io.github.toyota32k.media.lib.extractor.Extractor
 import io.github.toyota32k.media.lib.format.DefaultAudioStrategy
 import io.github.toyota32k.media.lib.format.IAudioStrategy
-import io.github.toyota32k.media.lib.misc.AndroidFile
 import io.github.toyota32k.media.lib.utils.UtLog
 
 class AudioTrack

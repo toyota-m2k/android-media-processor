@@ -1,5 +1,8 @@
-package io.github.toyota32k.media.lib.misc
+package io.github.toyota32k.media.lib.converter
 
+/**
+ * トリミング範囲
+ */
 data class TrimmingRange(val startUs:Long = 0L, val endUs:Long = 0L) {
     val hasStart = startUs>0L
     val hasEnd = endUs>0L

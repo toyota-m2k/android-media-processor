@@ -1,13 +1,11 @@
 package io.github.toyota32k.media.lib.codec
 
 import android.media.MediaFormat
-import android.view.Surface
 import io.github.toyota32k.media.lib.surface.OutputSurface
 import io.github.toyota32k.media.lib.track.Muxer
-import io.github.toyota32k.media.lib.utils.Chronos
 
 class VideoDecoder(format: MediaFormat):BaseDecoder(format)  {
-    lateinit var outputSurface:OutputSurface
+    private lateinit var outputSurface:OutputSurface
     override val sampleType = Muxer.SampleType.Video
     override fun configure() {
         outputSurface = OutputSurface()

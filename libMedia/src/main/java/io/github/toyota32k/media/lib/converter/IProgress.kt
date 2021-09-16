@@ -1,7 +1,12 @@
 package io.github.toyota32k.media.lib.converter
 
+/**
+ * 進捗報告用 i/f
+ */
+@Suppress("unused")
 interface IProgress {
-    val percent:Int     // percent (-1: on total not available)
-    val total:Long      // in us
-    val current:Long    // in us
+    val percentage:Int      // prrogress in percent (0: not available)
+    val total:Long          // total duration in us
+    val current:Long        // current position in us
+    val remainingTime:Long  // expected remaining time in ms (-1: not available)
 }

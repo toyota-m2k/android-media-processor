@@ -25,10 +25,6 @@ class AudioChannel {
     private val mEmptyBuffers: Queue<AudioBuffer> = ArrayDeque()
     private val mFilledBuffers: Queue<AudioBuffer> = ArrayDeque()
 
-//    private var mDecoder: MediaCodec? = null
-//    private var mEncoder: MediaCodec
-//    private var mEncodeFormat: MediaFormat
-//
     private var mInputSampleRate = 0
     private var mInputChannelCount = 0
     private var mOutputChannelCount = 0
@@ -38,13 +34,6 @@ class AudioChannel {
     private val mOverflowBuffer = AudioBuffer()
 
     private lateinit var mActualDecodedFormat: MediaFormat
-
-
-//    init {
-//        mDecoder = decoder
-//        mEncoder = encoder
-//        mEncodeFormat = encodeFormat
-//    }
 
     fun setActualDecodedFormat(decodedFormat: MediaFormat, encodeFormat: MediaFormat) {
         mActualDecodedFormat = decodedFormat

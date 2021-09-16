@@ -5,13 +5,10 @@ import android.media.MediaFormat
 import io.github.toyota32k.media.lib.codec.BaseDecoder
 import io.github.toyota32k.media.lib.codec.BaseEncoder
 import io.github.toyota32k.media.lib.extractor.Extractor
-import io.github.toyota32k.media.lib.misc.TrimmingRange
+import io.github.toyota32k.media.lib.converter.TrimmingRange
 import io.github.toyota32k.media.lib.misc.check
 import io.github.toyota32k.media.lib.utils.UtLog
-import kotlinx.coroutines.CancellableContinuation
-import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.isActive
 import java.io.Closeable
 
 abstract class Track(val extractor:Extractor, val inputFormat:MediaFormat?, val outputFormat:MediaFormat, val trackIdx:Int, type:Muxer.SampleType) : Closeable {
