@@ -15,14 +15,15 @@ class VideoDecoder(format: MediaFormat):BaseDecoder(format)  {
     }
 
     override fun chainTo(encoder: BaseEncoder) :Boolean {
-        return chainTo(null) { index, length, end->
+        return chainTo(null) { index, length, end, timeUs ->
             if(end) {
                 eos = true
                 encoder.encoder.signalEndOfInputStream()
                 decoder.releaseOutputBuffer(index, false)
             } else {
-                decoder.releaseOutputBuffer(index, length>0)
-                if(length>0 && encoder is VideoEncoder) {
+                val render = length>0 && trimmingRange.contains(timeUs)
+                decoder.releaseOutputBuffer(index, render)
+                if(render && encoder is VideoEncoder) {
                     outputSurface.awaitNewImage()
                     outputSurface.drawImage()
                     encoder.inputSurface.setPresentationTime(bufferInfo.presentationTimeUs*1000)

@@ -37,10 +37,12 @@ abstract class BaseCodec(val mediaFormat:MediaFormat) : Closeable {
 
     protected var disposed:Boolean = false
         private set
-    override open fun close() {
+
+    override fun close() {
         if(!disposed) {
             mediaCodec.release()
             disposed = true
+            logger.debug("disposed")
         }
     }
 }

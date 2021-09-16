@@ -2,13 +2,13 @@ package io.github.toyota32k.media.lib.misc
 
 import android.content.Context
 import android.media.MediaExtractor
-import android.media.MediaMuxer
 import android.net.Uri
+import androidx.documentfile.provider.DocumentFile
 import java.io.File
 import java.io.FileDescriptor
 import java.io.RandomAccessFile
 
-class MediaFile {
+class AndroidFile {
     val uri:Uri?
     val context:Context?
     val path: File?
@@ -62,6 +62,19 @@ class MediaFile {
         }
     }
 
+    override fun toString(): String {
+        return path?.toString() ?: uri?.toString() ?: "*invalid-path*"
+    }
+
+    fun delete() {
+        if (hasPath) {
+            path!!.delete()
+        } else if (hasUri) {
+            DocumentFile.fromSingleUri(context!!, uri!!)?.delete()
+        }
+    }
+
+
 //
 //    fun mediaMuxer(format:Int=MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4): MediaMuxer {
 //        return if(hasUri) {
@@ -72,7 +85,7 @@ class MediaFile {
 //    }
 }
 
-fun MediaExtractor.setDataSource(source:MediaFile) {
+fun MediaExtractor.setDataSource(source:AndroidFile) {
     if(source.hasUri) {
         this.setDataSource(source.context!!, source.uri!!, null)
     } else {

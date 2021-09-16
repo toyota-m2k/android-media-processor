@@ -32,8 +32,11 @@ class Chronos(callerLogger:UtLog) {
 
     fun <T> measure(msg:String?=null, fn:()->T):T {
         val begin = System.currentTimeMillis()
+        var result = false
         logger.debug("enter ${msg?:""}")
-        return fn().also {
+        return try {
+            fn()
+        } finally {
             logger.debug("exit ${formatMS(System.currentTimeMillis()-begin)} ${msg?:""}")
         }
     }

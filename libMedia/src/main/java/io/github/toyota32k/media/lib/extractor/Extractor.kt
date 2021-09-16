@@ -5,16 +5,14 @@ import android.media.MediaExtractor
 import android.media.MediaFormat
 import io.github.toyota32k.media.lib.codec.BaseCodec
 import io.github.toyota32k.media.lib.codec.BaseDecoder
-import io.github.toyota32k.media.lib.misc.MediaFile
+import io.github.toyota32k.media.lib.misc.AndroidFile
 import io.github.toyota32k.media.lib.track.Muxer
-import io.github.toyota32k.media.lib.utils.Chronos
+import io.github.toyota32k.media.lib.misc.TrimmingRange
 import io.github.toyota32k.media.lib.utils.UtLog
-import io.github.toyota32k.media.lib.utils.UtLoggerInstance
 import java.io.Closeable
-import java.lang.IllegalStateException
 import java.nio.ByteBuffer
 
-class Extractor(inPath: MediaFile) : Closeable {
+class Extractor(inPath: AndroidFile) : Closeable {
 //    companion object {
 //        val logger = UtLog("Extractor", null, "io.github.toyota32k.")
 //    }
@@ -25,33 +23,22 @@ class Extractor(inPath: MediaFile) : Closeable {
     protected lateinit var inputFormat:MediaFormat
     var eos:Boolean = false
         private set
-    var trimEndUs:Long = 0
-//    var trimStartUs:Long = 0
+    var trimmingRange = TrimmingRange.Empty
+        set(v) {
+            field = v
+            if(v.hasStart) {
+                extractor.seekTo(v.startUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
+                logger.debug("SeekTo: ${trimmingRange.startUs/1000L} result: ${extractor.sampleTime/1000L}")
+            } else {
+                logger.assert(false, "don't set trimmingRange twice.")
+                extractor.seekTo(0L, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
+            }
+        }
 
     fun selectTrack(idx:Int, type: Muxer.SampleType) {
         logger = UtLog("Extractor($type)", null, "io.github.toyota32k.")
         trackIdx = idx
         extractor.selectTrack(idx)
-    }
-
-    fun setTrimmingRange(startMs:Long, endMs:Long) {
-        if(startMs>0) {
-            val startUs = startMs*1000L
-//            extractor.seekTo(startUs, MediaExtractor.SEEK_TO_CLOSEST_SYNC)
-            var sampleTime = extractor.sampleTime
-            if(sampleTime==0L) {
-                while(sampleTime<startUs) {
-                    extractor.advance()
-                    sampleTime = extractor.sampleTime
-                    if(sampleTime<0) {
-                        throw IllegalStateException("seek error")
-                    }
-                }
-            }
-            logger.debug("SeekTo: $startMs result: ${extractor.sampleTime/1000L}")
-        }
-//        trimStartUs = startMs*1000
-        trimEndUs = endMs*1000
     }
 
     fun chainTo(output: BaseDecoder) : Boolean {
@@ -71,7 +58,7 @@ class Extractor(inPath: MediaFile) : Closeable {
 //            logger.debug("SeekTo: $trimStartUs/1000 result: ${extractor.sampleTime/1000L}")
 //            trimStartUs = 0L
 //        }
-        if(idx<0||(trimEndUs>0 && extractor.sampleTime>=trimEndUs)) {
+        if(idx<0||!trimmingRange.checkEnd(extractor.sampleTime)) {
             logger.debug("found eos")
             eos = true
             decoder.queueInputBuffer(inputBufferIdx, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
@@ -80,7 +67,7 @@ class Extractor(inPath: MediaFile) : Closeable {
             val sampleSize = extractor.readSampleData(inputBuffer, 0)
             if(sampleSize>0) {
                 val sampleTime = extractor.sampleTime
-                logger.debug("read $sampleSize bytes at ${sampleTime/1000} ms")
+//                logger.debug("read $sampleSize bytes at ${sampleTime/1000} ms")
                 decoder.queueInputBuffer(inputBufferIdx, 0, sampleSize, extractor.sampleTime, extractor.sampleFlags)
             } else {
                 logger.error("zero byte read.")
@@ -95,6 +82,7 @@ class Extractor(inPath: MediaFile) : Closeable {
         if(!disposed) {
             disposed = true
             extractor.release()
+            logger.debug("disposed")
         }
     }
 }

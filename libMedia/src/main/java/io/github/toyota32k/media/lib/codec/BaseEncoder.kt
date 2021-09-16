@@ -40,7 +40,7 @@ abstract class BaseEncoder(format: MediaFormat):BaseCodec(format) {
                         encoder.releaseOutputBuffer(result, false)
                         continue
                     }
-                    logger.debug("output:$result size=${bufferInfo.size}")
+//                    logger.debug("output:$result size=${bufferInfo.size}")
                     muxer.writeSampleData(sampleType, encoder.getOutputBuffer(result)!!, bufferInfo)
                     writtenPresentationTimeUs = bufferInfo.presentationTimeUs
                     encoder.releaseOutputBuffer(result, false)

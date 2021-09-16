@@ -4,17 +4,15 @@ import android.media.MediaCodec
 import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
 import android.media.MediaMuxer
-import io.github.toyota32k.media.lib.codec.BaseEncoder
 import io.github.toyota32k.media.lib.misc.ISO6709LocationParser
-import io.github.toyota32k.media.lib.misc.MediaFile
+import io.github.toyota32k.media.lib.misc.AndroidFile
 import io.github.toyota32k.media.lib.utils.UtLog
-import io.github.toyota32k.media.lib.utils.UtLoggerInstance
 import java.io.Closeable
 import java.lang.IllegalStateException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
-class Muxer(inPath:MediaFile, outPath:MediaFile, val hasAudio:Boolean): Closeable {
+class Muxer(inPath:AndroidFile, outPath:AndroidFile, val hasAudio:Boolean): Closeable {
     companion object {
         val logger = UtLog("Muxer", null, "io.github.toyota32k.")
         const val BUFFER_SIZE = 64 * 1024
@@ -34,7 +32,7 @@ class Muxer(inPath:MediaFile, outPath:MediaFile, val hasAudio:Boolean): Closeabl
         setupMetaDataBy(inPath)
     }
 
-    private fun setupMetaDataBy(inPath: MediaFile) {
+    private fun setupMetaDataBy(inPath: AndroidFile) {
         val mediaMetadataRetriever = inPath.fileDescriptorToRead { fd-> MediaMetadataRetriever().apply { setDataSource(fd) }}
         val rotation = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull()
         if (rotation != null) {
@@ -53,7 +51,7 @@ class Muxer(inPath:MediaFile, outPath:MediaFile, val hasAudio:Boolean): Closeabl
             }
         }
 
-        val duration = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()?.also {
+        mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()?.also {
             durationUs = it * 1000
             logger.info("metadata: duration=${durationUs/1000} ms")
         }
@@ -146,6 +144,7 @@ class Muxer(inPath:MediaFile, outPath:MediaFile, val hasAudio:Boolean): Closeabl
             disposed = true
             muxer.stop()
             muxer.release()
+            logger.debug("disposed")
         }
     }
 }
