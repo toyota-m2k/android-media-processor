@@ -1,14 +1,20 @@
-package io.github.toyota32k.media.lib.misc
+package io.github.toyota32k.media.lib.converter
 
 import android.content.Context
 import android.media.MediaExtractor
-import android.media.MediaMuxer
 import android.net.Uri
+import androidx.documentfile.provider.DocumentFile
 import java.io.File
 import java.io.FileDescriptor
 import java.io.RandomAccessFile
 
-class MediaFile {
+/**
+ * Androidのファイルパス指定を抽象化するためのクラス
+ * java.io.Fileによる指定と、android.net.Uri (+Context) による指定をサポート
+ * ただし、Uriによる指定は、 android.provider.DocumentsProvider ベースのuri、すなわち、
+ * Intent.ACTION_OPEN_DOCUMENTなどによって、取得されたuriであることを前提としている。
+ */
+class AndroidFile {
     val uri:Uri?
     val context:Context?
     val path: File?
@@ -62,6 +68,19 @@ class MediaFile {
         }
     }
 
+    override fun toString(): String {
+        return path?.toString() ?: uri?.toString() ?: "*invalid-path*"
+    }
+
+    fun delete() {
+        if (hasPath) {
+            path!!.delete()
+        } else if (hasUri) {
+            DocumentFile.fromSingleUri(context!!, uri!!)?.delete()
+        }
+    }
+
+
 //
 //    fun mediaMuxer(format:Int=MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4): MediaMuxer {
 //        return if(hasUri) {
@@ -72,7 +91,7 @@ class MediaFile {
 //    }
 }
 
-fun MediaExtractor.setDataSource(source:MediaFile) {
+fun MediaExtractor.setDataSource(source:AndroidFile) {
     if(source.hasUri) {
         this.setDataSource(source.context!!, source.uri!!, null)
     } else {

@@ -5,8 +5,10 @@ import android.media.MediaFormat
 import io.github.toyota32k.media.lib.codec.BaseDecoder
 import io.github.toyota32k.media.lib.codec.BaseEncoder
 import io.github.toyota32k.media.lib.extractor.Extractor
-import io.github.toyota32k.media.lib.utils.Chronos
+import io.github.toyota32k.media.lib.converter.TrimmingRange
+import io.github.toyota32k.media.lib.misc.check
 import io.github.toyota32k.media.lib.utils.UtLog
+import kotlinx.coroutines.CoroutineScope
 import java.io.Closeable
 
 abstract class Track(val extractor:Extractor, val inputFormat:MediaFormat?, val outputFormat:MediaFormat, val trackIdx:Int, type:Muxer.SampleType) : Closeable {
@@ -34,17 +36,27 @@ abstract class Track(val extractor:Extractor, val inputFormat:MediaFormat?, val 
     abstract val decoder: BaseDecoder
     abstract val encoder: BaseEncoder
 
+    var trimmingRange: TrimmingRange
+        get() = extractor.trimmingRange
+        set(v) {
+            extractor.trimmingRange = v
+            decoder.trimmingRange = v
+        }
+
     val eos
         get() = extractor.eos && decoder.eos && encoder.eos
 
-    fun next(muxer: Muxer) : Boolean {
+    fun next(muxer: Muxer, coroutineScope: CoroutineScope?) : Boolean {
         var effected = false
+        coroutineScope.check()
         if (extractor.chainTo(decoder)==true) {
             effected = true
         }
+        coroutineScope.check()
         if (decoder.chainTo(encoder)) {
             effected = true
         }
+        coroutineScope.check()
         if (encoder.chainTo(muxer)) {
             effected = true
         }
@@ -57,6 +69,7 @@ abstract class Track(val extractor:Extractor, val inputFormat:MediaFormat?, val 
             disposed = true
             encoder.close()
             decoder.close()
+            extractor.close()
         }
     }
 }

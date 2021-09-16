@@ -1,5 +1,8 @@
 package io.github.toyota32k.media.lib.utils
 
+/**
+ * 時間計測用ログ出力クラス
+ */
 class Chronos(callerLogger:UtLog) {
     var logger = UtLog("TIME", callerLogger, callerLogger.omissionNamespace).apply { stackOffset=5 }
     var prev:Long
@@ -32,8 +35,11 @@ class Chronos(callerLogger:UtLog) {
 
     fun <T> measure(msg:String?=null, fn:()->T):T {
         val begin = System.currentTimeMillis()
+        var result = false
         logger.debug("enter ${msg?:""}")
-        return fn().also {
+        return try {
+            fn()
+        } finally {
             logger.debug("exit ${formatMS(System.currentTimeMillis()-begin)} ${msg?:""}")
         }
     }

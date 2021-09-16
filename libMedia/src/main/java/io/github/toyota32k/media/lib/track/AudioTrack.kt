@@ -3,10 +3,10 @@ package io.github.toyota32k.media.lib.track
 import android.media.MediaFormat
 import io.github.toyota32k.media.lib.codec.AudioDecoder
 import io.github.toyota32k.media.lib.codec.AudioEncoder
+import io.github.toyota32k.media.lib.converter.AndroidFile
 import io.github.toyota32k.media.lib.extractor.Extractor
 import io.github.toyota32k.media.lib.format.DefaultAudioStrategy
 import io.github.toyota32k.media.lib.format.IAudioStrategy
-import io.github.toyota32k.media.lib.misc.MediaFile
 import io.github.toyota32k.media.lib.utils.UtLog
 
 class AudioTrack
@@ -16,7 +16,7 @@ private constructor(extractor: Extractor, inputFormat:MediaFormat, strategy: IAu
     override val encoder: AudioEncoder = AudioEncoder(outputFormat).apply { start() }
 
     companion object {
-        fun create(inPath: MediaFile, strategy: IAudioStrategy): AudioTrack? {
+        fun create(inPath: AndroidFile, strategy: IAudioStrategy): AudioTrack? {
             val extractor = Extractor(inPath)
             val trackIdx = findTrackIdx(extractor.extractor, "audio")
             if (trackIdx < 0) {

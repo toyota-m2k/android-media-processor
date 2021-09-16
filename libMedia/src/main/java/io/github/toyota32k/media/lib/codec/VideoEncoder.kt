@@ -2,7 +2,6 @@ package io.github.toyota32k.media.lib.codec
 
 import android.media.MediaCodec
 import android.media.MediaFormat
-import android.view.Surface
 import io.github.toyota32k.media.lib.surface.InputSurface
 import io.github.toyota32k.media.lib.track.Muxer
 
