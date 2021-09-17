@@ -20,25 +20,21 @@ import kotlin.math.min
 /**
  * 動画ファイルのトランスコード/トリミングを行うコンバータークラス
  */
-class Converter(private val inPath:AndroidFile, private val outPath: AndroidFile, private val videoStrategy:IVideoStrategy=HD720VideoStrategy, private val audioStrategy:IAudioStrategy=DefaultAudioStrategy, private val trimmingRange: TrimmingRange?=null) {
+class Converter() {
     companion object {
         val logger = UtLog("Converter", null, "io.github.toyota32k.")
         val factory
             get() = Factory()
     }
 
-    // region - Result
+    lateinit var inPath:AndroidFile
+    lateinit var outPath: AndroidFile
 
+    var videoStrategy:IVideoStrategy=HD720VideoStrategy
+    var audioStrategy:IAudioStrategy=DefaultAudioStrategy
+    var trimmingRange = TrimmingRange.Empty
     var deleteOutputOnError:Boolean = true
-
-    // endregion - Result
-
-    // region - Progress
-
-//    private val progress: Progress
     var onProgress : ((IProgress)->Unit)? = null
-
-    // endregion
 
     /**
      * Converterのファクトリクラス
@@ -48,41 +44,36 @@ class Converter(private val inPath:AndroidFile, private val outPath: AndroidFile
         companion object {
             val logger = UtLog("Factory", Converter.logger, Converter.logger.omissionNamespace)
         }
-        private var inPath: AndroidFile? = null
-        private var outPath: AndroidFile? = null
-        private var videoStrategy:IVideoStrategy = HD720VideoStrategy
-        private var audioStrategy:IAudioStrategy = DefaultAudioStrategy
-        private var trimStart:Long = 0L
-        private var trimEnd:Long = 0L
-        private var deleteOutputOnError = true
-        private var onProgress:((IProgress)->Unit)? = null
+        val converter = Converter()
+        var trimStart:Long = 0L
+        var trimEnd:Long = 0L
 
         fun input(path: File): Factory {
-            inPath = AndroidFile(path)
+            converter.inPath = AndroidFile(path)
             return this
         }
 
         fun input(uri: Uri, context: Context): Factory {
-            inPath = AndroidFile(uri, context)
+            converter.inPath = AndroidFile(uri, context)
             return this
         }
 
         fun output(path: File): Factory {
-            outPath = AndroidFile(path)
+            converter.outPath = AndroidFile(path)
             return this
         }
 
         fun output(uri: Uri, context: Context): Factory {
-            outPath = AndroidFile(uri, context)
+            converter.outPath = AndroidFile(uri, context)
             return this
         }
 
         fun videoStrategy(s:IVideoStrategy):Factory {
-            videoStrategy = s
+            converter.videoStrategy = s
             return this
         }
         fun audioStrategy(s:IAudioStrategy):Factory {
-            audioStrategy = s
+            converter.audioStrategy = s
             return this
         }
 
@@ -97,42 +88,36 @@ class Converter(private val inPath:AndroidFile, private val outPath: AndroidFile
         }
 
         fun setProgressHandler(proc:(IProgress)->Unit):Factory {
-            onProgress = proc
+            converter.onProgress = proc
             return this
         }
 
         fun deleteOutputOnError(flag:Boolean):Factory {
-            this.deleteOutputOnError = flag
+            converter.deleteOutputOnError = flag
             return this
         }
 
         fun build():Converter {
-            val input = inPath ?: throw IllegalStateException("input file is not specified.")
-            val output = outPath ?: throw IllegalStateException("output file is not specified.")
+            if(!converter::inPath.isInitialized) throw IllegalStateException("input file is not specified.")
+            if(!converter::outPath.isInitialized) throw IllegalStateException("output file is not specified.")
 
             logger.info("### media converter information ###")
-            logger.info("input : $input")
-            logger.info("output: $output")
-            logger.info("video strategy: ${videoStrategy.javaClass.name}")
-            logger.info("audio strategy: ${audioStrategy.javaClass.name}")
+            logger.info("input : $converter.input")
+            logger.info("output: $converter.output")
+            logger.info("video strategy: ${converter.videoStrategy.javaClass.name}")
+            logger.info("audio strategy: ${converter.audioStrategy.javaClass.name}")
 
-            val trimmingRange = if(trimStart>0||trimEnd>0) {
+            if(trimStart>0||trimEnd>0) {
                 logger.info("trimming start: ${trimStart / 1000} ms")
                 logger.info("trimming end  : ${trimEnd / 1000} ms")
-                TrimmingRange(trimStart,trimEnd)
-            } else {
-                TrimmingRange.Empty
+                converter.trimmingRange = TrimmingRange(trimStart,trimEnd)
             }
 
-            logger.info("delete output on error = $deleteOutputOnError")
-            if(onProgress==null) {
+            logger.info("delete output on error = $converter.deleteOutputOnError")
+            if(converter.onProgress==null) {
                 logger.info("no progress handler")
             }
-
-            return Converter(input, output, videoStrategy, audioStrategy, trimmingRange).also { cv->
-                cv.deleteOutputOnError = deleteOutputOnError
-                cv.onProgress = onProgress
-            }
+            return converter
         }
 
         suspend fun execute() : ConvertResult {
