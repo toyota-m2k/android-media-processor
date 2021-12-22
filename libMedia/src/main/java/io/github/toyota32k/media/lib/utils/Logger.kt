@@ -58,18 +58,13 @@ class UtLoggerInstance(private val tag:String) : IUtVaLogger {
     }
 
     override fun stackTrace(e:Throwable, message:String?) {
-        if(message!=null) {
+        if(!message.isNullOrBlank()) {
             error(message)
         }
         e.message?.also { msg->
             error(msg)
         }
-        val sw = StringWriter()
-        PrintWriter(sw).use { pw->
-            e.printStackTrace(pw)
-            pw.flush()
-        }
-        print(Log.ERROR, sw.toString())
+        print(Log.ERROR, e.stackTraceToString())
     }
 
     private fun printToSystemOut(tag: String, s: String): Int {

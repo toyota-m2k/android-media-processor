@@ -20,7 +20,7 @@ import kotlin.math.min
 /**
  * 動画ファイルのトランスコード/トリミングを行うコンバータークラス
  */
-class Converter() {
+class Converter {
     companion object {
         val logger = UtLog("Converter", null, "io.github.toyota32k.")
         val factory
@@ -281,10 +281,9 @@ class Converter() {
                 AudioTrack.create(inPath, audioStrategy).use { audioTrack->
                 VideoTrack.create(inPath, videoStrategy).use { videoTrack->
                 Muxer(inPath, outPath, audioTrack!=null).use { muxer->
-                    val tr = trimmingRange ?: TrimmingRange.Empty
-                    val progress = Progress.create(muxer.durationUs, tr, onProgress)
-                    videoTrack.trimmingRange = tr
-                    audioTrack?.trimmingRange = tr
+                    val progress = Progress.create(muxer.durationUs, trimmingRange, onProgress)
+                    videoTrack.trimmingRange = trimmingRange
+                    audioTrack?.trimmingRange = trimmingRange
                     fun eos():Boolean = videoTrack.eos && audioTrack?.eos?:true
                     var tick = -1L
                     var count = 0
