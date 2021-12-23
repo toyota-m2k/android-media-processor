@@ -44,9 +44,9 @@ class Converter {
         companion object {
             val logger = UtLog("Factory", Converter.logger, Converter.logger.omissionNamespace)
         }
-        val converter = Converter()
-        var trimStart:Long = 0L
-        var trimEnd:Long = 0L
+        private val converter = Converter()
+        private var trimStart:Long = 0L
+        private var trimEnd:Long = 0L
 
         fun input(path: File): Factory {
             converter.inPath = AndroidFile(path)
@@ -78,12 +78,16 @@ class Converter {
         }
 
         fun trimmingStartFrom(timeMs:Long):Factory {
-            trimStart = timeMs*1000L
+            if(timeMs>0) {
+                trimStart = timeMs * 1000L
+            }
             return this
         }
 
         fun trimmingEndTo(timeMs:Long):Factory {
-            trimEnd = timeMs*1000L
+            if(timeMs>0) {
+                trimEnd = timeMs * 1000L
+            }
             return this
         }
 
@@ -250,7 +254,7 @@ class Converter {
      * この場合は、awaitから結果を受け取る前にコルーチンから抜けてしまい、resultは受け取らない。
      */
     fun executeAsync(coroutineScope: CoroutineScope?=null):IAwaiter<ConvertResult> {
-        val cs = coroutineScope ?: CoroutineScope(Dispatchers.Default)
+        val cs = coroutineScope ?: CoroutineScope(Dispatchers.IO)
         return Awaiter(cs.async {
             execute()
         })
@@ -276,7 +280,7 @@ class Converter {
      * このjob自体が終了してしまうため、resultは受け取れない。
      */
     suspend fun execute():ConvertResult {
-        return withContext(Dispatchers.Default) {
+        return withContext(Dispatchers.IO) {
             try {
                 AudioTrack.create(inPath, audioStrategy).use { audioTrack->
                 VideoTrack.create(inPath, videoStrategy).use { videoTrack->
