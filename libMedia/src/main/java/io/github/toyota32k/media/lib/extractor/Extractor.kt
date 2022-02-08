@@ -68,7 +68,7 @@ class Extractor(inPath: AndroidFile) : Closeable {
             val sampleSize = extractor.readSampleData(inputBuffer, 0)
             if(sampleSize>0) {
                 val sampleTime = extractor.sampleTime
-//                logger.debug("read $sampleSize bytes at ${sampleTime/1000} ms")
+                logger.debug("read $sampleSize bytes at ${sampleTime/1000} ms")
                 decoder.queueInputBuffer(inputBufferIdx, 0, sampleSize, sampleTime, extractor.sampleFlags)
             } else {
                 logger.error("zero byte read.")

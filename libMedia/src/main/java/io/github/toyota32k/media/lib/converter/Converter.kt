@@ -301,7 +301,7 @@ class Converter {
                             count++
                             if (tick < 0) {
                                 tick = System.currentTimeMillis()
-                            } else if (System.currentTimeMillis() - tick > 5000 && count > 100) {
+                            } else if (System.currentTimeMillis() - tick > (3*60*1000) && count > 100_000) {
                                 throw TimeoutException("no response from transcoder.")
                             }
                         } else {

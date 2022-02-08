@@ -49,7 +49,7 @@ abstract class Track(val extractor:Extractor, val inputFormat:MediaFormat?, val 
     fun next(muxer: Muxer, coroutineScope: CoroutineScope?) : Boolean {
         var effected = false
         coroutineScope.check()
-        if (extractor.chainTo(decoder)==true) {
+        if (extractor.chainTo(decoder)) {
             effected = true
         }
         coroutineScope.check()
