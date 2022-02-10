@@ -21,7 +21,7 @@ abstract class BaseEncoder(format: MediaFormat):BaseCodec(format) {
             val result: Int = encoder.dequeueOutputBuffer(bufferInfo, TIMEOUT_IMMEDIATE)
             when {
                 result == MediaCodec.INFO_TRY_AGAIN_LATER -> {
-                    logger.debug("no sufficient data yet.")
+//                    logger.debug("no sufficient data yet.")
                     return effected
                 }
                 result == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {

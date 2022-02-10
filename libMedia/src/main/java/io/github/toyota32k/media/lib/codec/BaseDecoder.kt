@@ -14,13 +14,18 @@ abstract class BaseDecoder(format: MediaFormat):BaseCodec(format) {
     protected fun chainTo(
         formatChanged:((decodedFormat:MediaFormat)->Unit)?,
         dataConsumed:(index:Int, length:Int, end:Boolean, timeUs:Long)->Unit) : Boolean {
+        if(eos) return false
         var effected = false
         while(true) {
             val index = decoder.dequeueOutputBuffer(bufferInfo, TIMEOUT_IMMEDIATE)
             when {
                 index >= 0 -> {
                     // logger.debug("output:$index size=${bufferInfo.size}")
-                    dataConsumed(index, bufferInfo.size, bufferInfo.flags.and(MediaCodec.BUFFER_FLAG_END_OF_STREAM)!=0, bufferInfo.presentationTimeUs)
+                    val eos = bufferInfo.flags.and(MediaCodec.BUFFER_FLAG_END_OF_STREAM)!=0
+                    if(eos) {
+                        this.eos = eos
+                    }
+                    dataConsumed(index, bufferInfo.size, eos, bufferInfo.presentationTimeUs)
                     return true
                 }
                 index == MediaCodec.INFO_TRY_AGAIN_LATER -> {
@@ -30,6 +35,9 @@ abstract class BaseDecoder(format: MediaFormat):BaseCodec(format) {
                 index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
                     logger.debug("format changed")
                     formatChanged?.invoke(decoder.outputFormat)
+                }
+                else -> {
+                    logger.error("unknown index ($index)")
                 }
             }
             effected = true
