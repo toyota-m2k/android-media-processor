@@ -261,6 +261,27 @@ class Converter {
     }
 
     /**
+     * より進捗の悪いトラックを優先的に処理することで、できるだけ均等に処理を進めてみる。
+     *
+     * 長い動画で、ビデオトラックとオーディオトラックの進捗度合いが大きく乖離すると、
+     *  - Extractor: decoder.dequeueInputBuffer(TIMEOUT_IMMEDIATE)
+     *  - Encoder: encoder.dequeueOutputBuffer(bufferInfo, TIMEOUT_IMMEDIATE)
+     * が永遠に、-1 を返し始めて、処理が完了しない現象に遭遇。
+     * ここからは、想像なのだけど、ビデオとオーディオの両方が揃うまで muxer が処理できず、バッファリングし続けているうちに、
+     * バッファがいっぱいになって、トラックの読み込みや、変換結果の書き込み、変換結果の読みだし、のどこかで処理が止まってしまうのではありますまいか？
+     * そこで、audio/videoトラックを均等に処理していくようにしてみたら、現象が回避された模様。
+     */
+    private fun CoroutineScope.next(muxer:Muxer, videoTrack:VideoTrack, audioTrack:AudioTrack?):Boolean {
+        if(!videoTrack.eos && (audioTrack==null || audioTrack.eos || videoTrack.convertedLength<=audioTrack.convertedLength)) {
+            return videoTrack.next(muxer, this)
+        } else if (audioTrack!=null && !audioTrack.eos) {
+            return audioTrack.next(muxer, this)
+        }
+        logger.assert(videoTrack.eos && audioTrack?.eos?:true)
+        return false
+    }
+
+    /**
      * コンバートを実行
      * 呼び出し元のCoroutineContext (JobやDeferred)をキャンセルすると処理は中止されるが、
      * withContextもキャンセルされてしまうので、リターンしないで終了する（= Result.cancelを返せない。）
@@ -295,14 +316,16 @@ class Converter {
                         if(!isActive) {
                             throw CancellationException("cancelled")
                         }
-                        val ve = videoTrack.next(muxer, this)
-                        val ae = audioTrack?.next(muxer, this) ?: false
-                        if (!ve && !ae) {
+
+//                        val ve = videoTrack.next(muxer, this)
+//                        val ae = audioTrack?.next(muxer, this) ?: false
+//                        if(!ve&&!ae) {
+                        if (!next(muxer, videoTrack, audioTrack)) {
                             count++
                             if (tick < 0) {
                                 tick = System.currentTimeMillis()
                             } else if (System.currentTimeMillis() - tick > (3*60*1000) && count > 100_000) {
-                                throw TimeoutException("no response from transcoder.")
+                                // throw TimeoutException("no response from transcoder.")
                             }
                         } else {
                             tick = -1

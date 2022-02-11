@@ -45,6 +45,8 @@ abstract class Track(val extractor:Extractor, val inputFormat:MediaFormat?, val 
 
     val eos
         get() = extractor.eos && decoder.eos && encoder.eos
+    val convertedLength:Long
+        get() = encoder.writtenPresentationTimeUs
 
     fun next(muxer: Muxer, coroutineScope: CoroutineScope?) : Boolean {
         var effected = false

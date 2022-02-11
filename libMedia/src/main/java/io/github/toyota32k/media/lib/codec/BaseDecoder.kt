@@ -23,7 +23,8 @@ abstract class BaseDecoder(format: MediaFormat):BaseCodec(format) {
                     // logger.debug("output:$index size=${bufferInfo.size}")
                     val eos = bufferInfo.flags.and(MediaCodec.BUFFER_FLAG_END_OF_STREAM)!=0
                     if(eos) {
-                        this.eos = eos
+                        logger.debug("found eos")
+                        this.eos = true
                     }
                     dataConsumed(index, bufferInfo.size, eos, bufferInfo.presentationTimeUs)
                     return true

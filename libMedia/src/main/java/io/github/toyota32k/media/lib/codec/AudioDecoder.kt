@@ -10,16 +10,12 @@ class AudioDecoder(format: MediaFormat):BaseDecoder(format) {
 
     override fun chainTo(encoder: BaseEncoder) :Boolean {
         return chainTo( { decodedFormat -> audioChannel.setActualDecodedFormat(decodedFormat, mediaFormat) }) inner@ { index, length, end, timeUs ->
-            var dealt = false
             if (length > 0 && trimmingRange.contains(timeUs)) {
                 audioChannel.drainDecoderBufferAndQueue(decoder, index, bufferInfo.presentationTimeUs)
-                dealt = true
+                audioChannel.feedEncoder(decoder, encoder.encoder, 0)
             }
             if (end) {
                 audioChannel.drainDecoderBufferAndQueue(decoder, AudioChannel.BUFFER_INDEX_END_OF_STREAM, 0)
-                dealt = true
-            }
-            if(dealt) {
                 audioChannel.feedEncoder(decoder, encoder.encoder, 0)
             }
         }

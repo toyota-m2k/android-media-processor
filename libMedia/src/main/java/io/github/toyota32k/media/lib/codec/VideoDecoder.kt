@@ -17,12 +17,16 @@ class VideoDecoder(format: MediaFormat):BaseDecoder(format)  {
             val render = length>0 && trimmingRange.contains(timeUs)
             decoder.releaseOutputBuffer(index, render)
             if(render && encoder is VideoEncoder) {
+                if(end) {
+                    logger.info("render end of data.")
+                }
                 outputSurface.awaitNewImage()
                 outputSurface.drawImage()
                 encoder.inputSurface.setPresentationTime(bufferInfo.presentationTimeUs*1000)
                 encoder.inputSurface.swapBuffers()
             }
             if(end) {
+                logger.info("signal end of input stream to encoder.")
                 encoder.encoder.signalEndOfInputStream()
             }
         }
