@@ -12,6 +12,7 @@ import io.github.toyota32k.media.lib.utils.UtLog
 import kotlinx.coroutines.*
 import java.io.File
 import java.lang.IllegalStateException
+import java.util.*
 import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.max
@@ -272,13 +273,34 @@ class Converter {
      * そこで、audio/videoトラックを均等に処理していくようにしてみたら、現象が回避された模様。
      */
     private fun CoroutineScope.next(muxer:Muxer, videoTrack:VideoTrack, audioTrack:AudioTrack?):Boolean {
-        if(!videoTrack.eos && (audioTrack==null || audioTrack.eos || videoTrack.convertedLength<=audioTrack.convertedLength)) {
-            return videoTrack.next(muxer, this)
-        } else if (audioTrack!=null && !audioTrack.eos) {
-            return audioTrack.next(muxer, this)
+        // フォーマットが確定するまでは、両方を平行して進める
+        if(!muxer.isReady) {
+            // フォーマットが確定するまでは、入力がすべてバッファリングされるだけで、outputへの書き込みが発生しないため、
+            // Track.convertedLength がゼロのままになるので、下のロジックだと、Video側だけが読み込まれてバッファーがオーバーフローする。
+            val rv = if(!muxer.isVideoReady) {
+                if(videoTrack.eos) {
+                    throw IllegalStateException("unexpected eos in video track.")
+                }
+                videoTrack.next(muxer, this)
+            } else false
+            val ra = if(audioTrack!=null && !muxer.isAudioReady) {
+                if(audioTrack.eos) {
+                    throw IllegalStateException("unexpected eos in audio track.")
+                }
+                audioTrack.next(muxer, this)
+            } else false
+            return rv || ra
         }
-        logger.assert(videoTrack.eos && audioTrack?.eos?:true)
-        return false
+
+        // video/audio両方のフォーマットが確定したら（isReadyになったら）、進捗（convertedLength）が同程度になるように調整する。
+        return if(!videoTrack.eos && (audioTrack==null || audioTrack.eos || videoTrack.convertedLength<=audioTrack.convertedLength)) {
+            videoTrack.next(muxer, this)
+        } else if (audioTrack!=null && !audioTrack.eos) {
+            audioTrack.next(muxer, this)
+        } else {
+            logger.assert(videoTrack.eos && audioTrack?.eos ?: true)
+            false
+        }
     }
 
     /**

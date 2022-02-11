@@ -57,6 +57,8 @@ class Muxer(inPath:AndroidFile, outPath: AndroidFile, val hasAudio:Boolean): Clo
         }
     }
 
+    val isVideoReady get() = videoFormat != null
+    val isAudioReady get() = !hasAudio || audioFormat != null
     val isReady get() = videoFormat != null && (!hasAudio || audioFormat != null)
     private var mByteBuffer: ByteBuffer? = null
     private val mSampleInfoList = mutableListOf<SampleInfo>()
