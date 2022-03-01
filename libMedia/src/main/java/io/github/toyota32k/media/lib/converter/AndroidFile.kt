@@ -3,6 +3,7 @@ package io.github.toyota32k.media.lib.converter
 import android.content.Context
 import android.media.MediaExtractor
 import android.net.Uri
+import android.os.ParcelFileDescriptor
 import androidx.documentfile.provider.DocumentFile
 import java.io.File
 import java.io.FileDescriptor
@@ -43,30 +44,32 @@ class AndroidFile {
 //            }.fd
 //        }
 
-    fun <T> fileDescriptorToRead(fn:(FileDescriptor)->T):T {
+    fun <T> withFileDescriptor(mode:String, fn:(FileDescriptor)->T):T {
         return if(hasUri) {
-            fn(context!!.contentResolver.openAssetFileDescriptor(uri!!, "r" )!!.fileDescriptor)
-        } else { // Use RandomAccessFile so we can open the file with RW access;
-            // RW access allows the native writer to memory map the output file.
-            RandomAccessFile(path, "r").use {
-                fn(it.fd)
+            context!!.contentResolver.openAssetFileDescriptor(uri!!, mode)!!.use {
+                fn(it.fileDescriptor)
+            }
+        } else {
+            ParcelFileDescriptor.open(path!!, ParcelFileDescriptor.parseMode("r")).use {
+                fn(it.fileDescriptor)
             }
         }
     }
 
-    fun <T> fileDescriptorToWrite(fn:(FileDescriptor)->T):T {
+    fun <T> fileDescriptorToRead(fn:(FileDescriptor)->T):T = withFileDescriptor("r", fn)
+
+    fun <T> fileDescriptorToWrite(fn:(FileDescriptor)->T):T = withFileDescriptor("rw", fn)
+
+    fun openParcelFileDescriptor(mode:String):ParcelFileDescriptor {
         return if(hasUri) {
-            context!!.contentResolver.openAssetFileDescriptor(uri!!, "rw" )!!.use {
-                fn(it.fileDescriptor)
-            }
+            context!!.contentResolver.openFileDescriptor(uri!!, mode )!!
         } else { // Use RandomAccessFile so we can open the file with RW access;
-            // RW access allows the native writer to memory map the output file.
-            RandomAccessFile(path, "rws").use {
-                it.setLength(0)
-                fn(it.fd)
-            }
+            ParcelFileDescriptor.open(path!!, ParcelFileDescriptor.parseMode(mode))
         }
     }
+
+    fun openParcelFileDescriptorToRead() = openParcelFileDescriptor("r")
+    fun openParcelFileDescriptorToWrite() = openParcelFileDescriptor("rw")
 
     override fun toString(): String {
         return path?.toString() ?: uri?.toString() ?: "*invalid-path*"

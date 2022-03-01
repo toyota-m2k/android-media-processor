@@ -59,6 +59,11 @@ class Converter {
             return this
         }
 
+        fun input(src:AndroidFile): Factory {
+            converter.inPath = src
+            return this
+        }
+
         fun output(path: File): Factory {
             converter.outPath = AndroidFile(path)
             return this
@@ -66,6 +71,11 @@ class Converter {
 
         fun output(uri: Uri, context: Context): Factory {
             converter.outPath = AndroidFile(uri, context)
+            return this
+        }
+
+        fun output(dst:AndroidFile):Factory {
+            converter.outPath = dst
             return this
         }
 
