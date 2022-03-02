@@ -50,7 +50,7 @@ class AndroidFile {
                 fn(it.fileDescriptor)
             }
         } else {
-            ParcelFileDescriptor.open(path!!, ParcelFileDescriptor.parseMode("r")).use {
+            ParcelFileDescriptor.open(path!!, ParcelFileDescriptor.parseMode(mode)).use {
                 fn(it.fileDescriptor)
             }
         }
