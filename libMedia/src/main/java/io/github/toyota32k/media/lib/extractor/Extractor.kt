@@ -8,15 +8,13 @@ import io.github.toyota32k.media.lib.codec.BaseDecoder
 import io.github.toyota32k.media.lib.converter.AndroidFile
 import io.github.toyota32k.media.lib.track.Muxer
 import io.github.toyota32k.media.lib.converter.TrimmingRange
+import io.github.toyota32k.media.lib.utils.IUtExternalLogger
 import io.github.toyota32k.media.lib.utils.UtLog
+import io.github.toyota32k.media.lib.utils.UtLoggerInstance
 import java.io.Closeable
 import java.nio.ByteBuffer
 
 class Extractor(inPath: AndroidFile) : Closeable {
-//    companion object {
-//        val logger = UtLog("Extractor", null, "io.github.toyota32k.")
-//    }
-
     lateinit var logger:UtLog
     val extractor = inPath.fileDescriptorToRead { fd-> MediaExtractor().apply { setDataSource(fd) }}
     var trackIdx:Int = -1

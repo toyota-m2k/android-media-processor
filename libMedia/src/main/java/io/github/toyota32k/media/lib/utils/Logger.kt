@@ -29,6 +29,7 @@ class UtLoggerInstance(private val tag:String) : IUtVaLogger {
     companion object {
         @JvmStatic
         var externalLogger:IUtExternalLogger? = null
+            internal set
     }
 
     override fun debug(s: String, vararg args: Any?) {
