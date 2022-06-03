@@ -30,6 +30,7 @@ class Converter {
         private const val MaxNoEffectedCount = 10
         // 両方のトラックが、デコーダーまでEOSになった後、NOPのまま待たされる時間の限界値
         private const val LimitOfPatience = 15*1000L        // 15秒
+        private const val MaxRetryCount = 1000
     }
 
     lateinit var inPath:AndroidFile
@@ -323,6 +324,7 @@ class Converter {
                     // ビデオトラックの処理がオーディオトラックより遅れている
                     if(videoNoEffectContext>MaxNoEffectedCount) {
                         // N回以上、ビデオトラックから応答がなければ、オーディオトラックに処理をまわしてみる
+                        logger.debug("no response from video track ... try audio track.")
                         videoNoEffectContext = 0
                         audioTrack
                     } else {
@@ -334,6 +336,7 @@ class Converter {
                     // オーディオトラックの処理がビデオトラックより遅れている
                     if(audioNoEffectedCount>MaxNoEffectedCount) {
                         // N回以上、オーディオトラックから応答がなければ、ビデオトラックに処理をまわしてみる。
+                        logger.debug("no response from audio track ... try video track.")
                         audioNoEffectedCount = 0
                         videoTrack
                     } else {
@@ -356,12 +359,14 @@ class Converter {
                     videoNoEffectContext = 0
                 } else {
                     videoNoEffectContext++
+                    logger.debug("no response from video track ($videoNoEffectContext)")
                 }
             } else {
                 if(result) {
                     audioNoEffectedCount = 0
                 } else {
                     audioNoEffectedCount++
+                    logger.debug("no response from audio track ($audioNoEffectedCount)")
                 }
             }
             return result
@@ -463,12 +468,11 @@ class Converter {
 //                        val ae = audioTrack?.next(muxer, this) ?: false
 //                        if(!ve&&!ae) {
                         if (!tracks.next(this)) {
-                            if(videoTrack.decoder.eos && audioTrack?.decoder?.eos?:true) {
+                            if(videoTrack.decoder.eos && audioTrack?.decoder?.eos != false) {
                                 count++
-                                logger.debug("... i'm waiting ... $count")
                                 if (tick < 0) {
                                     tick = System.currentTimeMillis()
-                                } else if (System.currentTimeMillis() - tick > LimitOfPatience && count > 10_000) {
+                                } else if (System.currentTimeMillis() - tick > LimitOfPatience && count > MaxRetryCount) {
                                     logger.info("decoders reached EOS but encoder not working ... forced to stop muxer")
                                     val fv = videoTrack.encoder.forceEos(muxer)
                                     val fa = audioTrack?.encoder?.forceEos(muxer)==true
