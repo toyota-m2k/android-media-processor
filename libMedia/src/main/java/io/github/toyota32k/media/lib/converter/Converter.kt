@@ -416,11 +416,11 @@ class Converter {
 
     private fun sendALetterToYou(v:Boolean, a:Boolean) {
         if(v && a) {
-            aLetterForYou = "video and audio tracks were forced to finalized"
+            aLetterForYou = "video and audio tracks were forced to be finalized"
         } else if (v) {
-            aLetterForYou = "video track was forced to finalized"
+            aLetterForYou = "video track was forced to be finalized"
         } else if (a) {
-            aLetterForYou = "audio track was forced to finalized"
+            aLetterForYou = "audio track was forced to be finalized"
         } else {
             aLetterForYou = "unexpected status."
         }
