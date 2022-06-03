@@ -21,7 +21,7 @@ abstract class BaseEncoder(format: MediaFormat):BaseCodec(format) {
             val result: Int = encoder.dequeueOutputBuffer(bufferInfo, TIMEOUT_IMMEDIATE)
             when {
                 result == MediaCodec.INFO_TRY_AGAIN_LATER -> {
-//                    logger.debug("no sufficient data yet.")
+                    logger.verbose("no sufficient data yet.")
                     return effected
                 }
                 result == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
@@ -40,18 +40,29 @@ abstract class BaseEncoder(format: MediaFormat):BaseCodec(format) {
                         encoder.releaseOutputBuffer(result, false)
                         continue
                     }
-//                    logger.debug("output:$result size=${bufferInfo.size}")
+                    logger.verbose("output:$result size=${bufferInfo.size}")
                     muxer.writeSampleData(sampleType, encoder.getOutputBuffer(result)!!, bufferInfo)
                     if(bufferInfo.presentationTimeUs>0) {
                         writtenPresentationTimeUs = bufferInfo.presentationTimeUs
                     }
                     encoder.releaseOutputBuffer(result, false)
-                    break
+                    if(eos) {
+                        break
+                    }
                 }
                 else -> {}
             }
             effected = true
         }
         return effected
+    }
+
+    fun forceEos(muxer:Muxer):Boolean {
+        return if(!eos) {
+            logger.debug("forced to set eos.")
+            eos = true
+            muxer.complete(sampleType)
+            true
+        } else false
     }
 }

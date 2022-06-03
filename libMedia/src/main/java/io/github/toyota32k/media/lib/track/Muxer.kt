@@ -20,13 +20,15 @@ class Muxer(inPath:AndroidFile, outPath: AndroidFile, val hasAudio:Boolean): Clo
 
     enum class SampleType { Audio, Video }
 
-    val muxer:MediaMuxer = outPath.fileDescriptorToWrite { fd-> MediaMuxer(fd, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4) }
+    private val muxer:MediaMuxer = outPath.fileDescriptorToWrite { fd-> MediaMuxer(fd, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4) }
     var durationUs: Long = -1L   // for progress
         private set
-    var videoFormat: MediaFormat? = null
-    var audioFormat: MediaFormat? = null
-    var videoTrackIndex = -1
-    var audioTrackIndex = -1
+
+    private var videoFormat: MediaFormat? = null
+    private var audioFormat: MediaFormat? = null
+
+    private var videoTrackIndex = -1
+    private var audioTrackIndex = -1
 
     init {
         setupMetaDataBy(inPath)
@@ -109,6 +111,10 @@ class Muxer(inPath:AndroidFile, outPath: AndroidFile, val hasAudio:Boolean): Clo
     fun writeSampleData(sampleType: SampleType, byteBuf: ByteBuffer, bufferInfo: MediaCodec.BufferInfo) {
         if (isReady) {
             muxer.writeSampleData(trackIndexOf(sampleType), byteBuf, bufferInfo)
+            if(bufferInfo.flags.and(MediaCodec.BUFFER_FLAG_END_OF_STREAM)!=0) {
+                logger.debug("reached to eos.")
+                complete(sampleType)
+            }
             return
         }
 
@@ -120,6 +126,34 @@ class Muxer(inPath:AndroidFile, outPath: AndroidFile, val hasAudio:Boolean): Clo
         byteBuffer.put(byteBuf)
         mSampleInfoList.add(SampleInfo(sampleType, bufferInfo.size, bufferInfo))
     }
+
+    private var isVideoCompleted:Boolean = false
+    private var isAudioCompleted:Boolean = false
+    private var muxerStopped = false
+
+    fun complete(sampleType: SampleType) {
+        when(sampleType) {
+            SampleType.Audio -> isAudioCompleted = true
+            SampleType.Video -> isVideoCompleted = true
+        }
+        if(isAudioCompleted && isVideoCompleted) {
+            stopMuxer()
+        }
+    }
+
+    fun stopMuxer() {
+        if(!muxerStopped) {
+            muxerStopped = true
+            try {
+                logger.debug("muxer stopped.")
+                muxer.stop()
+            } catch (e: Throwable) {
+                logger.stackTrace(e)
+            }
+        }
+    }
+
+
 
 
     private class SampleInfo(sampleType: SampleType, size: Int, bufferInfo: MediaCodec.BufferInfo) {
@@ -144,7 +178,6 @@ class Muxer(inPath:AndroidFile, outPath: AndroidFile, val hasAudio:Boolean): Clo
     override fun close() {
         if(!disposed) {
             disposed = true
-            muxer.stop()
             muxer.release()
             logger.debug("disposed")
         }

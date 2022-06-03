@@ -20,7 +20,7 @@ abstract class BaseDecoder(format: MediaFormat):BaseCodec(format) {
             val index = decoder.dequeueOutputBuffer(bufferInfo, TIMEOUT_IMMEDIATE)
             when {
                 index >= 0 -> {
-                    // logger.debug("output:$index size=${bufferInfo.size}")
+                    logger.verbose("output:$index size=${bufferInfo.size}")
                     val eos = bufferInfo.flags.and(MediaCodec.BUFFER_FLAG_END_OF_STREAM)!=0
                     if(eos) {
                         logger.debug("found eos")
@@ -30,7 +30,7 @@ abstract class BaseDecoder(format: MediaFormat):BaseCodec(format) {
                     return true
                 }
                 index == MediaCodec.INFO_TRY_AGAIN_LATER -> {
-                    // logger.debug("no sufficient data yet")
+                    logger.verbose("no sufficient data yet")
                     return effected
                 }
                 index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
