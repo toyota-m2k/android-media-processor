@@ -5,11 +5,11 @@ plugins {
 }
 
 android {
-    compileSdk 32
+    compileSdk 31
 
     defaultConfig {
         minSdk 23
-        targetSdk 32
+        targetSdk 31
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         consumerProguardFiles "consumer-rules.pro"
@@ -29,15 +29,13 @@ android {
         jvmTarget = '1.8'
     }
     packagingOptions {
-        resources {
-            excludes += ['META-INF/DEPENDENCIES']
-        }
+        exclude 'META-INF/DEPENDENCIES'
     }
 }
 
 dependencies {
-    implementation 'androidx.appcompat:appcompat:1.4.1'
-    implementation 'com.google.android.material:material:1.6.0'
+    implementation 'androidx.appcompat:appcompat:1.4.2'
+    implementation 'com.google.android.material:material:1.6.1'
     implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:1.5.2'
     testImplementation 'junit:junit:4.13.2'
     androidTestImplementation 'androidx.test.ext:junit:1.1.3'
