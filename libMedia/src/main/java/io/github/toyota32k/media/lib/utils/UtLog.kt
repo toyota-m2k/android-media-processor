@@ -1,5 +1,6 @@
 package io.github.toyota32k.media.lib.utils
 
+import android.util.Log
 import io.github.toyota32k.media.lib.BuildConfig
 import java.io.Closeable
 import java.lang.Exception
@@ -39,6 +40,8 @@ class UtLog @JvmOverloads constructor(val tag:String, val parent:UtLog?=null, va
 //        }
 
         val libLogger:UtLog by lazy { UtLog("libUtils") }
+
+        var logLevel:Int = Log.DEBUG    // Log.VERBOSE
     }
 
     private val logger = UtLoggerInstance(hierarchicTag(tag,parent))
@@ -73,13 +76,23 @@ class UtLog @JvmOverloads constructor(val tag:String, val parent:UtLog?=null, va
             message ?: ""
         }
     }
+    @JvmOverloads
+    fun verbose(msg: String?=null) {
+        logger.verbose(compose(msg))
+    }
+    fun verbose(fn:()->String) {
+        if(logLevel>=Log.VERBOSE) {
+            verbose(fn())
+        }
+    }
+
 
     @JvmOverloads
     fun debug(msg: String?=null) {
         logger.debug(compose(msg))
     }
     fun debug(fn:()->String) {
-        if(BuildConfig.DEBUG) {
+        if(logLevel>=Log.DEBUG) {
             debug(fn())
         }
     }
@@ -97,11 +110,6 @@ class UtLog @JvmOverloads constructor(val tag:String, val parent:UtLog?=null, va
     @JvmOverloads
     fun info(msg: String?=null) {
         logger.info(compose(msg))
-    }
-
-    @JvmOverloads
-    fun verbose(msg: String?=null) {
-        logger.verbose(compose(msg))
     }
 
     @JvmOverloads

@@ -112,7 +112,7 @@ class Muxer(inPath:AndroidFile, outPath: AndroidFile, val hasAudio:Boolean): Clo
         if (isReady) {
             muxer.writeSampleData(trackIndexOf(sampleType), byteBuf, bufferInfo)
             if(bufferInfo.flags.and(MediaCodec.BUFFER_FLAG_END_OF_STREAM)!=0) {
-                logger.debug("reached to eos.")
+                logger.debug("$sampleType -- reached to eos.")
                 complete(sampleType)
             }
             return

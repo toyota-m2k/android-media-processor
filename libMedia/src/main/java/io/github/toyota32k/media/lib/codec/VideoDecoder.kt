@@ -27,6 +27,7 @@ class VideoDecoder(format: MediaFormat):BaseDecoder(format)  {
             }
             if(end) {
                 logger.info("signal end of input stream to encoder.")
+                eos = true
                 encoder.encoder.signalEndOfInputStream()
             }
         }
