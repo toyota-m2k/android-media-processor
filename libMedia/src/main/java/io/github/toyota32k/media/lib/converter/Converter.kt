@@ -7,13 +7,13 @@ import io.github.toyota32k.media.lib.format.HD720VideoStrategy
 import io.github.toyota32k.media.lib.format.IAudioStrategy
 import io.github.toyota32k.media.lib.format.IVideoStrategy
 import io.github.toyota32k.media.lib.misc.RingBuffer
-import io.github.toyota32k.media.lib.track.*
+import io.github.toyota32k.media.lib.track.AudioTrack
+import io.github.toyota32k.media.lib.track.Muxer
+import io.github.toyota32k.media.lib.track.Track
+import io.github.toyota32k.media.lib.track.VideoTrack
 import io.github.toyota32k.media.lib.utils.UtLog
 import kotlinx.coroutines.*
 import java.io.File
-import java.lang.IllegalStateException
-import java.util.*
-import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.max
 import kotlin.math.min
@@ -27,7 +27,7 @@ class Converter {
         val factory
             get() = Factory()
         // 片方のトラックがN回以上、応答なしになったとき、もう片方のトラックに処理をまわす、そのNの定義（数は適当）
-        private const val MaxNoEffectedCount = 10
+        private const val MaxNoEffectedCount = 20
         // 両方のトラックが、デコーダーまでEOSになった後、NOPのまま待たされる時間の限界値
         private const val LimitOfPatience = 15*1000L        // 15秒
         private const val MaxRetryCount = 1000
@@ -286,10 +286,11 @@ class Converter {
      * ここからは、想像なのだけど、ビデオとオーディオの両方が揃うまで muxer が処理できず、バッファリングし続けているうちに、
      * バッファがいっぱいになって、トラックの読み込みや、変換結果の書き込み、変換結果の読みだし、のどこかで処理が止まってしまうのではありますまいか？
      * そこで、audio/videoトラックを均等に処理していくようにしてみたら、現象が回避された模様。
+     *
+     * このロジックだと、進捗が遅れているトラックで読み込みが止まると、もう片方も（処理可能であっても）止まってしまってしまう可能性があるので、
+     * MaxNoEffectedCount回（20回 <-- テキトー）に1回くらいは、もう片方に処理をまわしてみる。
      */
-    class TrackMediator(val muxer:Muxer, val videoTrack: VideoTrack, val audioTrack: AudioTrack?) {
-        companion object {
-        }
+    class TrackMediator(val muxer:Muxer, private val videoTrack: VideoTrack, private val audioTrack: AudioTrack?) {
         private var audioNoEffectedCount = 0
         private var videoNoEffectContext = 0
 
@@ -319,6 +320,10 @@ class Converter {
                 if(audioTrack==null||audioTrack.eos) {
                     // オーディオトラックがない、または、オーディオトラックがEOSに達しているなら、videoTrack一択
                     videoTrack
+                }
+                else if(videoTrack.eos) {
+                    // ビデオトラックがEOSに達している
+                    audioTrack
                 }
                 else if(videoTrack.convertedLength<=audioTrack.convertedLength) {
                     // ビデオトラックの処理がオーディオトラックより遅れている
@@ -373,58 +378,20 @@ class Converter {
         }
     }
 
-//    private fun CoroutineScope.next(tracks:TrackMediator):Boolean {
-//        // フォーマットが確定するまでは、両方を平行して進める
-//        if(!muxer.isReady) {
-//            // フォーマットが確定するまでは、入力がすべてバッファリングされるだけで、outputへの書き込みが発生しないため、
-//            // Track.convertedLength がゼロのままになるので、下のロジックだと、Video側だけが読み込まれてバッファーがオーバーフローする。
-//            val rv = if(!muxer.isVideoReady) {
-//                if(videoTrack.eos) {
-//                    throw IllegalStateException("unexpected eos in video track.")
-//                }
-//                videoTrack.next(muxer, this)
-//            } else false
-//            val ra = if(audioTrack!=null && !muxer.isAudioReady) {
-//                if(audioTrack.eos) {
-//                    throw IllegalStateException("unexpected eos in audio track.")
-//                }
-//                audioTrack.next(muxer, this)
-//            } else false
-//            return rv || ra
-//        }
+//    var aLetterForYou:String = ""
+//        private set
 //
-//        // video/audio両方のフォーマットが確定したら（isReadyになったら）、進捗（convertedLength）が同程度になるように調整する。
-//        return if(!videoTrack.eos && (audioTrack==null || audioTrack.eos || videoTrack.convertedLength<=audioTrack.convertedLength) || audioNoEffectedCount > maxAudioNoEffectedCount) {
-//            audioNoEffectedCount = 0
-//            videoTrack.next(muxer, this)
-//        } else if (audioTrack!=null && !audioTrack.eos) {
-//            audioTrack.next(muxer, this).also { effected ->
-//                if (effected) {
-//                    audioNoEffectedCount++
-//                } else {
-//                    audioNoEffectedCount = 0
-//                }
-//            }
+//    private fun sendALetterToYou(v:Boolean, a:Boolean) {
+//        if(v && a) {
+//            aLetterForYou = "video and audio tracks were forced to be finalized"
+//        } else if (v) {
+//            aLetterForYou = "video track was forced to be finalized"
+//        } else if (a) {
+//            aLetterForYou = "audio track was forced to be finalized"
 //        } else {
-//            logger.assert(videoTrack.eos && audioTrack?.eos ?: true)
-//            false
+//            aLetterForYou = "unexpected status."
 //        }
 //    }
-
-    var aLetterForYou:String = ""
-        private set
-
-    private fun sendALetterToYou(v:Boolean, a:Boolean) {
-        if(v && a) {
-            aLetterForYou = "video and audio tracks were forced to be finalized"
-        } else if (v) {
-            aLetterForYou = "video track was forced to be finalized"
-        } else if (a) {
-            aLetterForYou = "audio track was forced to be finalized"
-        } else {
-            aLetterForYou = "unexpected status."
-        }
-    }
 
     /**
      * コンバートを実行
@@ -474,9 +441,11 @@ class Converter {
                                     tick = System.currentTimeMillis()
                                 } else if (System.currentTimeMillis() - tick > LimitOfPatience && count > MaxRetryCount) {
                                     logger.info("decoders reached EOS but encoder not working ... forced to stop muxer")
-                                    val fv = videoTrack.encoder.forceEos(muxer)
-                                    val fa = audioTrack?.encoder?.forceEos(muxer)==true
-                                    sendALetterToYou(fv, fa)
+                                    videoTrack.encoder.forceEos(muxer)
+                                    audioTrack?.encoder?.forceEos(muxer)
+//                                    val fv = videoTrack.encoder.forceEos(muxer)
+//                                    val fa = audioTrack?.encoder?.forceEos(muxer)==true
+//                                    sendALetterToYou(fv, fa)
                                 }
 //                                throw TimeoutException("no response from transcoder.")
                             }

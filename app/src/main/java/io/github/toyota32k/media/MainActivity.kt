@@ -35,6 +35,7 @@ class MainViewModel(savedStateHandle: SavedStateHandle): ViewModel() {
     val message = MutableLiveData<String>("")
     var job: IAwaiter<ConvertResult>? = null
 
+    var repeat:Int = 0
     private fun onProgress(p: IProgress) {
         val percent = p.percentage
         val remain = p.remainingTime / 1000
@@ -42,22 +43,61 @@ class MainViewModel(savedStateHandle: SavedStateHandle): ViewModel() {
         val sec = remain % 60
         progress.value = if(percent>0) {
             if(remain>0) {
-                "$percent % (ramain = $min min $sec sec)"
+                "<$repeat> $percent % (ramain = $min min $sec sec)"
             } else {
-                "$percent %"
+                "<$repeat> $percent %"
             }
         } else {
             (p.current / 1000L).toString() + " ms"
         }
     }
 
+    /**
+     * コンバートを１００回繰り返す耐久テスト用
+     */
+    fun convert__(context:Context) {
+            if(job!=null) return
+            val input = inputUri.value ?: return
+            val output = outputUri.value ?: return
+            processing.value = true
+            message.value = "Processing..."
+
+            viewModelScope.launch {
+                for(i in 0..100) {
+                    repeat = i+1
+                    val result = Converter.factory
+                        .input(input, context)
+                        .output(output, context)
+                        .setProgressHandler(this@MainViewModel::onProgress)
+                        .trimmingStartFrom(trimStart.value ?: 0L)
+                        .trimmingEndTo(trimEnd.value ?: 0L)
+                        .executeAsync(viewModelScope).apply { job = this }
+                        .await()
+                    progress.value = ""
+                    job = null
+                    message.value = when {
+                        result.succeeded -> "Completed"
+                        result.cancelled -> "Cancelled"
+                        else -> result.errorMessage
+                    }
+                    if(!result.succeeded) {
+                        break
+                    }
+                }
+                processing.value = false
+            }
+    }
+
+    /**
+     * 普通のコンバートテスト用
+     */
     fun convert(context: Context) {
         if(job!=null) return
         val input = inputUri.value ?: return
         val output = outputUri.value ?: return
         processing.value = true
         message.value = "Processing..."
-
+        repeat = 1
         viewModelScope.launch {
             val result = Converter.factory
                 .input(input, context)
