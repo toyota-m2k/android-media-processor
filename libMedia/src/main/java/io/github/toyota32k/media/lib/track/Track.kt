@@ -62,6 +62,7 @@ abstract class Track(val extractor:Extractor, val inputFormat:MediaFormat?, val 
         if (encoder.chainTo(muxer)) {
             effected = true
         }
+//        logger.debug("$effected")
         return effected
     }
 

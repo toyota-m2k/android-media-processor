@@ -21,37 +21,46 @@ abstract class BaseEncoder(format: MediaFormat):BaseCodec(format) {
             val result: Int = encoder.dequeueOutputBuffer(bufferInfo, TIMEOUT_IMMEDIATE)
             when {
                 result == MediaCodec.INFO_TRY_AGAIN_LATER -> {
-//                    logger.debug("no sufficient data yet.")
+                    logger.verbose { "no sufficient data yet." }
                     return effected
                 }
                 result == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
                     logger.debug("input format changed.")
+                    effected = true
                     val actualFormat = encoder.outputFormat
                     muxer.setOutputFormat(sampleType, actualFormat)
                 }
                 result >= 0 -> {
+                    effected = true
                     if (bufferInfo.flags.and(MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
                         logger.debug("found end of stream.")
                         eos = true
                         bufferInfo.set(0, 0, 0, bufferInfo.flags)
                     }
-                    if (bufferInfo.flags and MediaCodec.BUFFER_FLAG_CODEC_CONFIG != 0) { // SPS or PPS, which should be passed by MediaFormat.
+                    else if (bufferInfo.flags.and(MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) { // SPS or PPS, which should be passed by MediaFormat.
                         logger.debug("codec config.")
                         encoder.releaseOutputBuffer(result, false)
                         continue
                     }
-//                    logger.debug("output:$result size=${bufferInfo.size}")
+                    logger.verbose {"output:$result size=${bufferInfo.size}"}
                     muxer.writeSampleData(sampleType, encoder.getOutputBuffer(result)!!, bufferInfo)
                     if(bufferInfo.presentationTimeUs>0) {
                         writtenPresentationTimeUs = bufferInfo.presentationTimeUs
                     }
                     encoder.releaseOutputBuffer(result, false)
-                    break
+                    return true
                 }
                 else -> {}
             }
-            effected = true
         }
-        return effected
+    }
+
+    fun forceEos(muxer:Muxer):Boolean {
+        return if(!eos) {
+            logger.debug("forced to set eos.")
+            eos = true
+            muxer.complete(sampleType)
+            true
+        } else false
     }
 }

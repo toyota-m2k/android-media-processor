@@ -9,15 +9,43 @@ class AudioDecoder(format: MediaFormat):BaseDecoder(format) {
     override val sampleType = Muxer.SampleType.Audio
 
     override fun chainTo(encoder: BaseEncoder) :Boolean {
-        return chainTo( { decodedFormat -> audioChannel.setActualDecodedFormat(decodedFormat, mediaFormat) }) inner@ { index, length, end, timeUs ->
-            if (length > 0 && trimmingRange.contains(timeUs)) {
-                audioChannel.drainDecoderBufferAndQueue(decoder, index, bufferInfo.presentationTimeUs)
-                audioChannel.feedEncoder(decoder, encoder.encoder, 0)
+        return if(!decoderEos) {
+            chainTo(
+                formatChanged = { decodedFormat ->
+                    audioChannel.setActualDecodedFormat(decodedFormat, mediaFormat)
+                },
+                dataConsumed = { index, length, end, timeUs ->
+                    if (length > 0 && trimmingRange.contains(timeUs)) {
+                        if(end) {
+                            logger.info("render end of data.")
+                        }
+                        audioChannel.drainDecoderBufferAndQueue(decoder, index, bufferInfo.presentationTimeUs)
+                        audioChannel.feedEncoder(decoder, encoder.encoder, 0)
+                    }
+                    if (end) {
+                        logger.debug("found eos")
+                        audioChannel.drainDecoderBufferAndQueue(decoder, AudioChannel.BUFFER_INDEX_END_OF_STREAM, 0)
+                        audioChannel.feedEncoder(decoder, encoder.encoder, 0)
+                        if(audioChannel.eos) {
+                            // 入力ストリームを AudioChannel に書き込んだ時点で、
+                            // AudioChannel もeosに達している（AudioChannelのバッファに未処理データがない）ので、
+                            // デコーダーが eos に達したと判断する。
+                            logger.debug("decoder complete (no more buffer in AudioChannel")
+                            eos = true
+                        }
+                    }
+                })
+        } else if (!eos) {
+            // デコーダーの入力（エクストラクターの出力）は eos に達しているが、AudioChannel のバッファにデータが残っている。
+            audioChannel.feedEncoder(decoder, encoder.encoder, 0).apply {
+                if(audioChannel.eos) {
+                    // AudioChannel も eos に達した。
+                    logger.debug("decoder complete (AudioChannel flushed")
+                    eos = true
+                }
             }
-            if (end) {
-                audioChannel.drainDecoderBufferAndQueue(decoder, AudioChannel.BUFFER_INDEX_END_OF_STREAM, 0)
-                audioChannel.feedEncoder(decoder, encoder.encoder, 0)
-            }
+        } else {
+            false
         }
     }
 }

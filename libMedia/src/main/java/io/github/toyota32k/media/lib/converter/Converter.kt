@@ -7,13 +7,13 @@ import io.github.toyota32k.media.lib.format.HD720VideoStrategy
 import io.github.toyota32k.media.lib.format.IAudioStrategy
 import io.github.toyota32k.media.lib.format.IVideoStrategy
 import io.github.toyota32k.media.lib.misc.RingBuffer
-import io.github.toyota32k.media.lib.track.*
+import io.github.toyota32k.media.lib.track.AudioTrack
+import io.github.toyota32k.media.lib.track.Muxer
+import io.github.toyota32k.media.lib.track.Track
+import io.github.toyota32k.media.lib.track.VideoTrack
 import io.github.toyota32k.media.lib.utils.UtLog
 import kotlinx.coroutines.*
 import java.io.File
-import java.lang.IllegalStateException
-import java.util.*
-import java.util.concurrent.TimeoutException
 import java.util.concurrent.atomic.AtomicBoolean
 import kotlin.math.max
 import kotlin.math.min
@@ -26,6 +26,11 @@ class Converter {
         val logger = UtLog("Converter", null, "io.github.toyota32k.")
         val factory
             get() = Factory()
+        // 片方のトラックがN回以上、応答なしになったとき、もう片方のトラックに処理をまわす、そのNの定義（数は適当）
+        private const val MaxNoEffectedCount = 20
+        // 両方のトラックが、デコーダーまでEOSになった後、NOPのまま待たされる時間の限界値
+        private const val LimitOfPatience = 15*1000L        // 15秒
+        private const val MaxRetryCount = 1000
     }
 
     lateinit var inPath:AndroidFile
@@ -117,8 +122,8 @@ class Converter {
             if(!converter::outPath.isInitialized) throw IllegalStateException("output file is not specified.")
 
             logger.info("### media converter information ###")
-            logger.info("input : $converter.input")
-            logger.info("output: $converter.output")
+            logger.info("input : ${converter.inPath}")
+            logger.info("output: ${converter.outPath}")
             logger.info("video strategy: ${converter.videoStrategy.javaClass.name}")
             logger.info("audio strategy: ${converter.audioStrategy.javaClass.name}")
 
@@ -128,7 +133,7 @@ class Converter {
                 converter.trimmingRange = TrimmingRange(trimStart,trimEnd)
             }
 
-            logger.info("delete output on error = $converter.deleteOutputOnError")
+            logger.info("delete output on error = ${converter.deleteOutputOnError}")
             if(converter.onProgress==null) {
                 logger.info("no progress handler")
             }
@@ -281,37 +286,112 @@ class Converter {
      * ここからは、想像なのだけど、ビデオとオーディオの両方が揃うまで muxer が処理できず、バッファリングし続けているうちに、
      * バッファがいっぱいになって、トラックの読み込みや、変換結果の書き込み、変換結果の読みだし、のどこかで処理が止まってしまうのではありますまいか？
      * そこで、audio/videoトラックを均等に処理していくようにしてみたら、現象が回避された模様。
+     *
+     * このロジックだと、進捗が遅れているトラックで読み込みが止まると、もう片方も（処理可能であっても）止まってしまってしまう可能性があるので、
+     * MaxNoEffectedCount回（20回 <-- テキトー）に1回くらいは、もう片方に処理をまわしてみる。
      */
-    private fun CoroutineScope.next(muxer:Muxer, videoTrack:VideoTrack, audioTrack:AudioTrack?):Boolean {
-        // フォーマットが確定するまでは、両方を平行して進める
-        if(!muxer.isReady) {
+    class TrackMediator(val muxer:Muxer, private val videoTrack: VideoTrack, private val audioTrack: AudioTrack?) {
+        private var audioNoEffectedCount = 0
+        private var videoNoEffectContext = 0
+
+        val eos:Boolean get() = videoTrack.eos && audioTrack?.eos?:true
+
+        private fun runUp(coroutineScope: CoroutineScope):Boolean {
             // フォーマットが確定するまでは、入力がすべてバッファリングされるだけで、outputへの書き込みが発生しないため、
-            // Track.convertedLength がゼロのままになるので、下のロジックだと、Video側だけが読み込まれてバッファーがオーバーフローする。
             val rv = if(!muxer.isVideoReady) {
                 if(videoTrack.eos) {
                     throw IllegalStateException("unexpected eos in video track.")
                 }
-                videoTrack.next(muxer, this)
+                videoTrack.next(muxer, coroutineScope)
             } else false
+
             val ra = if(audioTrack!=null && !muxer.isAudioReady) {
                 if(audioTrack.eos) {
                     throw IllegalStateException("unexpected eos in audio track.")
                 }
-                audioTrack.next(muxer, this)
+                audioTrack.next(muxer, coroutineScope)
             } else false
             return rv || ra
         }
 
-        // video/audio両方のフォーマットが確定したら（isReadyになったら）、進捗（convertedLength）が同程度になるように調整する。
-        return if(!videoTrack.eos && (audioTrack==null || audioTrack.eos || videoTrack.convertedLength<=audioTrack.convertedLength)) {
-            videoTrack.next(muxer, this)
-        } else if (audioTrack!=null && !audioTrack.eos) {
-            audioTrack.next(muxer, this)
-        } else {
-            logger.assert(videoTrack.eos && audioTrack?.eos ?: true)
-            false
+
+        private val nextTrack:Track
+            get() =
+                if(audioTrack==null||audioTrack.eos) {
+                    // オーディオトラックがない、または、オーディオトラックがEOSに達しているなら、videoTrack一択
+                    videoTrack
+                }
+                else if(videoTrack.eos) {
+                    // ビデオトラックがEOSに達している
+                    audioTrack
+                }
+                else if(videoTrack.convertedLength<=audioTrack.convertedLength) {
+                    // ビデオトラックの処理がオーディオトラックより遅れている
+                    if(videoNoEffectContext>MaxNoEffectedCount) {
+                        // N回以上、ビデオトラックから応答がなければ、オーディオトラックに処理をまわしてみる
+                        logger.debug {"no response from video track ($videoNoEffectContext) ... try audio track."}
+                        videoNoEffectContext = 0
+                        audioTrack
+                    } else {
+                        // 順当にビデオトラック
+                        videoTrack
+                    }
+                }
+                else {
+                    // オーディオトラックの処理がビデオトラックより遅れている
+                    if(audioNoEffectedCount>MaxNoEffectedCount) {
+                        // N回以上、オーディオトラックから応答がなければ、ビデオトラックに処理をまわしてみる。
+                        logger.debug {"no response from audio track ($audioNoEffectedCount)... try video track."}
+                        audioNoEffectedCount = 0
+                        videoTrack
+                    } else {
+                        audioTrack
+                    }
+                }
+
+        fun next(coroutineScope: CoroutineScope):Boolean {
+            // フォーマットが確定するまでは、両方を平行して進める
+            if(!muxer.isReady) {
+                return runUp(coroutineScope)
+            }
+            // フォーマットが確定したら、進捗度合いが同程度になるよう調停する。
+            val track = nextTrack
+            val result = track.next(muxer, coroutineScope)
+
+            // 応答なしカウンタのメンテナンス
+            if(track === videoTrack) {
+                if(result) {
+                    videoNoEffectContext = 0
+                } else {
+                    videoNoEffectContext++
+//                    logger.verbose("no response from video track ($videoNoEffectContext)")
+                }
+            } else {
+                if(result) {
+                    audioNoEffectedCount = 0
+                } else {
+                    audioNoEffectedCount++
+//                    logger.verbose("no response from audio track ($audioNoEffectedCount)")
+                }
+            }
+            return result
         }
     }
+
+//    var aLetterForYou:String = ""
+//        private set
+//
+//    private fun sendALetterToYou(v:Boolean, a:Boolean) {
+//        if(v && a) {
+//            aLetterForYou = "video and audio tracks were forced to be finalized"
+//        } else if (v) {
+//            aLetterForYou = "video track was forced to be finalized"
+//        } else if (a) {
+//            aLetterForYou = "audio track was forced to be finalized"
+//        } else {
+//            aLetterForYou = "unexpected status."
+//        }
+//    }
 
     /**
      * コンバートを実行
@@ -341,23 +421,33 @@ class Converter {
                     val progress = Progress.create(muxer.durationUs, trimmingRange, onProgress)
                     videoTrack.trimmingRange = trimmingRange
                     audioTrack?.trimmingRange = trimmingRange
-                    fun eos():Boolean = videoTrack.eos && audioTrack?.eos?:true
+//                    fun eos():Boolean = videoTrack.eos && audioTrack?.eos?:true
                     var tick = -1L
                     var count = 0
-                    while (!eos()) {
+                    val tracks = TrackMediator(muxer, videoTrack, audioTrack)
+                    while (!tracks.eos) {
                         if(!isActive) {
                             throw CancellationException("cancelled")
                         }
 
+
 //                        val ve = videoTrack.next(muxer, this)
 //                        val ae = audioTrack?.next(muxer, this) ?: false
 //                        if(!ve&&!ae) {
-                        if (!next(muxer, videoTrack, audioTrack)) {
-                            count++
-                            if (tick < 0) {
-                                tick = System.currentTimeMillis()
-                            } else if (System.currentTimeMillis() - tick > (3*60*1000) && count > 100_000) {
-                                // throw TimeoutException("no response from transcoder.")
+                        if (!tracks.next(this)) {
+                            if(videoTrack.decoder.eos && audioTrack?.decoder?.eos != false) {
+                                count++
+                                if (tick < 0) {
+                                    tick = System.currentTimeMillis()
+                                } else if (System.currentTimeMillis() - tick > LimitOfPatience && count > MaxRetryCount) {
+                                    logger.info("decoders reached EOS but encoder not working ... forced to stop muxer")
+                                    videoTrack.encoder.forceEos(muxer)
+                                    audioTrack?.encoder?.forceEos(muxer)
+//                                    val fv = videoTrack.encoder.forceEos(muxer)
+//                                    val fa = audioTrack?.encoder?.forceEos(muxer)==true
+//                                    sendALetterToYou(fv, fa)
+                                }
+//                                throw TimeoutException("no response from transcoder.")
                             }
                         } else {
                             tick = -1

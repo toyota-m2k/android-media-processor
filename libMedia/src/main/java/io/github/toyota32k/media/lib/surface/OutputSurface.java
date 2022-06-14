@@ -60,20 +60,23 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
         }
         eglSetup(width, height);
         makeCurrent();
-        setup();
+        setup(this);
     }
     /**
      * Creates an OutputSurface using the current EGL context (rather than establishing a
      * new one).  Creates a Surface that can be passed to MediaCodec.configure().
      */
     public OutputSurface() {
-        setup();
+        setup(this);
+    }
+    public OutputSurface(final SurfaceTexture.OnFrameAvailableListener listener) {
+        setup(listener);
     }
     /**
      * Creates instances of TextureRender and SurfaceTexture, and a Surface associated
      * with the SurfaceTexture.
      */
-    private void setup() {
+    private void setup(SurfaceTexture.OnFrameAvailableListener listener) {
         mTextureRender = new TextureRender();
         mTextureRender.surfaceCreated();
         // Even if we don't access the SurfaceTexture after the constructor returns, we
@@ -93,7 +96,7 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
         //
         // Java language note: passing "this" out of a constructor is generally unwise,
         // but we should be able to get away with it here.
-        mSurfaceTexture.setOnFrameAvailableListener(this);
+        mSurfaceTexture.setOnFrameAvailableListener(listener);
         mSurface = new Surface(mSurfaceTexture);
     }
     /**
@@ -196,7 +199,7 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
      * data is available.
      */
     public void awaitNewImage() {
-        final int TIMEOUT_MS = 10000;
+        final int TIMEOUT_MS = 2000;
         synchronized (mFrameSyncObject) {
             while (!mFrameAvailable) {
                 try {
@@ -250,6 +253,10 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
      */
     public void drawImage() {
         mTextureRender.drawFrame(mSurfaceTexture);
+    }
+    public void latchImage() {
+        mTextureRender.checkGlError("before updateTexImage");
+        mSurfaceTexture.updateTexImage();
     }
     @Override
     public void onFrameAvailable(SurfaceTexture st) {
