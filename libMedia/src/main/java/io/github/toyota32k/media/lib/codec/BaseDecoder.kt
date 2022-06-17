@@ -45,7 +45,11 @@ abstract class BaseDecoder(format: MediaFormat):BaseCodec(format) {
                     formatChanged?.invoke(decoder.outputFormat)
                 }
                 else -> {
-                    logger.error("unknown index ($index)")
+                    if(index == -3) {
+                        logger.debug("BUFFERS_CHANGED ... ignorable.")
+                    } else {
+                        logger.error("unknown index ($index)")
+                    }
                 }
             }
             effected = true

@@ -4,6 +4,7 @@ import android.media.MediaFormat
 import io.github.toyota32k.media.lib.codec.VideoDecoder
 import io.github.toyota32k.media.lib.codec.VideoEncoder
 import io.github.toyota32k.media.lib.converter.AndroidFile
+import io.github.toyota32k.media.lib.converter.Converter
 import io.github.toyota32k.media.lib.extractor.Extractor
 import io.github.toyota32k.media.lib.format.IVideoStrategy
 import io.github.toyota32k.media.lib.misc.MediaConstants
@@ -23,7 +24,7 @@ class VideoTrack
             val extractor = Extractor(inPath)
             val trackIdx = findTrackIdx(extractor.extractor, "video")
             if (trackIdx < 0) {
-                UtLog("Track(Video)", null, "io.github.toyota32k.").info("no video truck")
+                UtLog("Track(Video)", Converter.logger, ).info("no video truck")
                 throw UnsupportedOperationException("no video track")
             }
             val inputFormat = getMediaFormat(extractor.extractor, trackIdx)

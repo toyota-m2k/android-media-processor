@@ -39,7 +39,7 @@ class UtLog @JvmOverloads constructor(val tag:String, val parent:UtLog?=null, va
 //            }
 //        }
 
-        val libLogger:UtLog by lazy { UtLog("libUtils") }
+//        val libLogger:UtLog by lazy { UtLog("libUtils") }
 
         var logLevel:Int = Log.DEBUG    // Log.VERBOSE
     }
@@ -76,13 +76,13 @@ class UtLog @JvmOverloads constructor(val tag:String, val parent:UtLog?=null, va
             message ?: ""
         }
     }
-    @JvmOverloads
-    fun verbose(msg: String?=null) {
+    private fun verbose(msg: String?=null) {
         logger.verbose(compose(msg))
     }
+
     fun verbose(fn:()->String) {
-        if(logLevel>=Log.VERBOSE) {
-            verbose(fn())
+        if(logLevel<=Log.VERBOSE) {
+            logger.verbose(compose(fn()))
         }
     }
 
@@ -92,8 +92,8 @@ class UtLog @JvmOverloads constructor(val tag:String, val parent:UtLog?=null, va
         logger.debug(compose(msg))
     }
     fun debug(fn:()->String) {
-        if(logLevel>=Log.DEBUG) {
-            debug(fn())
+        if(logLevel<=Log.DEBUG) {
+            logger.debug(compose(fn()))
         }
     }
 
@@ -120,7 +120,7 @@ class UtLog @JvmOverloads constructor(val tag:String, val parent:UtLog?=null, va
     @JvmOverloads
     fun assert(chk:Boolean, msg:String?=null) {
         if(!chk) {
-            stackTrace(Exception("assertion failed."), msg)
+            logger.stackTrace(Exception("assertion failed."), compose(msg))
         }
     }
 

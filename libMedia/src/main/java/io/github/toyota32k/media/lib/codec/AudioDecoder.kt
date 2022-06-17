@@ -40,7 +40,7 @@ class AudioDecoder(format: MediaFormat):BaseDecoder(format) {
             audioChannel.feedEncoder(decoder, encoder.encoder, 0).apply {
                 if(audioChannel.eos) {
                     // AudioChannel も eos に達した。
-                    logger.debug("decoder complete (AudioChannel flushed")
+                    logger.debug("decoder complete (AudioChannel flushed)")
                     eos = true
                 }
             }

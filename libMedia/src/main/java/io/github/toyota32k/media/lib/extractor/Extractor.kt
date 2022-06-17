@@ -6,6 +6,7 @@ import android.media.MediaFormat
 import io.github.toyota32k.media.lib.codec.BaseCodec
 import io.github.toyota32k.media.lib.codec.BaseDecoder
 import io.github.toyota32k.media.lib.converter.AndroidFile
+import io.github.toyota32k.media.lib.converter.Converter
 import io.github.toyota32k.media.lib.track.Muxer
 import io.github.toyota32k.media.lib.converter.TrimmingRange
 import io.github.toyota32k.media.lib.utils.IUtExternalLogger
@@ -35,7 +36,7 @@ class Extractor(inPath: AndroidFile) : Closeable {
         }
 
     fun selectTrack(idx:Int, type: Muxer.SampleType) {
-        logger = UtLog("Extractor($type)", null, "io.github.toyota32k.")
+        logger = UtLog("Extractor($type)", Converter.logger)
         trackIdx = idx
         extractor.selectTrack(idx)
     }

@@ -2,6 +2,7 @@ package io.github.toyota32k.media.lib.codec
 
 import android.media.MediaCodec
 import android.media.MediaFormat
+import io.github.toyota32k.media.lib.converter.Converter
 import io.github.toyota32k.media.lib.track.Muxer
 import io.github.toyota32k.media.lib.utils.UtLog
 import java.io.Closeable
@@ -27,7 +28,7 @@ abstract class BaseCodec(val mediaFormat:MediaFormat) : Closeable {
     }
 
     fun start() {
-        logger = UtLog(name, null, "io.github.toyota32k.")
+        logger = UtLog(name, Converter.logger)
         configure()
         mediaCodec.start()
     }

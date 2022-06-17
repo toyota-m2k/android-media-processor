@@ -23,7 +23,7 @@ import kotlin.math.min
  */
 class Converter {
     companion object {
-        val logger = UtLog("Converter", null, "io.github.toyota32k.")
+        val logger = UtLog("AMP", null, "io.github.toyota32k.media.lib.")
         val factory
             get() = Factory()
         // 片方のトラックがN回以上、応答なしになったとき、もう片方のトラックに処理をまわす、そのNの定義（数は適当）
@@ -48,7 +48,7 @@ class Converter {
     @Suppress("unused", "MemberVisibilityCanBePrivate")
     class Factory {
         companion object {
-            val logger = UtLog("Factory", Converter.logger, Converter.logger.omissionNamespace)
+            val logger = UtLog("Factory", Converter.logger)
         }
         private val converter = Converter()
         private var trimStart:Long = 0L

@@ -4,6 +4,7 @@ import android.media.MediaExtractor
 import android.media.MediaFormat
 import io.github.toyota32k.media.lib.codec.BaseDecoder
 import io.github.toyota32k.media.lib.codec.BaseEncoder
+import io.github.toyota32k.media.lib.converter.Converter
 import io.github.toyota32k.media.lib.extractor.Extractor
 import io.github.toyota32k.media.lib.converter.TrimmingRange
 import io.github.toyota32k.media.lib.misc.check
@@ -15,7 +16,7 @@ abstract class Track(val extractor:Extractor, val inputFormat:MediaFormat?, val 
     val logger:UtLog
     init {
         extractor.selectTrack(trackIdx, type)
-        logger = UtLog("Track($type)", null, "io.github.toyota32k.")
+        logger = UtLog("Track($type)", Converter.logger)
     }
     companion object {
         fun findTrackIdx(extractor: MediaExtractor, type: String): Int {

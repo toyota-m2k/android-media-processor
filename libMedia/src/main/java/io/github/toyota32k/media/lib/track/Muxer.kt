@@ -5,6 +5,7 @@ import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
 import android.media.MediaMuxer
 import io.github.toyota32k.media.lib.converter.AndroidFile
+import io.github.toyota32k.media.lib.converter.Converter
 import io.github.toyota32k.media.lib.misc.ISO6709LocationParser
 import io.github.toyota32k.media.lib.utils.UtLog
 import java.io.Closeable
@@ -14,7 +15,7 @@ import java.nio.ByteOrder
 
 class Muxer(inPath:AndroidFile, outPath: AndroidFile, val hasAudio:Boolean): Closeable {
     companion object {
-        val logger = UtLog("Muxer", null, "io.github.toyota32k.")
+        val logger = UtLog("Muxer", Converter.logger)
         const val BUFFER_SIZE = 64 * 1024
     }
 
