@@ -7,7 +7,7 @@ data class TrimmingRange(val startUs:Long = 0L, val endUs:Long = 0L) {
     val hasStart = startUs>0L
     val hasEnd = endUs>0L
     val hasAny = hasStart||hasEnd
-    val isEmpty = !hasEnd
+    val isEmpty = !hasAny
 
     fun checkStart(timeUs:Long):Boolean {
         return startUs==0L || startUs <= timeUs
