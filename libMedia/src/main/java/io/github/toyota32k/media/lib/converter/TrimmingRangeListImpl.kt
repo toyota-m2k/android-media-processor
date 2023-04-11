@@ -13,7 +13,7 @@ class TrimmingRangeListImpl : ITrimmingRangeList {
 
     fun addRange(startUs:Long, endUs:Long) {
         val s =  list.firstOrNull()?.startUs ?: 0L
-        val e =  list.lastOrNull()?.startUs ?: 0L
+        val e =  list.lastOrNull()?.endUs ?: 0L
 
         if(list.isNotEmpty() && e==0L) {
             throw IllegalStateException("previous range is not terminated.")
