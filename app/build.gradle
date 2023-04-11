@@ -4,12 +4,12 @@ plugins {
 }
 
 android {
-    compileSdk 31
+    compileSdk 33
 
     defaultConfig {
         applicationId "io.github.toyota32k.media"
         minSdk 23
-        targetSdk 31
+        targetSdk 33
         versionCode 1
         versionName "1.0"
 
@@ -31,7 +31,7 @@ android {
     }
     kotlinOptions {
         jvmTarget = '1.8'
-        useIR = true
+//        useIR = true
     }
     buildFeatures {
         compose true

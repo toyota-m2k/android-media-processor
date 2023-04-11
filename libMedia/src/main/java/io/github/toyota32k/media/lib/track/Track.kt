@@ -5,6 +5,7 @@ import android.media.MediaFormat
 import io.github.toyota32k.media.lib.codec.BaseDecoder
 import io.github.toyota32k.media.lib.codec.BaseEncoder
 import io.github.toyota32k.media.lib.converter.Converter
+import io.github.toyota32k.media.lib.converter.ITrimmingRangeList
 import io.github.toyota32k.media.lib.extractor.Extractor
 import io.github.toyota32k.media.lib.converter.TrimmingRange
 import io.github.toyota32k.media.lib.misc.check
@@ -37,11 +38,11 @@ abstract class Track(val extractor:Extractor, val inputFormat:MediaFormat?, val 
     abstract val decoder: BaseDecoder
     abstract val encoder: BaseEncoder
 
-    var trimmingRange: TrimmingRange
-        get() = extractor.trimmingRange
+    var trimmingRangeList: ITrimmingRangeList
+        get() = extractor.trimmingRangeList
         set(v) {
-            extractor.trimmingRange = v
-            decoder.trimmingRange = v
+            extractor.trimmingRangeList = v
+//            decoder.trimmingRangeList = v
         }
 
     val eos

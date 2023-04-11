@@ -20,6 +20,8 @@ import io.github.toyota32k.media.lib.converter.ConvertResult
 import io.github.toyota32k.media.lib.converter.Converter
 import io.github.toyota32k.media.lib.converter.IAwaiter
 import io.github.toyota32k.media.lib.converter.IProgress
+import io.github.toyota32k.media.lib.format.NoConvertAudioStrategy
+import io.github.toyota32k.media.lib.format.NoConvertVideoStrategy
 import io.github.toyota32k.media.lib.utils.UtLog
 import io.github.toyota32k.media.ui.theme.AndroidMediaProcessorTheme
 import kotlinx.coroutines.launch
@@ -69,8 +71,8 @@ class MainViewModel(savedStateHandle: SavedStateHandle): ViewModel() {
                         .input(input, context)
                         .output(output, context)
                         .setProgressHandler(this@MainViewModel::onProgress)
-                        .trimmingStartFrom(trimStart.value ?: 0L)
-                        .trimmingEndTo(trimEnd.value ?: 0L)
+//                        .trimmingStartFrom(trimStart.value ?: 0L)
+//                        .trimmingEndTo(trimEnd.value ?: 0L)
                         .executeAsync(viewModelScope).apply { job = this }
                         .await()
                     progress.value = ""
@@ -103,8 +105,12 @@ class MainViewModel(savedStateHandle: SavedStateHandle): ViewModel() {
                 .input(input, context)
                 .output(output, context)
                 .setProgressHandler(this@MainViewModel::onProgress)
-                .trimmingStartFrom(trimStart.value?:0L)
-                .trimmingEndTo(trimEnd.value?:0L)
+                .addTrimmingRange(1000L, 4000L)
+                .addTrimmingRange(28000L, 30000L)
+                .audioStrategy(NoConvertAudioStrategy)
+                .videoStrategy(NoConvertVideoStrategy)
+//                .trimmingStartFrom(trimStart.value?:0L)
+//                .trimmingEndTo(trimEnd.value?:0L)
                 .executeAsync(viewModelScope).apply { job = this }
                 .await()
             processing.value = false
