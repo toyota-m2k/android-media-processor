@@ -34,3 +34,16 @@ fun MediaFormat.getText(name: String, defaultValue: String): String {
     }
 }
 
+fun MediaFormat.summary( msg:String="", logger:UtLog=IStrategy.logger) {
+    logger.info("---------------------------------------------------")
+    logger.info("MediaFormat Summary ... $msg")
+    logger.info("- Type           ${getText(MediaFormat.KEY_MIME, "n/a")}")
+    logger.info("- Width          ${getInt(MediaFormat.KEY_WIDTH, 0)}")
+    logger.info("- Height         ${getInt(MediaFormat.KEY_HEIGHT, 0)}")
+    logger.info("- BitRate        ${getInt(MediaFormat.KEY_BIT_RATE, 0)}")
+    logger.info("- FrameRate      ${getInt(MediaFormat.KEY_FRAME_RATE, 0)}")
+    logger.info("- iFrameInterval ${getInt(MediaFormat.KEY_I_FRAME_INTERVAL, 0)}")
+    logger.info("- colorFormat    ${String.format("0x%x",getInt(MediaFormat.KEY_COLOR_FORMAT, 0))}")
+    logger.info("---------------------------------------------------")
+}
+

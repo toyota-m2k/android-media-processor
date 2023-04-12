@@ -45,6 +45,10 @@ object HD720VideoStrategy : IVideoStrategy {
         format.setInteger(MediaFormat.KEY_FRAME_RATE, outputFrameRate)
         format.setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, iFrameInterval)
         format.setInteger(MediaFormat.KEY_COLOR_FORMAT, MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface)
+
+        inputFormat.summary("input")
+        format.summary("output")
+
         return format
     }
 }
