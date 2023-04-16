@@ -20,8 +20,8 @@ import io.github.toyota32k.media.lib.converter.ConvertResult
 import io.github.toyota32k.media.lib.converter.Converter
 import io.github.toyota32k.media.lib.converter.IAwaiter
 import io.github.toyota32k.media.lib.converter.IProgress
-import io.github.toyota32k.media.lib.format.NoConvertAudioStrategy
-import io.github.toyota32k.media.lib.format.NoConvertVideoStrategy
+import io.github.toyota32k.media.lib.strategy.PresetAudioStrategies
+import io.github.toyota32k.media.lib.strategy.PresetVideoStrategies
 import io.github.toyota32k.media.lib.utils.UtLog
 import io.github.toyota32k.media.ui.theme.AndroidMediaProcessorTheme
 import kotlinx.coroutines.launch
@@ -105,12 +105,10 @@ class MainViewModel(savedStateHandle: SavedStateHandle): ViewModel() {
                 .input(input, context)
                 .output(output, context)
                 .setProgressHandler(this@MainViewModel::onProgress)
-                .addTrimmingRange(1000L, 4000L)
-                .addTrimmingRange(28000L, 30000L)
-                .audioStrategy(NoConvertAudioStrategy)
-                .videoStrategy(NoConvertVideoStrategy)
-//                .trimmingStartFrom(trimStart.value?:0L)
-//                .trimmingEndTo(trimEnd.value?:0L)
+                .audioStrategy(PresetAudioStrategies.AACDefault)
+                .videoStrategy(PresetVideoStrategies.AVC1080Profile)
+                .trimmingStartFrom(trimStart.value?:0L)
+                .trimmingEndTo(trimEnd.value?:0L)
                 .executeAsync(viewModelScope).apply { job = this }
                 .await()
             processing.value = false

@@ -2,11 +2,11 @@ package io.github.toyota32k.media.lib.converter
 
 import android.content.Context
 import android.net.Uri
-import io.github.toyota32k.media.lib.format.DefaultAudioStrategy
-import io.github.toyota32k.media.lib.format.HD720VideoStrategy
-import io.github.toyota32k.media.lib.format.IAudioStrategy
-import io.github.toyota32k.media.lib.format.IVideoStrategy
 import io.github.toyota32k.media.lib.misc.RingBuffer
+import io.github.toyota32k.media.lib.strategy.IAudioStrategy
+import io.github.toyota32k.media.lib.strategy.IVideoStrategy
+import io.github.toyota32k.media.lib.strategy.PresetAudioStrategies
+import io.github.toyota32k.media.lib.strategy.PresetVideoStrategies
 import io.github.toyota32k.media.lib.track.AudioTrack
 import io.github.toyota32k.media.lib.track.Muxer
 import io.github.toyota32k.media.lib.track.Track
@@ -36,8 +36,8 @@ class Converter {
     lateinit var inPath:AndroidFile
     lateinit var outPath: AndroidFile
 
-    var videoStrategy:IVideoStrategy=HD720VideoStrategy
-    var audioStrategy:IAudioStrategy=DefaultAudioStrategy
+    var videoStrategy: IVideoStrategy = PresetVideoStrategies.AVC720Profile
+    var audioStrategy:IAudioStrategy=PresetAudioStrategies.AACDefault
     var trimmingRangeList : ITrimmingRangeList = ITrimmingRangeList.empty() // TrimmingRange.Empty
     var deleteOutputOnError:Boolean = true
     var onProgress : ((IProgress)->Unit)? = null
@@ -51,9 +51,11 @@ class Converter {
             val logger = UtLog("Factory", Converter.logger)
         }
         private val converter = Converter()
-//        private var trimStart:Long = 0L
-//        private var trimEnd:Long = 0L
         private val trimmingRangeList = TrimmingRangeListImpl()
+
+        // for backward compatibility only
+        private var trimStart:Long = 0L
+        private var trimEnd:Long = 0L
 
         fun input(path: File): Factory {
             converter.inPath = AndroidFile(path)
@@ -89,7 +91,7 @@ class Converter {
             converter.videoStrategy = s
             return this
         }
-        fun audioStrategy(s:IAudioStrategy):Factory {
+        fun audioStrategy(s: IAudioStrategy):Factory {
             converter.audioStrategy = s
             return this
         }
@@ -108,19 +110,19 @@ class Converter {
             return this
         }
 
-//        fun trimmingStartFrom(timeMs:Long):Factory {
-//            if(timeMs>0) {
-//                trimStart = timeMs * 1000L
-//            }
-//            return this
-//        }
-//
-//        fun trimmingEndTo(timeMs:Long):Factory {
-//            if(timeMs>0) {
-//                trimEnd = timeMs * 1000L
-//            }
-//            return this
-//        }
+        fun trimmingStartFrom(timeMs:Long):Factory {
+            if(timeMs>0) {
+                trimStart = timeMs * 1000L
+            }
+            return this
+        }
+
+        fun trimmingEndTo(timeMs:Long):Factory {
+            if(timeMs>0) {
+                trimEnd = timeMs * 1000L
+            }
+            return this
+        }
 
         fun setProgressHandler(proc:(IProgress)->Unit):Factory {
             converter.onProgress = proc
@@ -141,6 +143,10 @@ class Converter {
             logger.info("output: ${converter.outPath}")
             logger.info("video strategy: ${converter.videoStrategy.javaClass.name}")
             logger.info("audio strategy: ${converter.audioStrategy.javaClass.name}")
+
+            if(trimmingRangeList.isEmpty && (trimStart>0 || trimEnd>0)) {
+                trimmingRangeList.addRange(trimStart, trimEnd)
+            }
 
             if(trimmingRangeList.isNotEmpty) {
 //                logger.info("trimming start: ${trimStart / 1000} ms")

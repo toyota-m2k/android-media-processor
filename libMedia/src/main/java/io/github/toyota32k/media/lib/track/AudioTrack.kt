@@ -8,8 +8,7 @@ import io.github.toyota32k.media.lib.codec.AudioEncoder
 import io.github.toyota32k.media.lib.converter.AndroidFile
 import io.github.toyota32k.media.lib.converter.Converter
 import io.github.toyota32k.media.lib.extractor.Extractor
-import io.github.toyota32k.media.lib.format.DefaultAudioStrategy
-import io.github.toyota32k.media.lib.format.IAudioStrategy
+import io.github.toyota32k.media.lib.strategy.IAudioStrategy
 import io.github.toyota32k.media.lib.utils.UtLog
 
 class AudioTrack
@@ -27,8 +26,9 @@ private constructor(extractor: Extractor, inputFormat:MediaFormat, outputFormat:
                 return null
             }
             val inputFormat = getMediaFormat(extractor.extractor, trackIdx)
-            val output = strategy.createEncoder(inputFormat)
-            return AudioTrack(extractor, inputFormat, output.format, output.codec, trackIdx)
+            val encoder = strategy.createEncoder()
+            val outputFormat = strategy.createOutputFormat(inputFormat)
+            return AudioTrack(extractor, inputFormat, outputFormat, encoder, trackIdx)
         }
     }
 }

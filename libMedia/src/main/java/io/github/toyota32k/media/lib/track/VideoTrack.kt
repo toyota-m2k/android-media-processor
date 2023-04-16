@@ -7,8 +7,8 @@ import io.github.toyota32k.media.lib.codec.VideoEncoder
 import io.github.toyota32k.media.lib.converter.AndroidFile
 import io.github.toyota32k.media.lib.converter.Converter
 import io.github.toyota32k.media.lib.extractor.Extractor
-import io.github.toyota32k.media.lib.format.IVideoStrategy
 import io.github.toyota32k.media.lib.misc.MediaConstants
+import io.github.toyota32k.media.lib.strategy.IVideoStrategy
 import io.github.toyota32k.media.lib.utils.UtLog
 import java.lang.UnsupportedOperationException
 
@@ -34,8 +34,9 @@ class VideoTrack
                 // refer: https://android.googlesource.com/platform/frameworks/av/+blame/lollipop-release/media/libstagefright/Utils.cpp
                 inputFormat.setInteger(MediaConstants.KEY_ROTATION_DEGREES, 0)
             }
-            val output = strategy.createEncoder(inputFormat)
-            return VideoTrack(extractor, inputFormat, output.format, output.codec, trackIdx)
+            val encoder = strategy.createEncoder()
+            val outputFormat = strategy.createOutputFormat(inputFormat)
+            return VideoTrack(extractor, inputFormat, outputFormat, encoder, trackIdx)
         }
     }
 }
