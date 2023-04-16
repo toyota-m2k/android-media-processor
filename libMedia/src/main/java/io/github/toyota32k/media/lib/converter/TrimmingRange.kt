@@ -7,7 +7,12 @@ data class TrimmingRange(val startUs:Long = 0L, val endUs:Long = 0L) {
     val hasStart = startUs>0L
     val hasEnd = endUs>0L
     val hasAny = hasStart||hasEnd
-    val isEmpty = !hasEnd
+    val isEmpty = !hasAny
+    var naturalDurationUs:Long = -1L
+
+    fun closeBy(naturalDurationUs: Long) {
+        this.naturalDurationUs = naturalDurationUs
+    }
 
     fun checkStart(timeUs:Long):Boolean {
         return startUs==0L || startUs <= timeUs
@@ -19,6 +24,15 @@ data class TrimmingRange(val startUs:Long = 0L, val endUs:Long = 0L) {
     fun contains(timeUs:Long):Boolean {
         return checkStart(timeUs) && checkEnd(timeUs)
     }
+
+    val actualEndUs :Long
+        get() {
+            if(naturalDurationUs<0L) throw java.lang.IllegalStateException("call closeBy() first.")
+            return if (endUs == 0L) naturalDurationUs else endUs
+        }
+
+    val durationUs:Long
+        get() = actualEndUs - startUs
 
     companion object {
         val Empty = TrimmingRange()

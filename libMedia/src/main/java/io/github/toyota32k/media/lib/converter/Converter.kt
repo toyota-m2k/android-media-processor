@@ -2,11 +2,11 @@ package io.github.toyota32k.media.lib.converter
 
 import android.content.Context
 import android.net.Uri
-import io.github.toyota32k.media.lib.format.DefaultAudioStrategy
-import io.github.toyota32k.media.lib.format.HD720VideoStrategy
-import io.github.toyota32k.media.lib.format.IAudioStrategy
-import io.github.toyota32k.media.lib.format.IVideoStrategy
 import io.github.toyota32k.media.lib.misc.RingBuffer
+import io.github.toyota32k.media.lib.strategy.IAudioStrategy
+import io.github.toyota32k.media.lib.strategy.IVideoStrategy
+import io.github.toyota32k.media.lib.strategy.PresetAudioStrategies
+import io.github.toyota32k.media.lib.strategy.PresetVideoStrategies
 import io.github.toyota32k.media.lib.track.AudioTrack
 import io.github.toyota32k.media.lib.track.Muxer
 import io.github.toyota32k.media.lib.track.Track
@@ -36,9 +36,9 @@ class Converter {
     lateinit var inPath:AndroidFile
     lateinit var outPath: AndroidFile
 
-    var videoStrategy:IVideoStrategy=HD720VideoStrategy
-    var audioStrategy:IAudioStrategy=DefaultAudioStrategy
-    var trimmingRange = TrimmingRange.Empty
+    var videoStrategy: IVideoStrategy = PresetVideoStrategies.AVC720Profile
+    var audioStrategy:IAudioStrategy=PresetAudioStrategies.AACDefault
+    var trimmingRangeList : ITrimmingRangeList = ITrimmingRangeList.empty() // TrimmingRange.Empty
     var deleteOutputOnError:Boolean = true
     var onProgress : ((IProgress)->Unit)? = null
 
@@ -51,6 +51,9 @@ class Converter {
             val logger = UtLog("Factory", Converter.logger)
         }
         private val converter = Converter()
+        private val trimmingRangeList = TrimmingRangeListImpl()
+
+        // for backward compatibility only
         private var trimStart:Long = 0L
         private var trimEnd:Long = 0L
 
@@ -88,8 +91,22 @@ class Converter {
             converter.videoStrategy = s
             return this
         }
-        fun audioStrategy(s:IAudioStrategy):Factory {
+        fun audioStrategy(s: IAudioStrategy):Factory {
             converter.audioStrategy = s
+            return this
+        }
+
+        fun addTrimmingRange(startMs:Long, endMs:Long):Factory {
+            trimmingRangeList.addRange(startMs*1000, endMs*1000)
+            return this
+        }
+
+        data class RangeMs(val startMs:Long, val endMs:Long)
+
+        fun addTrimmingRanges(vararg ranges:RangeMs):Factory {
+            ranges.forEach {
+                addTrimmingRange(it.startMs, it.endMs)
+            }
             return this
         }
 
@@ -127,10 +144,14 @@ class Converter {
             logger.info("video strategy: ${converter.videoStrategy.javaClass.name}")
             logger.info("audio strategy: ${converter.audioStrategy.javaClass.name}")
 
-            if(trimStart>0||trimEnd>0) {
-                logger.info("trimming start: ${trimStart / 1000} ms")
-                logger.info("trimming end  : ${trimEnd / 1000} ms")
-                converter.trimmingRange = TrimmingRange(trimStart,trimEnd)
+            if(trimmingRangeList.isEmpty && (trimStart>0 || trimEnd>0)) {
+                trimmingRangeList.addRange(trimStart, trimEnd)
+            }
+
+            if(trimmingRangeList.isNotEmpty) {
+//                logger.info("trimming start: ${trimStart / 1000} ms")
+//                logger.info("trimming end  : ${trimEnd / 1000} ms")
+                converter.trimmingRangeList = trimmingRangeList
             }
 
             logger.info("delete output on error = ${converter.deleteOutputOnError}")
@@ -171,11 +192,11 @@ class Converter {
     /**
      * IProgress(進捗報告i/f)の実装クラス
      */
-    private class Progress(val durationUs:Long, val trimmingRange: TrimmingRange, val onProgress:(IProgress)->Unit): IProgress {
+    private class Progress(val trimmingRangeList: ITrimmingRangeList, val onProgress:(IProgress)->Unit): IProgress {
         companion object {
             const val ENTRY_COUNT = 10
-            fun create(durationUs: Long, trimmingRange: TrimmingRange, onProgress:((IProgress)->Unit)?):Progress? {
-                return if(onProgress!=null) Progress(durationUs, trimmingRange, onProgress) else null
+            fun create(trimmingRangeList: ITrimmingRangeList, onProgress:((IProgress)->Unit)?):Progress? {
+                return if(onProgress!=null) Progress(trimmingRangeList, onProgress) else null
             }
         }
         private data class DealtEntry(val position:Long, val tick:Long)
@@ -215,7 +236,7 @@ class Converter {
             set(v) {
                 if (field < v) {
                     field = v
-                    val pos = v - trimmingRange.startUs
+                    val pos = v // trimmingRangeList.getPositionInTrimmedDuration(v)
                     val dur = total
                     if(dur>0) {
                         val p = max(0, min(100, (pos * 100L / total).toInt()))
@@ -244,13 +265,9 @@ class Converter {
         override var percentage: Int = 0
             private set
         override val total: Long
-            get() = when {
-                    trimmingRange.hasEnd-> trimmingRange.endUs - trimmingRange.startUs
-                    trimmingRange.hasStart-> durationUs-trimmingRange.startUs
-                    else->durationUs
-                }
+            get() = trimmingRangeList.trimmedDurationUs
         override val current: Long
-            get() = progressInUs - trimmingRange.startUs
+            get() = progressInUs
     }
 
     /**
@@ -418,9 +435,10 @@ class Converter {
                 AudioTrack.create(inPath, audioStrategy).use { audioTrack->
                 VideoTrack.create(inPath, videoStrategy).use { videoTrack->
                 Muxer(inPath, outPath, audioTrack!=null).use { muxer->
-                    val progress = Progress.create(muxer.durationUs, trimmingRange, onProgress)
-                    videoTrack.trimmingRange = trimmingRange
-                    audioTrack?.trimmingRange = trimmingRange
+                    trimmingRangeList.closeBy(muxer.durationUs)
+                    val progress = Progress.create(trimmingRangeList, onProgress)
+                    videoTrack.trimmingRangeList = trimmingRangeList
+                    audioTrack?.trimmingRangeList = trimmingRangeList
 //                    fun eos():Boolean = videoTrack.eos && audioTrack?.eos?:true
                     var tick = -1L
                     var count = 0

@@ -14,8 +14,8 @@ class AudioDecoder(format: MediaFormat):BaseDecoder(format) {
                 formatChanged = { decodedFormat ->
                     audioChannel.setActualDecodedFormat(decodedFormat, mediaFormat)
                 },
-                dataConsumed = { index, length, end, timeUs ->
-                    if (length > 0 && trimmingRange.contains(timeUs)) {
+                dataConsumed = { index, length, end ->
+                    if (length > 0 /*&& trimmingRangeList.isValidPosition(timeUs)*/) {
                         if(end) {
                             logger.info("render end of data.")
                         }

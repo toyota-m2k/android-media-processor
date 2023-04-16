@@ -4,8 +4,8 @@ import android.media.MediaCodec
 import android.media.MediaFormat
 import io.github.toyota32k.media.lib.track.Muxer
 
-abstract class BaseEncoder(format: MediaFormat):BaseCodec(format) {
-    val encoder:MediaCodec = MediaCodec.createEncoderByType(format.getString(MediaFormat.KEY_MIME)!!)
+abstract class BaseEncoder(format: MediaFormat, val encoder:MediaCodec):BaseCodec(format) {
+//    val encoder:MediaCodec = MediaCodec.createEncoderByType(format.getString(MediaFormat.KEY_MIME)!!)
     override val name: String get() = "Encoder($sampleType)"
     override val mediaCodec get() = encoder
     var writtenPresentationTimeUs:Long = 0L

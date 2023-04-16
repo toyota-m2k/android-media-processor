@@ -13,8 +13,8 @@ class VideoDecoder(format: MediaFormat):BaseDecoder(format)  {
     }
 
     override fun chainTo(encoder: BaseEncoder) :Boolean {
-        return chainTo(null) { index, length, end, timeUs ->
-            val render = length>0 && trimmingRange.contains(timeUs)
+        return chainTo(null) { index, length, end ->
+            val render = length>0 /*&& trimmingRangeList.isValidPosition(timeUs)*/
             decoder.releaseOutputBuffer(index, render)
             if(render && encoder is VideoEncoder) {
                 if(end) {

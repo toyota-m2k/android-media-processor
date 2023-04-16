@@ -1,7 +1,6 @@
 package io.github.toyota32k.media.lib.utils
 
 import android.util.Log
-import io.github.toyota32k.media.lib.BuildConfig
 import java.io.Closeable
 import java.lang.Exception
 

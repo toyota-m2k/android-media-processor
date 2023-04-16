@@ -2,12 +2,12 @@ package io.github.toyota32k.media.lib.codec
 
 import android.media.MediaCodec
 import android.media.MediaFormat
-import io.github.toyota32k.media.lib.converter.TrimmingRange
+import io.github.toyota32k.media.lib.converter.ITrimmingRangeList
 
 abstract class BaseDecoder(format: MediaFormat):BaseCodec(format) {
 //    val inputBuffer: ByteBuffer?
     val decoder:MediaCodec = MediaCodec.createDecoderByType(format.getString(MediaFormat.KEY_MIME)!!)
-    var trimmingRange = TrimmingRange.Empty
+//    lateinit var trimmingRangeList : ITrimmingRangeList
     override val name: String get() = "Decoder($sampleType)"
     override val mediaCodec:MediaCodec get() = decoder
 
@@ -20,7 +20,7 @@ abstract class BaseDecoder(format: MediaFormat):BaseCodec(format) {
 
     protected fun chainTo(
         formatChanged:((decodedFormat:MediaFormat)->Unit)?,
-        dataConsumed:(index:Int, length:Int, end:Boolean, timeUs:Long)->Unit) : Boolean {
+        dataConsumed:(index:Int, length:Int, end:Boolean)->Unit) : Boolean {
         if(decoderEos) return false
         var effected = false
         while(true) {
@@ -33,7 +33,7 @@ abstract class BaseDecoder(format: MediaFormat):BaseCodec(format) {
                         logger.debug("found eos")
                         this.decoderEos = true
                     }
-                    dataConsumed(index, bufferInfo.size, eos, bufferInfo.presentationTimeUs)
+                    dataConsumed(index, bufferInfo.size, eos)
                     return true
                 }
                 index == MediaCodec.INFO_TRY_AGAIN_LATER -> {
