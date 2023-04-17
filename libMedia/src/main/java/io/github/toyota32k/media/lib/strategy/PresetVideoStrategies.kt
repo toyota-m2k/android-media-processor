@@ -61,9 +61,6 @@ object PresetVideoStrategies {
         MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface
     )
 
-    // HEVC - H.265
-    // FullHD 1080p
-
     object AVC1080HighProfile : VideoStrategy(
         "video/avc",
         MediaCodecInfo.CodecProfileLevel.AVCProfileHigh10,
@@ -76,13 +73,28 @@ object PresetVideoStrategies {
         MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface
     )
 
+    // HEVC - H.265
+    // FullHD 1080p
+
     object HEVC1080Profile : VideoStrategy(
         "video/hevc",
         MediaCodecInfo.CodecProfileLevel.HEVCProfileMain,
-        MediaCodecInfo.CodecProfileLevel.HEVCHighTierLevel31,
+        MediaCodecInfo.CodecProfileLevel.HEVCMainTierLevel4,
         null,
         FHD1080SizeCriteria,
         MaxDefault(10*1000*1000, 4*1000*1000),
+        MaxDefault(30),
+        MinDefault(1),
+        MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface
+    )
+
+    object HEVC1080HighProfile : VideoStrategy(
+        "video/hevc",
+        MediaCodecInfo.CodecProfileLevel.HEVCProfileMain10,
+        MediaCodecInfo.CodecProfileLevel.HEVCHighTierLevel5,
+        arrayOf(MediaCodecInfo.CodecProfileLevel.HEVCProfileMain),
+        FHD1080SizeCriteria,
+        MaxDefault(30*1000*1000, 15*1000*1000),
         MaxDefault(30),
         MinDefault(1),
         MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface
