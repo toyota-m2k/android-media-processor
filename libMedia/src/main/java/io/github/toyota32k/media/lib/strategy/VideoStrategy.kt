@@ -62,6 +62,8 @@ open class VideoStrategy(
             setInteger(MediaFormat.KEY_COLOR_FORMAT, colorFormat)
             setInteger(MediaFormat.KEY_PROFILE, pl.profile)
             setInteger(MediaFormat.KEY_LEVEL, pl.level)
+            setInteger(MediaFormat.KEY_MAX_HEIGHT, height)
+            setInteger(MediaFormat.KEY_MAX_WIDTH, width)
         }
     }
 
