@@ -27,7 +27,7 @@ private constructor(extractor: Extractor, inputFormat:MediaFormat, outputFormat:
             }
             val inputFormat = getMediaFormat(extractor.extractor, trackIdx)
             val encoder = strategy.createEncoder()
-            val outputFormat = strategy.createOutputFormat(inputFormat)
+            val outputFormat = strategy.createOutputFormat(inputFormat, encoder)
             return AudioTrack(extractor, inputFormat, outputFormat, encoder, trackIdx)
         }
     }

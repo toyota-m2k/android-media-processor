@@ -23,7 +23,9 @@ abstract class AbstractStrategy(
     val level:Int = 0,
     val fallbackProfiles: Array<Int>? = null,
 ) : IStrategy {
-    final override fun createEncoder(): MediaCodec {
-        return MediaCodec.createEncoderByType(mimeType)
+    override fun createEncoder(): MediaCodec {
+        return MediaCodec.createEncoderByType(mimeType).apply {
+            IStrategy.logger.info("using [$name] as encoder")
+        }
     }
 }

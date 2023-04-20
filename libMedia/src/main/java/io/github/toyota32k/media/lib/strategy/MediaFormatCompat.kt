@@ -78,5 +78,4 @@ data class MediaFormatCompat(val format:MediaFormat) {
     fun getChannelCount():Int? = getIntegerOrNull(MediaFormat.KEY_CHANNEL_COUNT)
     fun getSampleRate(def:Int):Int = getSampleRate() ?: def
     fun getChannelCount(def:Int):Int = getChannelCount() ?: def
-
 }

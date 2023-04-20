@@ -35,7 +35,7 @@ class VideoTrack
                 inputFormat.setInteger(MediaConstants.KEY_ROTATION_DEGREES, 0)
             }
             val encoder = strategy.createEncoder()
-            val outputFormat = strategy.createOutputFormat(inputFormat)
+            val outputFormat = strategy.createOutputFormat(inputFormat, encoder)
             return VideoTrack(extractor, inputFormat, outputFormat, encoder, trackIdx)
         }
     }

@@ -8,7 +8,7 @@ import java.lang.NullPointerException
 
 interface IStrategy {
     fun createEncoder(): MediaCodec
-    fun createOutputFormat(inputFormat: MediaFormat): MediaFormat
+    fun createOutputFormat(inputFormat: MediaFormat, encoder:MediaCodec): MediaFormat
     companion object {
         val logger = UtLog("Strategy", Converter.logger)
     }

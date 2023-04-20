@@ -10,8 +10,9 @@ data class TrimmingRange(val startUs:Long = 0L, val endUs:Long = 0L) {
     val isEmpty = !hasAny
     var naturalDurationUs:Long = -1L
 
-    fun closeBy(naturalDurationUs: Long) {
+    fun closeBy(naturalDurationUs: Long):Boolean {
         this.naturalDurationUs = naturalDurationUs
+        return startUs < naturalDurationUs
     }
 
     fun checkStart(timeUs:Long):Boolean {

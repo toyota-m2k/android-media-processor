@@ -1,5 +1,6 @@
 package io.github.toyota32k.media.lib.strategy
 
+import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaCodecList
 import android.media.MediaFormat
@@ -21,15 +22,15 @@ open class VideoStrategy(
     val colorFormat:Int, // = DEFAULT_COLOR_FORMAT,
 ) : AbstractStrategy(mimeType,profile,level,fallbackProfiles), IVideoStrategy {
 
-    override fun createOutputFormat(inputFormat: MediaFormat): MediaFormat {
-        return createOutputFormat(MediaFormatCompat(inputFormat))
+    override fun createOutputFormat(inputFormat: MediaFormat, encoder: MediaCodec): MediaFormat {
+        return createOutputFormat(MediaFormatCompat(inputFormat), encoder)
     }
 
     private fun hex(v:Int?):String {
         return if(v!=null) String.format("0x%x",v) else "n/a"
     }
 
-    private fun createOutputFormat(inputFormat: MediaFormatCompat): MediaFormat {
+    private fun createOutputFormat(inputFormat: MediaFormatCompat, encoder: MediaCodec): MediaFormat {
         val bitRate = this.bitRate.value(inputFormat.getBitRate())
         val frameRate = this.frameRate.value(inputFormat.getFrameRate())
         val iFrameInterval = this.iFrameInterval.value(inputFormat.getIFrameInterval())
@@ -40,10 +41,9 @@ open class VideoStrategy(
             width = size.width
             height = size.height
         }
-        val pl = supportedProfile() ?: throw IllegalStateException("no supported profile.")
+        val pl = supportedProfile(encoder) ?: throw IllegalStateException("no supported profile.")
 
-        logger.info("-------------------------------------------------------------------")
-        logger.info("Video Format")
+        logger.info("Video Format ------------------------------------------------------")
         logger.info("- Type           ${inputFormat.getMime()?:"n/a"} --> $mimeType")
         logger.info("- Profile        ${hex(inputFormat.getProfile())} --> ${hex(pl.profile)}")
         logger.info("- Level          ${hex(inputFormat.getLevel())} --> ${hex(pl.level)}")
@@ -62,20 +62,23 @@ open class VideoStrategy(
             setInteger(MediaFormat.KEY_COLOR_FORMAT, colorFormat)
             setInteger(MediaFormat.KEY_PROFILE, pl.profile)
             setInteger(MediaFormat.KEY_LEVEL, pl.level)
-            setInteger(MediaFormat.KEY_MAX_HEIGHT, height)
-            setInteger(MediaFormat.KEY_MAX_WIDTH, width)
+//            setInteger(MediaFormat.KEY_MAX_HEIGHT, height)
+//            setInteger(MediaFormat.KEY_MAX_WIDTH, width)
         }
     }
 
-    protected fun supportedProfile(): MediaCodecInfo.CodecProfileLevel? {
-        val supported = MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.filter { it.isEncoder }
-            .flatMap { info->
-                try { info.getCapabilitiesForType(mimeType).profileLevels.toList() } catch(_:Throwable) { emptyList()}
+    fun dumpCodecs() {
+        logger.info("#### dump codecs ####")
+        MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.filter { it.isEncoder }.forEach { ci->
+            val cap = try { ci.getCapabilitiesForType(mimeType) } catch(_:Throwable) { return@forEach }
+            cap.profileLevels.forEach { pl->
+                logger.info("${ci.name} : profile=${hex(pl.profile)}, level=${hex(pl.level)}")
+                logger.info("- - - - - - -")
             }
-            .sortedWith { v1, v2 ->
-                val r = v1.profile - v2.profile
-                if(r!=0) r else v1.level - v2.level
-            }
+        }
+    }
+
+    private fun supportedProfile(supported: List<MediaCodecInfo.CodecProfileLevel>) : MediaCodecInfo.CodecProfileLevel? {
         fun findProfile(profile:Int, level:Int=0): MediaCodecInfo.CodecProfileLevel? {
             return supported.firstOrNull { it.profile == profile && (level==0 || it.level>=level) }
         }
@@ -95,6 +98,33 @@ open class VideoStrategy(
             }
         }
         return null
+    }
+
+    protected fun supportedProfile(encoder: MediaCodec): MediaCodecInfo.CodecProfileLevel? {
+        val cap = try { encoder.codecInfo.getCapabilitiesForType(mimeType) } catch(_:Throwable) { return null }
+        val supported = cap.profileLevels
+            .sortedWith { v1, v2 ->
+                val r = v1.profile - v2.profile
+                if(r!=0) r else v1.level - v2.level
+            }
+        IStrategy.logger.info("Supported Profiles by [${encoder.name}] ---")
+        supported.forEach { IStrategy.logger.info("  profile=${hex(it.profile)}, level=${hex(it.level)}") }
+        IStrategy.logger.info("-------------------------------------------")
+
+        return supportedProfile(supported)
+    }
+
+    protected fun supportedProfile(): MediaCodecInfo.CodecProfileLevel? {
+//        dumpCodecs()
+        val supported = MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.filter { it.isEncoder }
+            .flatMap { info->
+                try { info.getCapabilitiesForType(mimeType).profileLevels.toList() } catch(_:Throwable) { emptyList()}
+            }
+            .sortedWith { v1, v2 ->
+                val r = v1.profile - v2.profile
+                if(r!=0) r else v1.level - v2.level
+            }
+        return supportedProfile(supported)
     }
 
 
@@ -117,7 +147,11 @@ open class VideoStrategy(
             if (r > 1) { // 拡大はしない
                 r = 1f
             }
-            return Size((width * r).roundToInt(), (height * r).roundToInt())
+            val w = (width * r).roundToInt()
+            val h = (height * r).roundToInt()
+            // widthは4の倍数でなければならないらしい (#5516)
+            // heightは2の倍数でないとエラーになるっぽい。(ClassRoom/shirasagi #3699)
+            return Size(w-w%4, h-h%2)
         }
     }
 }

@@ -29,6 +29,7 @@ abstract class BaseEncoder(format: MediaFormat, val encoder:MediaCodec):BaseCode
                     effected = true
                     val actualFormat = encoder.outputFormat
                     muxer.setOutputFormat(sampleType, actualFormat)
+                    logger.info("Actual Format: $actualFormat")
                 }
                 result >= 0 -> {
                     effected = true

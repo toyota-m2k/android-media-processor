@@ -1,5 +1,6 @@
 package io.github.toyota32k.media.lib.strategy
 
+import android.media.MediaCodec
 import android.media.MediaFormat
 import io.github.toyota32k.media.lib.misc.MediaConstants
 import io.github.toyota32k.media.lib.utils.UtLog
@@ -13,7 +14,7 @@ open class AudioStrategy (
     val bitRatePerChannel:MaxDefault,         //      // 1ch当たりのビットレート
 ) : AbstractStrategy(mimeType, profile, 0, fallbackProfiles), IAudioStrategy {
 
-    override fun createOutputFormat(inputFormat: MediaFormat): MediaFormat {
+    override fun createOutputFormat(inputFormat: MediaFormat, encoder:MediaCodec): MediaFormat {
         return createOutputFormat(MediaFormatCompat(inputFormat))
     }
     private fun hex(v:Int?):String {
@@ -25,8 +26,7 @@ open class AudioStrategy (
         val inputBitRatePerChannel = inputFormat.getBitRate(0)/channelCount
         val bitRate = this.bitRatePerChannel.value(inputBitRatePerChannel) * channelCount
 
-        VideoStrategy.logger.info("-------------------------------------------------------------------")
-        VideoStrategy.logger.info("Audio Format")
+        VideoStrategy.logger.info("Audio Format ------------------------------------------------------")
         VideoStrategy.logger.info("- Type           ${inputFormat.getMime()?:"n/a"} --> $mimeType")
         VideoStrategy.logger.info("- Profile        ${hex(inputFormat.getAacProfile())} --> ${hex(profile)}")
         VideoStrategy.logger.info("- SampleRate     ${inputFormat.getSampleRate()} --> $sampleRate")
