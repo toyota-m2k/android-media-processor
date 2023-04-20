@@ -21,7 +21,11 @@ object HD720VideoStrategy : IVideoStrategy {
         if (r > 1) { // 拡大はしない
             r = 1f
         }
-        return Size((width * r).roundToInt(), (height * r).roundToInt())
+        val w = (width * r).roundToInt()
+        val h = (height * r).roundToInt()
+        // widthは4の倍数でなければならないらしい (#5516)
+        // heightは2の倍数でないとエラーになるっぽい。(ClassRoom/shirasagi #3699)
+        return Size(w-w%4, h-h%2)
     }
 
     override fun createOutputFormat(inputFormat:MediaFormat):MediaFormat {
