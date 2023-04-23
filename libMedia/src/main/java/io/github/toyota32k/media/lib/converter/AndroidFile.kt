@@ -4,6 +4,7 @@ import android.content.Context
 import android.media.MediaExtractor
 import android.net.Uri
 import android.os.ParcelFileDescriptor
+import android.provider.OpenableColumns
 import androidx.documentfile.provider.DocumentFile
 import java.io.File
 import java.io.FileDescriptor
@@ -43,6 +44,37 @@ class AndroidFile {
 //                setLength(0)
 //            }.fd
 //        }
+
+    private fun getFileSizeFromUri(uri: Uri): Long {
+
+        val contentResolver = context?.contentResolver ?: return -1L
+        val mimeType = contentResolver.getType(uri) ?: return -1L
+
+        // ContentResolverから取得を試みる
+        if (mimeType.startsWith("image/") || mimeType.startsWith("video/") ||
+            mimeType.startsWith("audio/") || mimeType == "application/octet-stream") {
+            contentResolver.query(uri, null, null, null, null)?.use {
+                if (it.moveToFirst()) {
+                    val sizeIndex = it.getColumnIndex(OpenableColumns.SIZE)
+                    return it.getLong(sizeIndex)
+                }
+            }
+        }
+        // 取得できなければファイルを開いて取得する
+        contentResolver.openFileDescriptor(uri, "r")?.use {
+            return it.statSize
+        }
+        return -1L
+    }
+    fun getLength():Long {
+        return if(hasPath) {
+            path!!.length()
+        } else if(hasUri){
+            getFileSizeFromUri(uri!!)
+        } else {
+            -1L
+        }
+    }
 
     fun <T> withFileDescriptor(mode:String, fn:(FileDescriptor)->T):T {
         return if(hasUri) {

@@ -3,8 +3,10 @@ package io.github.toyota32k.media.lib.codec
 import android.media.MediaCodec
 import android.media.MediaFormat
 import io.github.toyota32k.media.lib.converter.ITrimmingRangeList
+import io.github.toyota32k.media.lib.format.dump
+import io.github.toyota32k.media.lib.report.Report
 
-abstract class BaseDecoder(format: MediaFormat):BaseCodec(format) {
+abstract class BaseDecoder(format: MediaFormat, report: Report):BaseCodec(format,report) {
 //    val inputBuffer: ByteBuffer?
     val decoder:MediaCodec = MediaCodec.createDecoderByType(format.getString(MediaFormat.KEY_MIME)!!)
 //    lateinit var trimmingRangeList : ITrimmingRangeList
@@ -43,6 +45,7 @@ abstract class BaseDecoder(format: MediaFormat):BaseCodec(format) {
                 index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
                     logger.debug("format changed")
                     formatChanged?.invoke(decoder.outputFormat)
+                    decoder.outputFormat.dump(logger, "OutputFormat Changed")
                 }
                 else -> {
                     if(index == -3) {

@@ -8,17 +8,18 @@ import io.github.toyota32k.media.lib.codec.AudioEncoder
 import io.github.toyota32k.media.lib.converter.AndroidFile
 import io.github.toyota32k.media.lib.converter.Converter
 import io.github.toyota32k.media.lib.extractor.Extractor
+import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
 import io.github.toyota32k.media.lib.utils.UtLog
 
 class AudioTrack
-private constructor(extractor: Extractor, inputFormat:MediaFormat, outputFormat: MediaFormat, encoder: MediaCodec, trackIdx:Int)
-    : Track(extractor, inputFormat, outputFormat, trackIdx, Muxer.SampleType.Audio) {
-    override val decoder: AudioDecoder = AudioDecoder(inputFormat).apply { start() }
-    override val encoder: AudioEncoder = AudioEncoder(outputFormat,encoder).apply { start() }
+private constructor(extractor: Extractor, inputFormat:MediaFormat, outputFormat: MediaFormat, encoder: MediaCodec, trackIdx:Int, report:Report)
+    : Track(extractor, inputFormat, outputFormat, trackIdx, Muxer.SampleType.Audio, report) {
+    override val decoder: AudioDecoder = AudioDecoder(inputFormat, report).apply { start() }
+    override val encoder: AudioEncoder = AudioEncoder(outputFormat,encoder,report).apply { start() }
 
     companion object {
-        fun create(inPath: AndroidFile, strategy: IAudioStrategy): AudioTrack? {
+        fun create(inPath: AndroidFile, strategy: IAudioStrategy, report: Report): AudioTrack? {
             val extractor = Extractor(inPath)
             val trackIdx = findTrackIdx(extractor.extractor, "audio")
             if (trackIdx < 0) {
@@ -28,7 +29,12 @@ private constructor(extractor: Extractor, inputFormat:MediaFormat, outputFormat:
             val inputFormat = getMediaFormat(extractor.extractor, trackIdx)
             val encoder = strategy.createEncoder()
             val outputFormat = strategy.createOutputFormat(inputFormat, encoder)
-            return AudioTrack(extractor, inputFormat, outputFormat, encoder, trackIdx)
+
+            report.updateAudioEncoder(encoder)
+            report.updateInputSummary(inputFormat)
+            report.updateOutputSummary(outputFormat)
+
+            return AudioTrack(extractor, inputFormat, outputFormat, encoder, trackIdx,report)
         }
     }
 }

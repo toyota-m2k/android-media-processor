@@ -2,9 +2,10 @@ package io.github.toyota32k.media.lib.codec
 
 import android.media.MediaFormat
 import io.github.toyota32k.media.lib.audio.AudioChannel
+import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.track.Muxer
 
-class AudioDecoder(format: MediaFormat):BaseDecoder(format) {
+class AudioDecoder(format: MediaFormat, report: Report):BaseDecoder(format, report) {
     private val audioChannel = AudioChannel()
     override val sampleType = Muxer.SampleType.Audio
 

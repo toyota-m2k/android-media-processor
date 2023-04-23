@@ -2,40 +2,41 @@ package io.github.toyota32k.media.lib.strategy
 
 import android.media.MediaCodec
 import android.media.MediaFormat
+import io.github.toyota32k.media.lib.format.Codec
+import io.github.toyota32k.media.lib.format.Profile
+import io.github.toyota32k.media.lib.format.getAacProfile
+import io.github.toyota32k.media.lib.format.getBitRate
+import io.github.toyota32k.media.lib.format.getChannelCount
+import io.github.toyota32k.media.lib.format.getMime
+import io.github.toyota32k.media.lib.format.getSampleRate
 import io.github.toyota32k.media.lib.misc.MediaConstants
 import io.github.toyota32k.media.lib.utils.UtLog
 
 open class AudioStrategy (
-    mimeType: String,
-    profile:Int,                            // profile は AAC Profile として扱う。AAC以外のAudioコーデックは知らん。
-    fallbackProfiles: Array<Int>?,
+    codec:Codec,
+    profile: Profile,                            // profile は AAC Profile として扱う。AAC以外のAudioコーデックは知らん。
+    fallbackProfiles: Array<Profile>?,
     val sampleRate:MaxDefault,
     val channelCount: MaxDefault,
     val bitRatePerChannel:MaxDefault,         //      // 1ch当たりのビットレート
-) : AbstractStrategy(mimeType, profile, 0, fallbackProfiles), IAudioStrategy {
+) : AbstractStrategy(codec, profile, null, fallbackProfiles), IAudioStrategy {
 
     override fun createOutputFormat(inputFormat: MediaFormat, encoder:MediaCodec): MediaFormat {
-        return createOutputFormat(MediaFormatCompat(inputFormat))
-    }
-    private fun hex(v:Int?):String {
-        return if(v!=null) String.format("0x%x",v) else "n/a"
-    }
-    private fun createOutputFormat(inputFormat: MediaFormatCompat): MediaFormat {
         val sampleRate = this.sampleRate.value(inputFormat.getSampleRate())
         val channelCount = this.channelCount.value(inputFormat.getChannelCount())
-        val inputBitRatePerChannel = inputFormat.getBitRate(0)/channelCount
+        val inputBitRatePerChannel = (inputFormat.getBitRate()?:0)/channelCount
         val bitRate = this.bitRatePerChannel.value(inputBitRatePerChannel) * channelCount
 
         VideoStrategy.logger.info("Audio Format ------------------------------------------------------")
-        VideoStrategy.logger.info("- Type           ${inputFormat.getMime()?:"n/a"} --> $mimeType")
-        VideoStrategy.logger.info("- Profile        ${hex(inputFormat.getAacProfile())} --> ${hex(profile)}")
+        VideoStrategy.logger.info("- Type           ${inputFormat.getMime()?:"n/a"} --> ${codec.mime}")
+        VideoStrategy.logger.info("- Profile        ${Profile.fromValue(inputFormat)?:"n/a"} --> $profile")
         VideoStrategy.logger.info("- SampleRate     ${inputFormat.getSampleRate()} --> $sampleRate")
         VideoStrategy.logger.info("- Channels       ${inputFormat.getChannelCount()?:"n/a"} --> $channelCount")
         VideoStrategy.logger.info("- BitRate        ${inputFormat.getBitRate()?:"n/a"} --> $bitRate")
         VideoStrategy.logger.info("-------------------------------------------------------------------")
 
-        return MediaFormat.createAudioFormat(mimeType, sampleRate, channelCount).apply {
-            setInteger(MediaFormat.KEY_AAC_PROFILE, profile)
+        return MediaFormat.createAudioFormat(codec.mime, sampleRate, channelCount).apply {
+            setInteger(MediaFormat.KEY_AAC_PROFILE, profile.value)
             setInteger(MediaFormat.KEY_BIT_RATE, bitRate)
         }
     }

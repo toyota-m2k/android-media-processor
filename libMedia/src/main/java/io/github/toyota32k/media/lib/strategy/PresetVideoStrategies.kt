@@ -1,6 +1,9 @@
 package io.github.toyota32k.media.lib.strategy
 
 import android.media.MediaCodecInfo
+import io.github.toyota32k.media.lib.format.Codec
+import io.github.toyota32k.media.lib.format.Level
+import io.github.toyota32k.media.lib.format.Profile
 
 object PresetVideoStrategies {
     val HD720SizeCriteria =
@@ -12,10 +15,10 @@ object PresetVideoStrategies {
     // HD-720p
 
     object AVC720LowProfile : VideoStrategy(
-        "video/avc",
-        MediaCodecInfo.CodecProfileLevel.AVCProfileMain,
-        MediaCodecInfo.CodecProfileLevel.AVCLevel13,
-        arrayOf(MediaCodecInfo.CodecProfileLevel.AVCProfileBaseline),
+        Codec.AVC,
+        Profile.AVCProfileMain,
+        Level.AVCLevel13,
+        arrayOf(Profile.AVCProfileBaseline),
         HD720SizeCriteria,
         MaxDefault(768*1000),
         MaxDefault(30, 24),
@@ -24,10 +27,10 @@ object PresetVideoStrategies {
     )
 
     object AVC720Profile : VideoStrategy(
-        "video/avc",
-        MediaCodecInfo.CodecProfileLevel.AVCProfileMain,
-        MediaCodecInfo.CodecProfileLevel.AVCLevel31,
-        arrayOf(MediaCodecInfo.CodecProfileLevel.AVCProfileBaseline),
+        Codec.AVC,
+        Profile.AVCProfileMain,
+        Level.AVCLevel31,
+        arrayOf(Profile.AVCProfileBaseline),
         HD720SizeCriteria,
         MaxDefault(4*1000*1000, 3*1000*1000),
         MaxDefault(30),
@@ -35,10 +38,10 @@ object PresetVideoStrategies {
         MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface
     )
     object AVC720HighProfile : VideoStrategy(
-        "video/avc",
-        MediaCodecInfo.CodecProfileLevel.AVCProfileHigh,
-        MediaCodecInfo.CodecProfileLevel.AVCLevel32,
-        arrayOf(MediaCodecInfo.CodecProfileLevel.AVCProfileMain,MediaCodecInfo.CodecProfileLevel.AVCProfileBaseline),
+        Codec.AVC,
+        Profile.AVCProfileHigh,
+        Level.AVCLevel32,
+        arrayOf(Profile.AVCProfileMain, Profile.AVCProfileBaseline),
         HD720SizeCriteria,
         MaxDefault(20*1000*1000, 10*1000*1000),
         MaxDefault(60, 30),
@@ -50,10 +53,10 @@ object PresetVideoStrategies {
     // AVC - H.264
     // FullHD-1080p
     object AVC1080Profile : VideoStrategy(
-        "video/avc",
-        MediaCodecInfo.CodecProfileLevel.AVCProfileHigh,
-        MediaCodecInfo.CodecProfileLevel.AVCLevel4,
-        arrayOf(MediaCodecInfo.CodecProfileLevel.AVCProfileMain),
+        Codec.AVC,
+        Profile.AVCProfileHigh,
+        Level.AVCLevel4,
+        arrayOf(Profile.AVCProfileMain),
         FHD1080SizeCriteria,
         MaxDefault(4*1000*1000, 2*1000*1000),
         MaxDefault(30),
@@ -62,10 +65,10 @@ object PresetVideoStrategies {
     )
 
     object AVC1080HighProfile : VideoStrategy(
-        "video/avc",
-        MediaCodecInfo.CodecProfileLevel.AVCProfileHigh10,
-        MediaCodecInfo.CodecProfileLevel.AVCLevel4,
-        arrayOf(MediaCodecInfo.CodecProfileLevel.AVCProfileHigh, MediaCodecInfo.CodecProfileLevel.AVCProfileMain),
+        Codec.AVC,
+        Profile.AVCProfileHigh10,
+        Level.AVCLevel4,
+        arrayOf(Profile.AVCProfileHigh, Profile.AVCProfileMain),
         FHD1080SizeCriteria,
         MaxDefault(20*1000*1000, 10*1000*1000),
         MaxDefault(60, 30),
@@ -77,9 +80,9 @@ object PresetVideoStrategies {
     // FullHD 1080p
 
     object HEVC1080Profile : VideoStrategy(
-        "video/hevc",
-        MediaCodecInfo.CodecProfileLevel.HEVCProfileMain,
-        MediaCodecInfo.CodecProfileLevel.HEVCMainTierLevel4,
+        Codec.HEVC,
+        Profile.HEVCProfileMain,
+        Level.HEVCMainTierLevel4,
         null,
         FHD1080SizeCriteria,
         MaxDefault(10*1000*1000, 4*1000*1000),
@@ -89,10 +92,10 @@ object PresetVideoStrategies {
     )
 
     object HEVC1080HighProfile : VideoStrategy(
-        "video/hevc",
-        MediaCodecInfo.CodecProfileLevel.HEVCProfileMain10,
-        MediaCodecInfo.CodecProfileLevel.HEVCHighTierLevel5,
-        arrayOf(MediaCodecInfo.CodecProfileLevel.HEVCProfileMain),
+        Codec.HEVC,
+        Profile.HEVCProfileMain10,
+        Level.HEVCHighTierLevel5,
+        arrayOf(Profile.HEVCProfileMain),
         FHD1080SizeCriteria,
         MaxDefault(30*1000*1000, 15*1000*1000),
         MaxDefault(30),

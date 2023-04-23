@@ -1,10 +1,11 @@
 package io.github.toyota32k.media.lib.codec
 
 import android.media.MediaFormat
+import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.surface.OutputSurface
 import io.github.toyota32k.media.lib.track.Muxer
 
-class VideoDecoder(format: MediaFormat):BaseDecoder(format)  {
+class VideoDecoder(format: MediaFormat,report: Report):BaseDecoder(format,report)  {
     private lateinit var outputSurface:OutputSurface
     override val sampleType = Muxer.SampleType.Video
     override fun configure() {

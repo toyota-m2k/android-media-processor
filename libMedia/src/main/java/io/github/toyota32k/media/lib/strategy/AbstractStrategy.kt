@@ -3,6 +3,9 @@ package io.github.toyota32k.media.lib.strategy
 import android.media.MediaCodec
 import android.media.MediaCodecInfo.CodecProfileLevel
 import android.media.MediaCodecList
+import io.github.toyota32k.media.lib.format.Codec
+import io.github.toyota32k.media.lib.format.Level
+import io.github.toyota32k.media.lib.format.Profile
 import java.lang.Integer.max
 import java.lang.Integer.min
 
@@ -18,13 +21,13 @@ data class MinDefault(val min:Int, val default:Int=min) {
 }
 
 abstract class AbstractStrategy(
-    val mimeType: String,
-    val profile:Int,
-    val level:Int = 0,
-    val fallbackProfiles: Array<Int>? = null,
+    val codec: Codec,
+    val profile: Profile,
+    val level:Level? = null,
+    val fallbackProfiles: Array<Profile>? = null,
 ) : IStrategy {
     override fun createEncoder(): MediaCodec {
-        return MediaCodec.createEncoderByType(mimeType).apply {
+        return MediaCodec.createEncoderByType(codec.mime).apply {
             IStrategy.logger.info("using [$name] as encoder")
         }
     }
