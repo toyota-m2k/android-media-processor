@@ -2,9 +2,11 @@ package io.github.toyota32k.media.lib.strategy
 
 import android.media.MediaCodec
 import android.media.MediaCodecInfo
+import android.media.MediaCodecInfo.CodecCapabilities
 import android.media.MediaCodecList
 import android.media.MediaFormat
 import android.util.Size
+import io.github.toyota32k.media.lib.format.BitRateMode
 import io.github.toyota32k.media.lib.format.Codec
 import io.github.toyota32k.media.lib.format.ColorFormat
 import io.github.toyota32k.media.lib.format.Level
@@ -29,7 +31,8 @@ open class VideoStrategy(
     val bitRate: MaxDefault, // = Int.MAX_VALUE,
     val frameRate: MaxDefault, // = Int.MAX_VALUE,
     val iFrameInterval:MinDefault, // = DEFAULT_IFRAME_INTERVAL,
-    val colorFormat:Int, // = DEFAULT_COLOR_FORMAT,
+    val colorFormat:ColorFormat?, // = DEFAULT_COLOR_FORMAT,
+    val bitRateMode: BitRateMode?,
 ) : AbstractStrategy(codec,profile,level,fallbackProfiles), IVideoStrategy {
 
 //    override fun createOutputFormat(inputFormat: MediaFormat, encoder: MediaCodec): MediaFormat {
@@ -41,6 +44,7 @@ open class VideoStrategy(
 //    }
 
     override fun createOutputFormat(inputFormat: MediaFormat, encoder: MediaCodec): MediaFormat {
+        val
         val bitRate = this.bitRate.value(inputFormat.getBitRate())
         val frameRate = this.frameRate.value(inputFormat.getFrameRate())
         val iFrameInterval = this.iFrameInterval.value(inputFormat.getIFrameInterval())
@@ -62,14 +66,14 @@ open class VideoStrategy(
         logger.info("- BitRate        ${inputFormat.getBitRate()?:"n/a"} --> $bitRate")
         logger.info("- FrameRate      ${inputFormat.getFrameRate()?:"n/a"} --> $frameRate")
         logger.info("- iFrameInterval ${inputFormat.getIFrameInterval()?:"n/a"} --> $iFrameInterval")
-        logger.info("- colorFormat    ${ColorFormat.fromValue(inputFormat)?:"n/a"} --> ${ColorFormat.fromValue(colorFormat)?:"n/a"}")
+        logger.info("- colorFormat    ${ColorFormat.fromValue(inputFormat)?:"n/a"} --> ${colorFormat?:"n/a"}")
         logger.info("-------------------------------------------------------------------")
 
         return MediaFormat.createVideoFormat(codec.mime, width, height).apply {
             setInteger(MediaFormat.KEY_BIT_RATE, bitRate)
             setInteger(MediaFormat.KEY_FRAME_RATE, frameRate)
             setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, iFrameInterval)
-            setInteger(MediaFormat.KEY_COLOR_FORMAT, colorFormat)
+            setInteger(MediaFormat.KEY_COLOR_FORMAT, (colorFormat?:ColorFormat.COLOR_FormatSurface).value)
             setInteger(MediaFormat.KEY_PROFILE, pl.profile)
             setInteger(MediaFormat.KEY_LEVEL, pl.level)
 //            setInteger(MediaFormat.KEY_MAX_HEIGHT, height)
@@ -110,8 +114,16 @@ open class VideoStrategy(
         return null
     }
 
+    protected fun capabilities(encoder: MediaCodec): CodecCapabilities? {
+        return try { encoder.codecInfo.getCapabilitiesForType(codec.mime) } catch(_:Throwable) { null }
+    }
+
+    protected fun isBitrateModeSupported(encoder: MediaCodec, mode: BitRateMode):Boolean {
+        return capabilities(encoder)?.encoderCapabilities?.isBitrateModeSupported(mode.value) ?: false
+    }
+
     protected fun supportedProfile(encoder: MediaCodec): MediaCodecInfo.CodecProfileLevel? {
-        val cap = try { encoder.codecInfo.getCapabilitiesForType(codec.mime) } catch(_:Throwable) { return null }
+        val cap = capabilities(encoder) ?: return null
         val supported = cap.profileLevels
             .sortedWith { v1, v2 ->
                 val r = v1.profile - v2.profile
@@ -166,3 +178,26 @@ open class VideoStrategy(
         }
     }
 }
+
+// ToDo: 可変ビットレート対応
+// コーデックが可変ビットレートに対応しているかどうかの確認
+// MediaCodecInfo codecInfo = MediaCodecList.getCodecInfoAt(index); // indexはコーデックのインデックス
+//MediaFormat format = MediaFormat.createVideoFormat("video/avc", width, height); // widthとheightはエンコードする動画の幅と高さ
+//MediaCodecInfo.VideoCapabilities videoCaps = codecInfo.getCapabilitiesForType("video/avc").getVideoCapabilities();
+//MediaCodecInfo.EncoderCapabilities encoderCaps = codecInfo.getCapabilitiesForType("video/avc").getEncoderCapabilities();
+//if (encoderCaps.isBitrateModeSupported(MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR)) {
+//    // 可変ビットレートモードがサポートされている場合の処理
+//} else {
+//    // サポートされていない場合の処理
+//}
+// 可変ビットレートの要求
+// MediaCodec codec = MediaCodec.createEncoderByType("video/avc");
+//MediaFormat mediaFormat = MediaFormat.createVideoFormat("video/avc", width, height);
+//mediaFormat.setInteger(MediaFormat.KEY_BIT_RATE, 400000); // ビットレートの指定
+//mediaFormat.setInteger(MediaFormat.KEY_BITRATE_MODE, MediaCodecInfo.EncoderCapabilities.BITRATE_MODE_VBR); // 可変ビットレートモードの指定
+//
+// KEY_BIT_RATEの指定は、目標（平均）ビットレートとして使用される。
+// 上限値はKEY_MAX_BIT_RATE で指定する。
+
+
+

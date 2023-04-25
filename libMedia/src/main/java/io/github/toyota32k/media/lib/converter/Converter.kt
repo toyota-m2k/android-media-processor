@@ -482,7 +482,7 @@ class Converter {
                     }
                     report.updateOutputFileInfo(outPath.getLength(), trimmingRangeList.trimmedDurationUs/1000L)
                     report.end()
-                    report.dump(logger, "#### Video Converted.")
+                    logger.info(report.toString())
                     progress?.finish()
                     ConvertResult.succeeded
                 }}}

@@ -52,12 +52,28 @@ class Report {
         output.duration = duration
     }
 
-    fun dump(logger: UtLog, message:String) {
-        logger.info("$message")
-        logger.info("Video Encoder = ${videoEncoderName?:"n/a"}")
-        logger.info("Audio Encoder = ${audioEncoderName?:"n/a"}")
+//    fun dump(logger: UtLog, message:String) {
+//        logger.info(message)
+//        logger.info("Video Encoder = ${videoEncoderName?:"n/a"}")
+//        logger.info("Audio Encoder = ${audioEncoderName?:"n/a"}")
+//        val consumed = TimeSpan(endTick - startTick)
+//        logger.info("Consumed Time = ${consumed.formatH()}")
+//        input.dump(logger, "Input Stream")
+//        output.dump(logger, "Output Stream")
+//    }
+
+    override fun toString(): String {
         val consumed = TimeSpan(endTick - startTick)
-        logger.info("Consumed Time = ${consumed.formatH()}")
-        input.dump(logger, "Input Stream")
+        return StringBuilder()
+            .appendLine()
+            .appendLine("Conversion Result")
+            .appendLine("- Video Encoder = ${videoEncoderName ?: "n/a"}")
+            .appendLine("- Audio Encoder = ${audioEncoderName?:"n/a"}")
+            .appendLine("- Consumed Time = ${consumed.formatH()}")
+            .appendLine(" Input Stream")
+            .append(input.toString())
+            .appendLine(" Output Stream")
+            .append(output.toString())
+            .toString()
     }
 }

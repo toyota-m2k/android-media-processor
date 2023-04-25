@@ -1,6 +1,7 @@
 package io.github.toyota32k.media.lib.report
 
 import android.media.MediaFormat
+import io.github.toyota32k.media.lib.format.BitRateMode
 import io.github.toyota32k.media.lib.format.Codec
 import io.github.toyota32k.media.lib.format.ColorFormat
 import io.github.toyota32k.media.lib.format.Level
@@ -20,6 +21,8 @@ data class VideoSummary(
     val width: Int,
     val height: Int,
     val bitRate: Int,
+    val maxBitRate:Int,
+    val bitRateMode: BitRateMode,
     val frameRate: Int,
     val iFrameInterval: Int,
     val colorFormat: ColorFormat?) {
@@ -39,16 +42,31 @@ data class VideoSummary(
         return String.format("%,d", this)
     }
 
-    fun dump(logger: UtLog, message:String) {
-        logger.info(message)
-        logger.info("Codec = ${codec?:"n/a"}")
-        logger.info("Profile = ${profile?:"n/a"}")
-        logger.info("Level = ${level?:"n/a"}")
-        logger.info("Width = $width")
-        logger.info("Height = $width")
-        logger.info("Bit Rate = ${bitRate.format()} bps")
-        logger.info("Frame Rate = ${frameRate.format()} fps")
-        logger.info("iFrame Interval = $iFrameInterval sec")
-        logger.info("Color Format = ${colorFormat?:"n/a"}")
+//    fun dump(logger: UtLog, message:String) {
+//        logger.info(message)
+//        logger.info("Codec = ${codec?:"n/a"}")
+//        logger.info("Profile = ${profile?:"n/a"}")
+//        logger.info("Level = ${level?:"n/a"}")
+//        logger.info("Width = $width")
+//        logger.info("Height = $width")
+//        logger.info("Bit Rate = ${bitRate.format()} bps")
+//        logger.info("Frame Rate = ${frameRate.format()} fps")
+//        logger.info("iFrame Interval = $iFrameInterval sec")
+//        logger.info("Color Format = ${colorFormat?:"n/a"}")
+//    }
+
+    override fun toString(): String {
+        return StringBuilder()
+            .appendLine("  Video")
+            .appendLine("  - Codec = ${codec?:"n/a"}")
+            .appendLine("  - Profile = ${profile?:"n/a"}")
+            .appendLine("  - Level = ${level?:"n/a"}")
+            .appendLine("  - Width = $width")
+            .appendLine("  - Height = $height")
+            .appendLine("  - Bit Rate = ${bitRate.format()} bps")
+            .appendLine("  - Frame Rate = ${frameRate.format()} fps")
+            .appendLine("  - iFrame Interval = $iFrameInterval sec")
+            .appendLine("  - Color Format = ${colorFormat?:"n/a"}")
+            .toString()
     }
 }

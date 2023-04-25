@@ -38,6 +38,9 @@ fun MediaFormat.getBitRate():Int? = safeGetIntegerOrNull(MediaFormat.KEY_BIT_RAT
 fun MediaFormat.getFrameRate():Int? = safeGetIntegerOrNull(MediaFormat.KEY_FRAME_RATE)
 fun MediaFormat.getIFrameInterval():Int? = safeGetIntegerOrNull(MediaFormat.KEY_I_FRAME_INTERVAL)
 fun MediaFormat.getColorFormat():Int? = safeGetIntegerOrNull(MediaFormat.KEY_COLOR_FORMAT)
+fun MediaFormat.getMaxBitRate():Int? = safeGetIntegerOrNull(MediaFormat.KEY_MAX_BIT_RATE)
+fun MediaFormat.getBitRateMode():Int? = safeGetIntegerOrNull(MediaFormat.KEY_BITRATE_MODE)
+
 fun MediaFormat.getAacProfile():Int? = safeGetIntegerOrNull(MediaFormat.KEY_AAC_PROFILE)
 fun MediaFormat.getSampleRate():Int? = safeGetIntegerOrNull(MediaFormat.KEY_SAMPLE_RATE)
 fun MediaFormat.getChannelCount():Int? = safeGetIntegerOrNull(MediaFormat.KEY_CHANNEL_COUNT)

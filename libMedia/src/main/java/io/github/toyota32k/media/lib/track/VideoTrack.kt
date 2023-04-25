@@ -38,7 +38,7 @@ class VideoTrack
             val encoder = strategy.createEncoder()
             val outputFormat = strategy.createOutputFormat(inputFormat, encoder)
 
-            report.updateAudioEncoder(encoder)
+            report.updateVideoEncoder(encoder)
             report.updateInputSummary(inputFormat)
             report.updateOutputSummary(outputFormat)
 

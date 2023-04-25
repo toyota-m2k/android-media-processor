@@ -14,24 +14,27 @@ class VideoDecoder(format: MediaFormat,report: Report):BaseDecoder(format,report
     }
 
     override fun chainTo(encoder: BaseEncoder) :Boolean {
-        return chainTo(null) { index, length, end ->
-            val render = length>0 /*&& trimmingRangeList.isValidPosition(timeUs)*/
-            decoder.releaseOutputBuffer(index, render)
-            if(render && encoder is VideoEncoder) {
-                if(end) {
-                    logger.info("render end of data.")
+        return chainTo(
+            formatChanged = null,
+            dataConsumed = { index, length, end ->
+                val render = length>0 /*&& trimmingRangeList.isValidPosition(timeUs)*/
+                decoder.releaseOutputBuffer(index, render)
+                if(render && encoder is VideoEncoder) {
+                    if(end) {
+                        logger.info("render end of data.")
+                    }
+                    outputSurface.awaitNewImage()
+                    outputSurface.drawImage()
+                    encoder.inputSurface.setPresentationTime(bufferInfo.presentationTimeUs*1000)
+                    encoder.inputSurface.swapBuffers()
                 }
-                outputSurface.awaitNewImage()
-                outputSurface.drawImage()
-                encoder.inputSurface.setPresentationTime(bufferInfo.presentationTimeUs*1000)
-                encoder.inputSurface.swapBuffers()
+                if(end) {
+                    logger.info("signal end of input stream to encoder.")
+                    eos = true
+                    encoder.encoder.signalEndOfInputStream()
+                }
             }
-            if(end) {
-                logger.info("signal end of input stream to encoder.")
-                eos = true
-                encoder.encoder.signalEndOfInputStream()
-            }
-        }
+        )
     }
 
     override fun close() {

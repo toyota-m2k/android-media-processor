@@ -24,13 +24,24 @@ data class AudioSummary(
         return String.format("%,d", this)
     }
 
-    fun dump(logger: UtLog, message:String) {
-        logger.info(message)
-        logger.info("Codec = ${codec?:"n/a"}")
-        logger.info("Profile = ${profile?:"n/a"}")
-        logger.info("Sample Rate = ${sampleRate.format()} Hz")
-        logger.info("Channels = $channelCount")
-        logger.info("Bit Rate = ${bitRate.format()} bps")
-    }
+//    fun dump(logger: UtLog, message:String) {
+//        logger.info(message)
+//        logger.info("Codec = ${codec?:"n/a"}")
+//        logger.info("Profile = ${profile?:"n/a"}")
+//        logger.info("Sample Rate = ${sampleRate.format()} Hz")
+//        logger.info("Channels = $channelCount")
+//        logger.info("Bit Rate = ${bitRate.format()} bps")
+//    }
 
+    override fun toString(): String {
+        return StringBuilder()
+            .appendLine("  Audio")
+            .appendLine("  - Codec = ${codec?:"n/a"}")
+            .appendLine("  - Profile = ${profile?:"n/a"}")
+            .appendLine("  - Sample Rate = ${sampleRate.format()} Hz")
+            .appendLine("  - Channels = $channelCount")
+            .appendLine("  - Bit Rate = ${bitRate.format()} bps")
+            .toString()
+
+    }
 }
