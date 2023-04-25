@@ -2,6 +2,7 @@ package io.github.toyota32k.media.lib.strategy
 
 import android.media.MediaCodecInfo
 import io.github.toyota32k.media.lib.format.Codec
+import io.github.toyota32k.media.lib.format.ColorFormat
 import io.github.toyota32k.media.lib.format.Level
 import io.github.toyota32k.media.lib.format.Profile
 
@@ -23,7 +24,8 @@ object PresetVideoStrategies {
         MaxDefault(768*1000),
         MaxDefault(30, 24),
         MinDefault(1),
-        MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface
+        ColorFormat.COLOR_FormatSurface,
+        null,
     )
 
     object AVC720Profile : VideoStrategy(
@@ -35,7 +37,8 @@ object PresetVideoStrategies {
         MaxDefault(4*1000*1000, 3*1000*1000),
         MaxDefault(30),
         MinDefault(1),
-        MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface
+        ColorFormat.COLOR_FormatSurface,
+        null,
     )
     object AVC720HighProfile : VideoStrategy(
         Codec.AVC,
@@ -46,7 +49,8 @@ object PresetVideoStrategies {
         MaxDefault(20*1000*1000, 10*1000*1000),
         MaxDefault(60, 30),
         MinDefault(1),
-        MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface
+        ColorFormat.COLOR_FormatSurface,
+        null,
     )
 
 
@@ -61,7 +65,8 @@ object PresetVideoStrategies {
         MaxDefault(4*1000*1000, 2*1000*1000),
         MaxDefault(30),
         MinDefault(1),
-        MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface
+        ColorFormat.COLOR_FormatSurface,
+        null,
     )
 
     object AVC1080HighProfile : VideoStrategy(
@@ -73,7 +78,8 @@ object PresetVideoStrategies {
         MaxDefault(20*1000*1000, 10*1000*1000),
         MaxDefault(60, 30),
         MinDefault(1),
-        MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface
+        ColorFormat.COLOR_FormatSurface,
+        null,
     )
 
     // HEVC - H.265
@@ -88,7 +94,8 @@ object PresetVideoStrategies {
         MaxDefault(10*1000*1000, 4*1000*1000),
         MaxDefault(30),
         MinDefault(1),
-        MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface
+        ColorFormat.COLOR_FormatSurface,
+        null,
     )
 
     object HEVC1080HighProfile : VideoStrategy(
@@ -100,6 +107,7 @@ object PresetVideoStrategies {
         MaxDefault(30*1000*1000, 15*1000*1000),
         MaxDefault(30),
         MinDefault(1),
-        MediaCodecInfo.CodecCapabilities.COLOR_FormatSurface
+        ColorFormat.COLOR_FormatSurface,
+        null,
     )
 }

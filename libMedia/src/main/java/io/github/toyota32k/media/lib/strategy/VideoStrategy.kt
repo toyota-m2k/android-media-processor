@@ -12,6 +12,7 @@ import io.github.toyota32k.media.lib.format.ColorFormat
 import io.github.toyota32k.media.lib.format.Level
 import io.github.toyota32k.media.lib.format.Profile
 import io.github.toyota32k.media.lib.format.getBitRate
+import io.github.toyota32k.media.lib.format.getBitRateMode
 import io.github.toyota32k.media.lib.format.getFrameRate
 import io.github.toyota32k.media.lib.format.getHeight
 import io.github.toyota32k.media.lib.format.getIFrameInterval
@@ -44,7 +45,6 @@ open class VideoStrategy(
 //    }
 
     override fun createOutputFormat(inputFormat: MediaFormat, encoder: MediaCodec): MediaFormat {
-        val
         val bitRate = this.bitRate.value(inputFormat.getBitRate())
         val frameRate = this.frameRate.value(inputFormat.getFrameRate())
         val iFrameInterval = this.iFrameInterval.value(inputFormat.getIFrameInterval())
@@ -56,17 +56,19 @@ open class VideoStrategy(
             height = size.height
         }
         val pl = supportedProfile(encoder) ?: throw IllegalStateException("no supported profile.")
+        val brm = if(bitRateMode!=null && isBitrateModeSupported(encoder, bitRateMode)) bitRateMode else null
 
         logger.info("Video Format ------------------------------------------------------")
         logger.info("- Type           ${inputFormat.getMime()?:"n/a"} --> ${codec.mime}")
-        logger.info("- Profile        ${Profile.fromValue(inputFormat)?:"n/a"} --> ${Profile.fromValue(codec, pl.profile)?:"n/a"}")
-        logger.info("- Level          ${Level.fromValue(inputFormat)} --> ${Level.fromValue(codec,pl.level)?:"n/a"}")
+        logger.info("- Profile        ${Profile.fromFormat(inputFormat)?:"n/a"} --> ${Profile.fromValue(codec, pl.profile)?:"n/a"}")
+        logger.info("- Level          ${Level.fromFormat(inputFormat)} --> ${Level.fromValue(codec,pl.level)?:"n/a"}")
         logger.info("- Width          ${inputFormat.getWidth()?:"n/a"} --> $width")
         logger.info("- Height         ${inputFormat.getHeight()?:"n/a"} --> $height")
         logger.info("- BitRate        ${inputFormat.getBitRate()?:"n/a"} --> $bitRate")
+        logger.info("- BitRateMode    ${inputFormat.getBitRateMode()?:"n/a"} --> ${brm?:"n/a"}")
         logger.info("- FrameRate      ${inputFormat.getFrameRate()?:"n/a"} --> $frameRate")
         logger.info("- iFrameInterval ${inputFormat.getIFrameInterval()?:"n/a"} --> $iFrameInterval")
-        logger.info("- colorFormat    ${ColorFormat.fromValue(inputFormat)?:"n/a"} --> ${colorFormat?:"n/a"}")
+        logger.info("- colorFormat    ${ColorFormat.fromFormat(inputFormat)?:"n/a"} --> ${colorFormat?:"n/a"}")
         logger.info("-------------------------------------------------------------------")
 
         return MediaFormat.createVideoFormat(codec.mime, width, height).apply {
@@ -76,6 +78,9 @@ open class VideoStrategy(
             setInteger(MediaFormat.KEY_COLOR_FORMAT, (colorFormat?:ColorFormat.COLOR_FormatSurface).value)
             setInteger(MediaFormat.KEY_PROFILE, pl.profile)
             setInteger(MediaFormat.KEY_LEVEL, pl.level)
+            if(brm!=null) {
+                setInteger(MediaFormat.KEY_BITRATE_MODE, brm.value)
+            }
 //            setInteger(MediaFormat.KEY_MAX_HEIGHT, height)
 //            setInteger(MediaFormat.KEY_MAX_WIDTH, width)
         }

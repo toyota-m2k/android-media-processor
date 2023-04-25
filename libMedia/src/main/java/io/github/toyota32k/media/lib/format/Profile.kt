@@ -215,8 +215,8 @@ enum class Profile(val codec: Codec, val value:Int) {
             }
         }
 
-        fun fromValue(mediaFormat: MediaFormat): Profile? {
-            val codec = Codec.codecOf(mediaFormat) ?: return null
+        fun fromFormat(mediaFormat: MediaFormat): Profile? {
+            val codec = Codec.fromFormat(mediaFormat) ?: return null
             val profile = if(codec.media==Media.Video)  { mediaFormat.getProfile() } else { mediaFormat.getAacProfile() } ?: return null
             return fromValue(codec, profile)
         }

@@ -4,12 +4,10 @@ import android.media.MediaCodec
 import android.media.MediaFormat
 import io.github.toyota32k.media.lib.format.Codec
 import io.github.toyota32k.media.lib.format.Profile
-import io.github.toyota32k.media.lib.format.getAacProfile
 import io.github.toyota32k.media.lib.format.getBitRate
 import io.github.toyota32k.media.lib.format.getChannelCount
 import io.github.toyota32k.media.lib.format.getMime
 import io.github.toyota32k.media.lib.format.getSampleRate
-import io.github.toyota32k.media.lib.misc.MediaConstants
 import io.github.toyota32k.media.lib.utils.UtLog
 
 open class AudioStrategy (
@@ -29,7 +27,7 @@ open class AudioStrategy (
 
         VideoStrategy.logger.info("Audio Format ------------------------------------------------------")
         VideoStrategy.logger.info("- Type           ${inputFormat.getMime()?:"n/a"} --> ${codec.mime}")
-        VideoStrategy.logger.info("- Profile        ${Profile.fromValue(inputFormat)?:"n/a"} --> $profile")
+        VideoStrategy.logger.info("- Profile        ${Profile.fromFormat(inputFormat)?:"n/a"} --> $profile")
         VideoStrategy.logger.info("- SampleRate     ${inputFormat.getSampleRate()} --> $sampleRate")
         VideoStrategy.logger.info("- Channels       ${inputFormat.getChannelCount()?:"n/a"} --> $channelCount")
         VideoStrategy.logger.info("- BitRate        ${inputFormat.getBitRate()?:"n/a"} --> $bitRate")

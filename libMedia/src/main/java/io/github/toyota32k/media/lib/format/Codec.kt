@@ -29,14 +29,14 @@ enum class Codec(val media: Media, val mime:String, val alias:String?=null) {
     ;
 
     companion object {
-        fun codecOf(type:String): Codec? {
+        fun fromMime(type:String): Codec? {
             return values().firstOrNull {
                 it.mime.compareTo(type, true) == 0 || it.alias?.compareTo(type, true)==0
             }
         }
-        fun codecOf(format: MediaFormat): Codec? {
+        fun fromFormat(format: MediaFormat): Codec? {
             val mime = format.getMime()?:return null
-            return codecOf(mime)
+            return fromMime(mime)
         }
     }
 }

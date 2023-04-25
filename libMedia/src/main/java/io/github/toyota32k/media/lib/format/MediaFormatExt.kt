@@ -1,7 +1,6 @@
 package io.github.toyota32k.media.lib.format
 
 import android.media.MediaFormat
-import io.github.toyota32k.media.lib.strategy.VideoStrategy
 import io.github.toyota32k.media.lib.utils.UtLog
 
 fun MediaFormat.safeGetStringOrNull(key:String):String? {
@@ -38,7 +37,7 @@ fun MediaFormat.getBitRate():Int? = safeGetIntegerOrNull(MediaFormat.KEY_BIT_RAT
 fun MediaFormat.getFrameRate():Int? = safeGetIntegerOrNull(MediaFormat.KEY_FRAME_RATE)
 fun MediaFormat.getIFrameInterval():Int? = safeGetIntegerOrNull(MediaFormat.KEY_I_FRAME_INTERVAL)
 fun MediaFormat.getColorFormat():Int? = safeGetIntegerOrNull(MediaFormat.KEY_COLOR_FORMAT)
-fun MediaFormat.getMaxBitRate():Int? = safeGetIntegerOrNull(MediaFormat.KEY_MAX_BIT_RATE)
+fun MediaFormat.getMaxBitRate():Int? = safeGetIntegerOrNull("max-bitrate")
 fun MediaFormat.getBitRateMode():Int? = safeGetIntegerOrNull(MediaFormat.KEY_BITRATE_MODE)
 
 fun MediaFormat.getAacProfile():Int? = safeGetIntegerOrNull(MediaFormat.KEY_AAC_PROFILE)
@@ -47,26 +46,26 @@ fun MediaFormat.getChannelCount():Int? = safeGetIntegerOrNull(MediaFormat.KEY_CH
 
 fun MediaFormat.dump(logger: UtLog, message:String) {
     logger.info("### $message")
-    val codec = Codec.codecOf(this)
+    val codec = Codec.fromFormat(this)
     if(codec == null) {
         logger.error("unknown codec.")
         return
     }
     logger.info("- $codec")
-    val profile = Profile.fromValue(this)
+    val profile = Profile.fromFormat(this)
     if(profile == null) {
         logger.error("unknown profile.")
         return
     }
     if(codec.media.isVideo()) {
-        val level = Level.fromValue(this)
+        val level = Level.fromFormat(this)
         logger.info("- $profile@${level?:"-"}")
         logger.info("- Width          ${getWidth()?:"n/a"}")
         logger.info("- Height         ${getHeight()?:"n/a"}")
         logger.info("- BitRate        ${getBitRate()?:"n/a"}")
         logger.info("- FrameRate      ${getFrameRate()?:"n/a"}")
         logger.info("- iFrameInterval ${getIFrameInterval()?:"n/a"}")
-        logger.info("- colorFormat    ${ColorFormat.fromValue(this)?:"n/a"}")
+        logger.info("- colorFormat    ${ColorFormat.fromFormat(this)?:"n/a"}")
     } else {
         logger.info("  $profile")
         logger.info("- SampleRate     ${getSampleRate()}")

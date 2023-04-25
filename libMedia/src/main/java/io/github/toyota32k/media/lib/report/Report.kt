@@ -4,7 +4,6 @@ import android.media.MediaCodec
 import android.media.MediaFormat
 import io.github.toyota32k.media.lib.format.Codec
 import io.github.toyota32k.media.lib.utils.TimeSpan
-import io.github.toyota32k.media.lib.utils.UtLog
 
 class Report {
     var videoEncoderName: String? = null
@@ -23,7 +22,7 @@ class Report {
     }
 
     private fun updateSummary(summary:Summary, format: MediaFormat) {
-        val codec = Codec.Companion.codecOf(format) ?: return
+        val codec = Codec.Companion.fromFormat(format) ?: return
         if(codec.media.isVideo()) {
             summary.videoSummary = VideoSummary(format)
         } else {

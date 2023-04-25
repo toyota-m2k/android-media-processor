@@ -10,9 +10,8 @@ import io.github.toyota32k.media.lib.format.getBitRate
 import io.github.toyota32k.media.lib.format.getFrameRate
 import io.github.toyota32k.media.lib.format.getHeight
 import io.github.toyota32k.media.lib.format.getIFrameInterval
+import io.github.toyota32k.media.lib.format.getMaxBitRate
 import io.github.toyota32k.media.lib.format.getWidth
-import io.github.toyota32k.media.lib.utils.UtLog
-import java.util.logging.Logger
 
 data class VideoSummary(
     val codec: Codec?,
@@ -22,24 +21,26 @@ data class VideoSummary(
     val height: Int,
     val bitRate: Int,
     val maxBitRate:Int,
-    val bitRateMode: BitRateMode,
+    val bitRateMode: BitRateMode?,
     val frameRate: Int,
     val iFrameInterval: Int,
     val colorFormat: ColorFormat?) {
     constructor(format: MediaFormat) : this(
-        Codec.codecOf(format),
-        Profile.fromValue(format),
-        Level.fromValue(format),
+        Codec.fromFormat(format),
+        Profile.fromFormat(format),
+        Level.fromFormat(format),
 
-        format.getWidth()?:-1,
-        format.getHeight()?:-1,
-        format.getBitRate()?:-1,
-        format.getFrameRate()?:-1,
-    format.getIFrameInterval()?:-1,
-        ColorFormat.fromValue(format))
+        width = format.getWidth()?:-1,
+        height = format.getHeight()?:-1,
+        bitRate = format.getBitRate()?:-1,
+        maxBitRate = format.getMaxBitRate()?:-1,
+        bitRateMode = BitRateMode.fromFormat(format),
+        frameRate = format.getFrameRate()?:-1,
+        iFrameInterval = format.getIFrameInterval()?:-1,
+        colorFormat = ColorFormat.fromFormat(format))
 
     private fun Int.format():String {
-        return String.format("%,d", this)
+        return if(this<0) "n/a" else String.format("%,d", this)
     }
 
 //    fun dump(logger: UtLog, message:String) {
@@ -63,7 +64,9 @@ data class VideoSummary(
             .appendLine("  - Level = ${level?:"n/a"}")
             .appendLine("  - Width = $width")
             .appendLine("  - Height = $height")
-            .appendLine("  - Bit Rate = ${bitRate.format()} bps")
+            .appendLine("  - Bit Rate (bps) = ${bitRate.format()}")
+            .appendLine("  - Max Bit Rate (bps) = ${maxBitRate.format()}")
+            .appendLine("  - Bit Rate Mode = ${bitRateMode ?: "n/a"}")
             .appendLine("  - Frame Rate = ${frameRate.format()} fps")
             .appendLine("  - iFrame Interval = $iFrameInterval sec")
             .appendLine("  - Color Format = ${colorFormat?:"n/a"}")
