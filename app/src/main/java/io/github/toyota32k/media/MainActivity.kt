@@ -71,6 +71,7 @@ class MainViewModel(savedStateHandle: SavedStateHandle): ViewModel() {
                         .input(input, context)
                         .output(output, context)
                         .setProgressHandler(this@MainViewModel::onProgress)
+                        .videoStrategy(PresetVideoStrategies.AVC720LowProfile)
 //                        .trimmingStartFrom(trimStart.value ?: 0L)
 //                        .trimmingEndTo(trimEnd.value ?: 0L)
                         .executeAsync(viewModelScope).apply { job = this }
@@ -106,7 +107,7 @@ class MainViewModel(savedStateHandle: SavedStateHandle): ViewModel() {
                 .output(output, context)
                 .setProgressHandler(this@MainViewModel::onProgress)
                 .audioStrategy(PresetAudioStrategies.AACDefault)
-                .videoStrategy(PresetVideoStrategies.AVC1080Profile)
+                .videoStrategy(PresetVideoStrategies.AVC720LowProfile)
                 .trimmingStartFrom(trimStart.value?:0L)
                 .trimmingEndTo(trimEnd.value?:0L)
                 .executeAsync(viewModelScope).apply { job = this }

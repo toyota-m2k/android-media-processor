@@ -8,7 +8,13 @@ class TrimmingRangeListImpl : ITrimmingRangeList {
 
     override fun closeBy(naturalDurationUs:Long) {
         this.naturalDurationUs = naturalDurationUs
-        list.forEach { it.closeBy(naturalDurationUs) }
+        val itr = list.listIterator()
+        while(itr.hasNext()) {
+            val r = itr.next()
+            if (!r.closeBy(naturalDurationUs)) {
+                itr.remove()
+            }
+        }
     }
 
     fun addRange(startUs:Long, endUs:Long) {

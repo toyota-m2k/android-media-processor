@@ -3,6 +3,7 @@ package io.github.toyota32k.media.lib.converter
 import android.content.Context
 import android.net.Uri
 import io.github.toyota32k.media.lib.misc.RingBuffer
+import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
 import io.github.toyota32k.media.lib.strategy.PresetAudioStrategies
@@ -41,6 +42,7 @@ class Converter {
     var trimmingRangeList : ITrimmingRangeList = ITrimmingRangeList.empty() // TrimmingRange.Empty
     var deleteOutputOnError:Boolean = true
     var onProgress : ((IProgress)->Unit)? = null
+    lateinit var report :Report
 
     /**
      * Converterのファクトリクラス
@@ -432,10 +434,12 @@ class Converter {
     suspend fun execute():ConvertResult {
         return withContext(Dispatchers.IO) {
             try {
-                AudioTrack.create(inPath, audioStrategy).use { audioTrack->
-                VideoTrack.create(inPath, videoStrategy).use { videoTrack->
+                report = Report().apply { start() }
+                AudioTrack.create(inPath, audioStrategy,report).use { audioTrack->
+                VideoTrack.create(inPath, videoStrategy,report).use { videoTrack->
                 Muxer(inPath, outPath, audioTrack!=null).use { muxer->
                     trimmingRangeList.closeBy(muxer.durationUs)
+                    report.updateInputFileInfo(inPath.getLength(), muxer.durationUs/1000L)
                     val progress = Progress.create(trimmingRangeList, onProgress)
                     videoTrack.trimmingRangeList = trimmingRangeList
                     audioTrack?.trimmingRangeList = trimmingRangeList
@@ -476,6 +480,9 @@ class Converter {
                             }
                         }
                     }
+                    report.updateOutputFileInfo(outPath.getLength(), trimmingRangeList.trimmedDurationUs/1000L)
+                    report.end()
+                    logger.info(report.toString())
                     progress?.finish()
                     ConvertResult.succeeded
                 }}}

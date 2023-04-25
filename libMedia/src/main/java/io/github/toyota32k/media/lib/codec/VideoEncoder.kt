@@ -2,11 +2,12 @@ package io.github.toyota32k.media.lib.codec
 
 import android.media.MediaCodec
 import android.media.MediaFormat
-import io.github.toyota32k.media.lib.strategy.MediaFormatCompat
+import io.github.toyota32k.media.lib.format.dump
+import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.surface.InputSurface
 import io.github.toyota32k.media.lib.track.Muxer
 
-class VideoEncoder(format:MediaFormat, encoder:MediaCodec):BaseEncoder(format, encoder) {
+class VideoEncoder(format:MediaFormat, encoder:MediaCodec, report: Report):BaseEncoder(format, encoder, report) {
     override val sampleType = Muxer.SampleType.Video
 
     lateinit var inputSurface:InputSurface
@@ -14,7 +15,7 @@ class VideoEncoder(format:MediaFormat, encoder:MediaCodec):BaseEncoder(format, e
     // override val surface: Surface? get() = inputSurface.surface
 
     override fun configure() {
-        MediaFormatCompat(mediaFormat).summary( "VideoEncoder.configure", logger)
+        mediaFormat.dump(logger, "VideoEncoder.configure")
         encoder.configure(mediaFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
         inputSurface = InputSurface(encoder.createInputSurface())
         inputSurface.makeCurrent()

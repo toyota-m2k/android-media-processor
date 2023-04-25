@@ -8,20 +8,21 @@ import io.github.toyota32k.media.lib.converter.AndroidFile
 import io.github.toyota32k.media.lib.converter.Converter
 import io.github.toyota32k.media.lib.extractor.Extractor
 import io.github.toyota32k.media.lib.misc.MediaConstants
+import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
 import io.github.toyota32k.media.lib.utils.UtLog
 import java.lang.UnsupportedOperationException
 
 class VideoTrack
-    private constructor(extractor:Extractor, inputFormat:MediaFormat, outputFormat:MediaFormat, encoder: MediaCodec, trackIdx:Int)
-        : Track(extractor, inputFormat, outputFormat, trackIdx, Muxer.SampleType.Video) {
+    private constructor(extractor:Extractor, inputFormat:MediaFormat, outputFormat:MediaFormat, encoder: MediaCodec, trackIdx:Int, report: Report)
+        : Track(extractor, inputFormat, outputFormat, trackIdx, Muxer.SampleType.Video,report) {
 
     // 必ず、Encoder-->Decoder の順に初期化＆開始する。そうしないと、Decoder側の inputSurfaceの初期化に失敗する。
-    override val encoder: VideoEncoder = VideoEncoder(outputFormat, encoder).apply { start() }
-    override val decoder: VideoDecoder = VideoDecoder(inputFormat).apply { start() }
+    override val encoder: VideoEncoder = VideoEncoder(outputFormat, encoder,report).apply { start() }
+    override val decoder: VideoDecoder = VideoDecoder(inputFormat,report).apply { start() }
 
     companion object {
-        fun create(inPath: AndroidFile, strategy: IVideoStrategy) : VideoTrack {
+        fun create(inPath: AndroidFile, strategy: IVideoStrategy, report: Report) : VideoTrack {
             val extractor = Extractor(inPath)
             val trackIdx = findTrackIdx(extractor.extractor, "video")
             if (trackIdx < 0) {
@@ -35,8 +36,13 @@ class VideoTrack
                 inputFormat.setInteger(MediaConstants.KEY_ROTATION_DEGREES, 0)
             }
             val encoder = strategy.createEncoder()
-            val outputFormat = strategy.createOutputFormat(inputFormat)
-            return VideoTrack(extractor, inputFormat, outputFormat, encoder, trackIdx)
+            val outputFormat = strategy.createOutputFormat(inputFormat, encoder)
+
+            report.updateVideoEncoder(encoder)
+            report.updateInputSummary(inputFormat)
+            report.updateOutputSummary(outputFormat)
+
+            return VideoTrack(extractor, inputFormat, outputFormat, encoder, trackIdx, report)
         }
     }
 }
