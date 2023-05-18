@@ -1,7 +1,13 @@
 package io.github.toyota32k.media.lib.report
 
+import android.media.MediaMetadataRetriever
+import io.github.toyota32k.media.lib.converter.AndroidFile
+import io.github.toyota32k.media.lib.converter.Converter
+import io.github.toyota32k.media.lib.extractor.Extractor
+import io.github.toyota32k.media.lib.track.Track
 import io.github.toyota32k.media.lib.utils.TimeSpan
 import io.github.toyota32k.media.lib.utils.UtLog
+import java.lang.UnsupportedOperationException
 
 data class Summary(
     var size:Long = 0L,
@@ -28,5 +34,24 @@ data class Summary(
             .append(videoSummary.toString())
             .append(audioSummary.toString())
             .toString()
+    }
+
+    companion object {
+        fun getSummary(file:AndroidFile):Summary {
+
+            val extractor = Extractor(file)
+            val videoTrack = Track.findTrackIdx(extractor.extractor, "video")
+            val videoSummary = if (videoTrack >= 0) {
+                VideoSummary(Track.getMediaFormat(extractor.extractor, videoTrack))
+            } else null
+            val audioTrack = Track.findTrackIdx(extractor.extractor, "audio")
+            val audioSummary = if(audioTrack >= 0) {
+                AudioSummary(Track.getMediaFormat(extractor.extractor, audioTrack))
+            } else null
+            val duration = file.fileDescriptorToRead { fd-> MediaMetadataRetriever().apply { setDataSource(fd) }}.use { mediaMetadataRetriever ->
+                mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLong() ?: -1L
+            }
+            return Summary(file.getLength(), duration, videoSummary, audioSummary)
+        }
     }
 }

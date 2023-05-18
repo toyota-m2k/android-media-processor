@@ -36,27 +36,28 @@ class Muxer(inPath:AndroidFile, outPath: AndroidFile, val hasAudio:Boolean): Clo
     }
 
     private fun setupMetaDataBy(inPath: AndroidFile) {
-        val mediaMetadataRetriever = inPath.fileDescriptorToRead { fd-> MediaMetadataRetriever().apply { setDataSource(fd) }}
-        val rotation = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull()
-        if (rotation != null) {
-            muxer.setOrientationHint(rotation)
-            logger.info("metadata: rotation=$rotation")
-        }
-
-        val locationString = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_LOCATION)
-        if (locationString != null) {
-            val location: FloatArray? = ISO6709LocationParser.parse(locationString)
-            if (location != null) {
-                muxer.setLocation(location[0], location[1])
-                logger.info("metadata: latitude=${location[0]}, longitude=${location[1]}")
-            } else {
-                logger.error("metadata: failed to parse the location metadata: $locationString")
+        inPath.fileDescriptorToRead { fd-> MediaMetadataRetriever().apply { setDataSource(fd) }}.use { mediaMetadataRetriever ->
+            val rotation = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull()
+            if (rotation != null) {
+                muxer.setOrientationHint(rotation)
+                logger.info("metadata: rotation=$rotation")
             }
-        }
 
-        mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()?.also {
-            durationUs = it * 1000
-            logger.info("metadata: duration=${durationUs/1000} ms")
+            val locationString = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_LOCATION)
+            if (locationString != null) {
+                val location: FloatArray? = ISO6709LocationParser.parse(locationString)
+                if (location != null) {
+                    muxer.setLocation(location[0], location[1])
+                    logger.info("metadata: latitude=${location[0]}, longitude=${location[1]}")
+                } else {
+                    logger.error("metadata: failed to parse the location metadata: $locationString")
+                }
+            }
+
+            mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()?.also {
+                durationUs = it * 1000
+                logger.info("metadata: duration=${durationUs / 1000} ms")
+            }
         }
     }
 
