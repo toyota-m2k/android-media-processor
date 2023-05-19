@@ -4,7 +4,7 @@ buildscript {
         // compose_version によって kotlin versionが制限される。
         // https://developer.android.google.cn/jetpack/androidx/releases/compose-kotlin?hl=ja
         compose_version = '1.4.3'
-        kotlin_version= '1.8.0'
+        kotlin_version= '1.8.10'
     }
     repositories {
         google()

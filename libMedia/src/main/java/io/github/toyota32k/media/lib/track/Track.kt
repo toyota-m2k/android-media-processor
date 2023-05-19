@@ -7,14 +7,13 @@ import io.github.toyota32k.media.lib.codec.BaseEncoder
 import io.github.toyota32k.media.lib.converter.Converter
 import io.github.toyota32k.media.lib.converter.ITrimmingRangeList
 import io.github.toyota32k.media.lib.extractor.Extractor
-import io.github.toyota32k.media.lib.converter.TrimmingRange
 import io.github.toyota32k.media.lib.misc.check
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.utils.UtLog
 import kotlinx.coroutines.CoroutineScope
 import java.io.Closeable
 
-abstract class Track(val extractor:Extractor, val inputFormat:MediaFormat?, val outputFormat:MediaFormat, val trackIdx:Int, type:Muxer.SampleType, report:Report) : Closeable {
+abstract class Track(val extractor:Extractor, val trackIdx:Int, type:Muxer.SampleType/*, val inputFormat:MediaFormat?, val outputFormat:MediaFormat, val trackIdx:Int, type:Muxer.SampleType, report:Report*/) : Closeable {
     val logger:UtLog
     init {
         extractor.selectTrack(trackIdx, type)

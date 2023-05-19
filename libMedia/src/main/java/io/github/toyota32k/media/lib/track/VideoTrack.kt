@@ -15,7 +15,7 @@ import java.lang.UnsupportedOperationException
 
 class VideoTrack
     private constructor(extractor:Extractor, inputFormat:MediaFormat, outputFormat:MediaFormat, encoder: MediaCodec, trackIdx:Int, report: Report)
-        : Track(extractor, inputFormat, outputFormat, trackIdx, Muxer.SampleType.Video,report) {
+        : Track(extractor, /*inputFormat, outputFormat,*/ trackIdx, Muxer.SampleType.Video /*,report*/) {
 
     // 必ず、Encoder-->Decoder の順に初期化＆開始する。そうしないと、Decoder側の inputSurfaceの初期化に失敗する。
     override val encoder: VideoEncoder = VideoEncoder(outputFormat, encoder,report).apply { start() }

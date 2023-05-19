@@ -4,8 +4,12 @@ plugins {
     id 'maven-publish'
 }
 
+group = "com.github.toyota-m2k"
+version='1.0'
+
 android {
     compileSdk 33
+    buildToolsVersion '33.0.0'
 
     defaultConfig {
         minSdk 23
@@ -36,7 +40,7 @@ android {
     publishing {
         singleVariant('release') {
             withSourcesJar()
-//            withJavadocJar()
+            withJavadocJar()
         }
     }
     namespace 'io.github.toyota32k.media.lib'

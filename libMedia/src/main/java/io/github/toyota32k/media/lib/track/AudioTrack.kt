@@ -14,7 +14,7 @@ import io.github.toyota32k.media.lib.utils.UtLog
 
 class AudioTrack
 private constructor(extractor: Extractor, inputFormat:MediaFormat, outputFormat: MediaFormat, encoder: MediaCodec, trackIdx:Int, report:Report)
-    : Track(extractor, inputFormat, outputFormat, trackIdx, Muxer.SampleType.Audio, report) {
+    : Track(extractor, /*inputFormat, outputFormat,*/ trackIdx, Muxer.SampleType.Audio /*, report*/) {
     override val decoder: AudioDecoder = AudioDecoder(inputFormat, report).apply { start() }
     override val encoder: AudioEncoder = AudioEncoder(outputFormat,encoder,report).apply { start() }
 
