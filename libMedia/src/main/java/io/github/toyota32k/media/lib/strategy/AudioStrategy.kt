@@ -8,7 +8,7 @@ import io.github.toyota32k.media.lib.format.getBitRate
 import io.github.toyota32k.media.lib.format.getChannelCount
 import io.github.toyota32k.media.lib.format.getMime
 import io.github.toyota32k.media.lib.format.getSampleRate
-import io.github.toyota32k.media.lib.utils.UtLog
+import io.github.toyota32k.utils.UtLog
 
 open class AudioStrategy (
     codec:Codec,

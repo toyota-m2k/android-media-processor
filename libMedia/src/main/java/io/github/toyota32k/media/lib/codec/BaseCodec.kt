@@ -5,7 +5,7 @@ import android.media.MediaFormat
 import io.github.toyota32k.media.lib.converter.Converter
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.track.Muxer
-import io.github.toyota32k.media.lib.utils.UtLog
+import io.github.toyota32k.utils.UtLog
 import java.io.Closeable
 
 abstract class BaseCodec(val mediaFormat:MediaFormat, val report: Report) : Closeable {
@@ -16,7 +16,7 @@ abstract class BaseCodec(val mediaFormat:MediaFormat, val report: Report) : Clos
     }
     abstract val sampleType: Muxer.SampleType
     abstract val name:String
-    lateinit var logger:UtLog
+    lateinit var logger: UtLog
     var eos:Boolean = false
         protected set
 

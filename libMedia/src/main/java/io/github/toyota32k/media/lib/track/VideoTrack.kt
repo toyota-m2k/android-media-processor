@@ -10,7 +10,7 @@ import io.github.toyota32k.media.lib.extractor.Extractor
 import io.github.toyota32k.media.lib.misc.MediaConstants
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
-import io.github.toyota32k.media.lib.utils.UtLog
+import io.github.toyota32k.utils.UtLog
 import java.lang.UnsupportedOperationException
 
 class VideoTrack

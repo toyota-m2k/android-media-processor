@@ -1,7 +1,7 @@
 package io.github.toyota32k.media.lib.format
 
 import android.media.MediaFormat
-import io.github.toyota32k.media.lib.utils.UtLog
+import io.github.toyota32k.utils.UtLog
 
 fun MediaFormat.safeGetStringOrNull(key:String):String? {
     return try {

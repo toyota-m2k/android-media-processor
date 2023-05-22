@@ -86,12 +86,13 @@ class TrimmingRangeListImpl : ITrimmingRangeList {
         if(naturalDurationUs<0) throw java.lang.IllegalStateException("call closeBy() in advance.")
         return if(list.isEmpty()) {
             when {
-                positionUs<0 -> ITrimmingRangeList.PositionState.OUT_OF_RANGE
+                positionUs<0 -> ITrimmingRangeList.PositionState.END
                 positionUs>=naturalDurationUs -> ITrimmingRangeList.PositionState.END
                 else -> ITrimmingRangeList.PositionState.VALID
             }
         } else {
             when {
+                positionUs<0 -> ITrimmingRangeList.PositionState.END
                 list.firstOrNull { it.contains(positionUs) } != null -> ITrimmingRangeList.PositionState.VALID
                 list.last().actualEndUs < positionUs -> ITrimmingRangeList.PositionState.END
                 else -> ITrimmingRangeList.PositionState.OUT_OF_RANGE

@@ -7,14 +7,12 @@ import io.github.toyota32k.media.lib.codec.BaseCodec
 import io.github.toyota32k.media.lib.codec.BaseDecoder
 import io.github.toyota32k.media.lib.converter.*
 import io.github.toyota32k.media.lib.track.Muxer
-import io.github.toyota32k.media.lib.utils.IUtExternalLogger
-import io.github.toyota32k.media.lib.utils.UtLog
-import io.github.toyota32k.media.lib.utils.UtLoggerInstance
+import io.github.toyota32k.utils.UtLog
 import java.io.Closeable
 import java.nio.ByteBuffer
 
 class Extractor(inPath: AndroidFile) : Closeable {
-    lateinit var logger:UtLog
+    lateinit var logger: UtLog
     val extractor = inPath.fileDescriptorToRead { fd-> MediaExtractor().apply { setDataSource(fd) }}
     var trackIdx:Int = -1
     protected lateinit var inputFormat:MediaFormat
@@ -41,6 +39,8 @@ class Extractor(inPath: AndroidFile) : Closeable {
         extractor.selectTrack(idx)
     }
 
+    var totalLength = 0L
+
     fun chainTo(output: BaseDecoder) : Boolean {
         if(eos) return false
         logger.assert(trackIdx>=0, "selectTrack() must be called before.")
@@ -60,6 +60,7 @@ class Extractor(inPath: AndroidFile) : Closeable {
             }
         }
 
+
         val decoder = output.decoder
         val inputBufferIdx = decoder.dequeueInputBuffer(BaseCodec.TIMEOUT_IMMEDIATE)
         if(inputBufferIdx<0) {
@@ -75,10 +76,12 @@ class Extractor(inPath: AndroidFile) : Closeable {
         } else {
             val inputBuffer = decoder.getInputBuffer(inputBufferIdx) as ByteBuffer
             val sampleSize = extractor.readSampleData(inputBuffer, 0)
+
             if(sampleSize>0) {
                 logger.assert(sampleTime == extractor.sampleTime)
                 logger.verbose {"read $sampleSize bytes at ${sampleTime/1000} ms"}
-                decoder.queueInputBuffer(inputBufferIdx, 0, sampleSize, trimmingRangeList.getPositionInTrimmedDuration(sampleTime), extractor.sampleFlags)
+                decoder.queueInputBuffer(inputBufferIdx, 0, sampleSize, totalLength, extractor.sampleFlags)
+                totalLength += sampleSize
             } else {
                 logger.error("zero byte read.")
             }
