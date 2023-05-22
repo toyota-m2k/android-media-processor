@@ -39,7 +39,7 @@ class Extractor(inPath: AndroidFile) : Closeable {
         extractor.selectTrack(idx)
     }
 
-    var totalLength = 0L
+    var totalTime = 0L
 
     fun chainTo(output: BaseDecoder) : Boolean {
         if(eos) return false
@@ -80,8 +80,8 @@ class Extractor(inPath: AndroidFile) : Closeable {
             if(sampleSize>0) {
                 logger.assert(sampleTime == extractor.sampleTime)
                 logger.verbose {"read $sampleSize bytes at ${sampleTime/1000} ms"}
-                decoder.queueInputBuffer(inputBufferIdx, 0, sampleSize, totalLength, extractor.sampleFlags)
-                totalLength += sampleSize
+                decoder.queueInputBuffer(inputBufferIdx, 0, sampleSize, totalTime, extractor.sampleFlags)
+                totalTime += sampleTime
             } else {
                 logger.error("zero byte read.")
             }
