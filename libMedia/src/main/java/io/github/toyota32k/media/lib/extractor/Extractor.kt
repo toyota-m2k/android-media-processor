@@ -40,6 +40,7 @@ class Extractor(inPath: AndroidFile) : Closeable {
     }
 
     var totalTime = 0L
+        private set
 
     fun chainTo(output: BaseDecoder) : Boolean {
         if(eos) return false
