@@ -1,8 +1,5 @@
 package io.github.toyota32k.media.lib.strategy
 
-import android.media.MediaFormat
-import io.github.toyota32k.media.lib.utils.UtLog
-
 //data class MediaFormatCompat(val format:MediaFormat) {
 //    fun getInteger(name:String, defaultValue:Int):Int {
 //        return try {

@@ -2,12 +2,9 @@ package io.github.toyota32k.media.lib.report
 
 import android.media.MediaMetadataRetriever
 import io.github.toyota32k.media.lib.converter.AndroidFile
-import io.github.toyota32k.media.lib.converter.Converter
 import io.github.toyota32k.media.lib.extractor.Extractor
 import io.github.toyota32k.media.lib.track.Track
 import io.github.toyota32k.media.lib.utils.TimeSpan
-import io.github.toyota32k.media.lib.utils.UtLog
-import java.lang.UnsupportedOperationException
 
 data class Summary(
     var size:Long = 0L,

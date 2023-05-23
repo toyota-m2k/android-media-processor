@@ -18,7 +18,7 @@ import io.github.toyota32k.media.lib.format.getHeight
 import io.github.toyota32k.media.lib.format.getIFrameInterval
 import io.github.toyota32k.media.lib.format.getMime
 import io.github.toyota32k.media.lib.format.getWidth
-import io.github.toyota32k.media.lib.utils.UtLog
+import io.github.toyota32k.utils.UtLog
 import kotlin.math.min
 import kotlin.math.roundToInt
 

@@ -3,8 +3,7 @@ package io.github.toyota32k.media.lib.strategy
 import android.media.MediaCodec
 import android.media.MediaFormat
 import io.github.toyota32k.media.lib.converter.Converter
-import io.github.toyota32k.media.lib.utils.UtLog
-import java.lang.NullPointerException
+import io.github.toyota32k.utils.UtLog
 
 interface IStrategy {
     fun createEncoder(): MediaCodec

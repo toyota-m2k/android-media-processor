@@ -2,7 +2,8 @@ package io.github.toyota32k.media.lib.audio
 
 import android.media.MediaCodec
 import android.media.MediaFormat
-import io.github.toyota32k.media.lib.utils.UtLog
+import io.github.toyota32k.media.lib.converter.Converter
+import io.github.toyota32k.utils.UtLog
 import java.lang.RuntimeException
 import java.lang.UnsupportedOperationException
 import java.nio.ByteBuffer
@@ -13,7 +14,7 @@ import java.util.*
 class AudioChannel {
     companion object {
         val BUFFER_INDEX_END_OF_STREAM = -1
-        val logger = UtLog("AC", null, "io.github.toyota32k.media.")
+        val logger = UtLog("AC", Converter.logger)
     }
     private class AudioBuffer {
         var bufferIndex = 0

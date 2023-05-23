@@ -12,7 +12,7 @@ import io.github.toyota32k.media.lib.track.AudioTrack
 import io.github.toyota32k.media.lib.track.Muxer
 import io.github.toyota32k.media.lib.track.Track
 import io.github.toyota32k.media.lib.track.VideoTrack
-import io.github.toyota32k.media.lib.utils.UtLog
+import io.github.toyota32k.utils.UtLog
 import kotlinx.coroutines.*
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
@@ -480,7 +480,7 @@ class Converter {
                             }
                         }
                     }
-                    report.updateOutputFileInfo(outPath.getLength(), trimmingRangeList.trimmedDurationUs/1000L)
+                    report.updateOutputFileInfo(outPath.getLength(), videoTrack.extractor.totalTime/1000L)
                     report.end()
                     logger.info(report.toString())
                     progress?.finish()

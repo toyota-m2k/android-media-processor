@@ -7,7 +7,7 @@ import android.media.MediaMuxer
 import io.github.toyota32k.media.lib.converter.AndroidFile
 import io.github.toyota32k.media.lib.converter.Converter
 import io.github.toyota32k.media.lib.misc.ISO6709LocationParser
-import io.github.toyota32k.media.lib.utils.UtLog
+import io.github.toyota32k.utils.UtLog
 import java.io.Closeable
 import java.lang.IllegalStateException
 import java.nio.ByteBuffer

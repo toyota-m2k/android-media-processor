@@ -22,8 +22,8 @@ import io.github.toyota32k.media.lib.converter.IAwaiter
 import io.github.toyota32k.media.lib.converter.IProgress
 import io.github.toyota32k.media.lib.strategy.PresetAudioStrategies
 import io.github.toyota32k.media.lib.strategy.PresetVideoStrategies
-import io.github.toyota32k.media.lib.utils.UtLog
 import io.github.toyota32k.media.ui.theme.AndroidMediaProcessorTheme
+import io.github.toyota32k.utils.UtLog
 import kotlinx.coroutines.launch
 
 class MainViewModel(savedStateHandle: SavedStateHandle): ViewModel() {
