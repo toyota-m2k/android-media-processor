@@ -41,6 +41,9 @@ class Extractor(inPath: AndroidFile) : Closeable {
 
     var totalTime = 0L
         private set
+    private var skipping = false
+    private var lastSampleTime = 0L
+    private var skippedTime = 0L
 
     fun chainTo(output: BaseDecoder) : Boolean {
         if(eos) return false
@@ -57,10 +60,17 @@ class Extractor(inPath: AndroidFile) : Closeable {
             if (position != null) {
                 logger.info("seek to the next range.")
                 extractor.seekTo(position.startUs, MediaExtractor.SEEK_TO_NEXT_SYNC)
+                if(!skipping) {
+                    lastSampleTime = sampleTime
+                    skipping = true
+                }
                 return true
             }
         }
-
+        if(skipping) {
+            skipping = false
+            skippedTime += (sampleTime-lastSampleTime)
+        }
 
         val decoder = output.decoder
         val inputBufferIdx = decoder.dequeueInputBuffer(BaseCodec.TIMEOUT_IMMEDIATE)
@@ -81,8 +91,8 @@ class Extractor(inPath: AndroidFile) : Closeable {
             if(sampleSize>0) {
                 logger.assert(sampleTime == extractor.sampleTime)
                 logger.verbose {"read $sampleSize bytes at ${sampleTime/1000} ms"}
+                totalTime = sampleTime - skippedTime
                 decoder.queueInputBuffer(inputBufferIdx, 0, sampleSize, totalTime, extractor.sampleFlags)
-                totalTime += sampleTime
             } else {
                 logger.error("zero byte read.")
             }
