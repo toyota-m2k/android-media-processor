@@ -254,20 +254,17 @@ class Converter {
                 synchronized(this) {
                     if (field < v) {
                         field = v
-                        if (field < v) {
-                            field = v
-                            val pos = v // trimmingRangeList.getPositionInTrimmedDuration(v)
-                            val dur = total
-                            if (dur > 0) {
-                                statistics.put(DealtEntry(pos, System.currentTimeMillis()))
-                                val head = statistics.head
-                                val tail = statistics.tail
-                                val time = tail.tick - head.tick
-                                if (time > 2000) {
-                                    val velocity = (tail.position - head.position) / time  // us / ms
-                                    if (velocity > 0) {
-                                        remainingTime = (dur - pos) / velocity
-                                    }
+                        val pos = v // trimmingRangeList.getPositionInTrimmedDuration(v)
+                        val dur = total
+                        if (dur > 0) {
+                            statistics.put(DealtEntry(pos, System.currentTimeMillis()))
+                            val head = statistics.head
+                            val tail = statistics.tail
+                            val time = tail.tick - head.tick
+                            if (time > 2000) {
+                                val velocity = (tail.position - head.position) / time  // us / ms
+                                if (velocity > 0) {
+                                    remainingTime = (dur - pos) / velocity
                                 }
                             }
                         }
