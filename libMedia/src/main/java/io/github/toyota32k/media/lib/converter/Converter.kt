@@ -194,7 +194,7 @@ class Converter {
     /**
      * IProgress(進捗報告i/f)の実装クラス
      */
-    private class Progress(val trimmingRangeList: ITrimmingRangeList, val onProgress:(IProgress)->Unit): IProgress {
+    private class Progress(val trimmingRangeList: ITrimmingRangeList, val onProgress:(IProgress)->Unit): IProgress, AutoCloseable {
         companion object {
             const val ENTRY_COUNT = 10
             fun create(trimmingRangeList: ITrimmingRangeList, onProgress:((IProgress)->Unit)?):Progress? {
@@ -218,58 +218,74 @@ class Converter {
                 }
             }
         fun finish() {
-            if(percentage !=100) {
-                percentage = 100
-                notifyProgress()
-            }
+            progressInUs = total
         }
 
-        private var busy = AtomicBoolean(false)
-        fun notifyProgress() {
-            if(busy.get()) return
-            CoroutineScope(Dispatchers.Main).launch {
-                busy.set(true)
-                onProgress(this@Progress)
-                busy.set(false)
+        lateinit var job: Job
+        override fun close() {
+            job.cancel()
+        }
+
+        private fun startWatch() {
+            data class ProgressData(
+                override var total: Long = 0,
+                override var current: Long = 0,
+                override var remainingTime: Long = 0):IProgress {
+                fun update(progress: IProgress) {
+                    total = progress.total
+                    current = progress.current
+                    remainingTime = progress.remainingTime
+                }
+            }
+            val progressData = ProgressData()
+
+            job = CoroutineScope(Dispatchers.Main).launch {
+                do {
+                    synchronized(this) { progressData.update(this@Progress) }
+                    onProgress(progressData)
+                    delay(500L)
+                } while(permyriad<10000)
             }
         }
 
         var progressInUs: Long = 0L
+            get() = synchronized(this) { field }
             set(v) {
-                if (field < v) {
-                    field = v
-                    val pos = v // trimmingRangeList.getPositionInTrimmedDuration(v)
-                    val dur = total
-                    if(dur>0) {
-                        val p = max(0, min(100, (pos * 100L / total).toInt()))
-                        if (percentage <p) {
-                            percentage = p
-                            statistics.put(DealtEntry(pos, System.currentTimeMillis()))
-                            val head = statistics.head
-                            val tail = statistics.tail
-                            val time = tail.tick - head.tick
-                            if(time>2000) {
-                                val velocity = (tail.position - head.position) / time  // us / ms
-                                if (velocity > 0) {
-                                    remainingTime = (dur - pos) / velocity
+                synchronized(this) {
+                    if (field < v) {
+                        field = v
+                        if (field < v) {
+                            field = v
+                            val pos = v // trimmingRangeList.getPositionInTrimmedDuration(v)
+                            val dur = total
+                            if (dur > 0) {
+                                statistics.put(DealtEntry(pos, System.currentTimeMillis()))
+                                val head = statistics.head
+                                val tail = statistics.tail
+                                val time = tail.tick - head.tick
+                                if (time > 2000) {
+                                    val velocity = (tail.position - head.position) / time  // us / ms
+                                    if (velocity > 0) {
+                                        remainingTime = (dur - pos) / velocity
+                                    }
                                 }
                             }
-                            notifyProgress()
                         }
-                    } else {
-                        notifyProgress()
                     }
                 }
             }
 
         override var remainingTime: Long = 0
             private set
-        override var percentage: Int = 0
-            private set
+
         override val total: Long
             get() = trimmingRangeList.trimmedDurationUs
         override val current: Long
             get() = progressInUs
+
+        init {
+            startWatch()
+        }
     }
 
     /**
@@ -440,51 +456,52 @@ class Converter {
                 Muxer(inPath, outPath, audioTrack!=null).use { muxer->
                     trimmingRangeList.closeBy(muxer.durationUs)
                     report.updateInputFileInfo(inPath.getLength(), muxer.durationUs/1000L)
-                    val progress = Progress.create(trimmingRangeList, onProgress)
-                    videoTrack.trimmingRangeList = trimmingRangeList
-                    audioTrack?.trimmingRangeList = trimmingRangeList
+                    Progress.create(trimmingRangeList, onProgress).use { progress ->
+                        videoTrack.trimmingRangeList = trimmingRangeList
+                        audioTrack?.trimmingRangeList = trimmingRangeList
 //                    fun eos():Boolean = videoTrack.eos && audioTrack?.eos?:true
-                    var tick = -1L
-                    var count = 0
-                    val tracks = TrackMediator(muxer, videoTrack, audioTrack)
-                    while (!tracks.eos) {
-                        if(!isActive) {
-                            throw CancellationException("cancelled")
-                        }
+                        var tick = -1L
+                        var count = 0
+                        val tracks = TrackMediator(muxer, videoTrack, audioTrack)
+                        while (!tracks.eos) {
+                            if (!isActive) {
+                                throw CancellationException("cancelled")
+                            }
 
 
 //                        val ve = videoTrack.next(muxer, this)
 //                        val ae = audioTrack?.next(muxer, this) ?: false
 //                        if(!ve&&!ae) {
-                        if (!tracks.next(this)) {
-                            if(videoTrack.decoder.eos && audioTrack?.decoder?.eos != false) {
-                                count++
-                                if (tick < 0) {
-                                    tick = System.currentTimeMillis()
-                                } else if (System.currentTimeMillis() - tick > LimitOfPatience && count > MaxRetryCount) {
-                                    logger.info("decoders reached EOS but encoder not working ... forced to stop muxer")
-                                    videoTrack.encoder.forceEos(muxer)
-                                    audioTrack?.encoder?.forceEos(muxer)
+                            if (!tracks.next(this)) {
+                                if (videoTrack.decoder.eos && audioTrack?.decoder?.eos != false) {
+                                    count++
+                                    if (tick < 0) {
+                                        tick = System.currentTimeMillis()
+                                    } else if (System.currentTimeMillis() - tick > LimitOfPatience && count > MaxRetryCount) {
+                                        logger.info("decoders reached EOS but encoder not working ... forced to stop muxer")
+                                        videoTrack.encoder.forceEos(muxer)
+                                        audioTrack?.encoder?.forceEos(muxer)
 //                                    val fv = videoTrack.encoder.forceEos(muxer)
 //                                    val fa = audioTrack?.encoder?.forceEos(muxer)==true
 //                                    sendALetterToYou(fv, fa)
-                                }
+                                    }
 //                                throw TimeoutException("no response from transcoder.")
-                            }
-                        } else {
-                            tick = -1
-                            count = 0
-                            if(progress!=null) {
-                                progress.videoProgressInUs = videoTrack.encoder.writtenPresentationTimeUs
-                                progress.audioProgressInUs = audioTrack?.encoder?.writtenPresentationTimeUs ?: progress.videoProgressInUs
+                                }
+                            } else {
+                                tick = -1
+                                count = 0
+                                if (progress != null) {
+                                    progress.videoProgressInUs = videoTrack.encoder.writtenPresentationTimeUs
+                                    progress.audioProgressInUs = audioTrack?.encoder?.writtenPresentationTimeUs ?: progress.videoProgressInUs
+                                }
                             }
                         }
+                        report.updateOutputFileInfo(outPath.getLength(), videoTrack.extractor.totalTime / 1000L)
+                        report.end()
+                        logger.info(report.toString())
+                        progress?.finish()
+                        ConvertResult.succeeded
                     }
-                    report.updateOutputFileInfo(outPath.getLength(), videoTrack.extractor.totalTime/1000L)
-                    report.end()
-                    logger.info(report.toString())
-                    progress?.finish()
-                    ConvertResult.succeeded
                 }}}
             }
             catch(e:Throwable) {
