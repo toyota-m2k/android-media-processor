@@ -13,10 +13,17 @@ import io.github.toyota32k.media.lib.track.Muxer
 import io.github.toyota32k.media.lib.track.Track
 import io.github.toyota32k.media.lib.track.VideoTrack
 import io.github.toyota32k.utils.UtLog
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Deferred
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
+import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
-import java.util.concurrent.atomic.AtomicBoolean
-import kotlin.math.max
 import kotlin.math.min
 
 /**
@@ -196,7 +203,7 @@ class Converter {
      */
     private class Progress(val trimmingRangeList: ITrimmingRangeList, val onProgress:(IProgress)->Unit): IProgress, AutoCloseable {
         companion object {
-            const val ENTRY_COUNT = 10
+            const val ENTRY_COUNT = 50
             fun create(trimmingRangeList: ITrimmingRangeList, onProgress:((IProgress)->Unit)?):Progress? {
                 return if(onProgress!=null) Progress(trimmingRangeList, onProgress) else null
             }
@@ -248,6 +255,8 @@ class Converter {
             }
         }
 
+        private var dTime:Long = 0L
+
         var progressInUs: Long = 0L
             get() = synchronized(this) { field }
             set(v) {
@@ -256,8 +265,13 @@ class Converter {
                         field = v
                         val pos = v // trimmingRangeList.getPositionInTrimmedDuration(v)
                         val dur = total
-                        if (dur > 0) {
-                            statistics.put(DealtEntry(pos, System.currentTimeMillis()))
+                        val tick = System.currentTimeMillis()
+                        if(tick-dTime>=1000L) {
+                            dTime = 0L  // コンバート速度、残り時間は1秒に1回更新する
+                        }
+                        if (dur > 0 && dTime==0L) {
+                            dTime = tick
+                            statistics.put(DealtEntry(pos, tick))
                             val head = statistics.head
                             val tail = statistics.tail
                             val time = tail.tick - head.tick
