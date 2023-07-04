@@ -48,6 +48,7 @@ class Converter {
     var audioStrategy:IAudioStrategy=PresetAudioStrategies.AACDefault
     var trimmingRangeList : ITrimmingRangeList = ITrimmingRangeList.empty() // TrimmingRange.Empty
     var deleteOutputOnError:Boolean = true
+    var rotation: Rotation? = null
     var onProgress : ((IProgress)->Unit)? = null
     lateinit var report :Report
 
@@ -140,6 +141,11 @@ class Converter {
 
         fun deleteOutputOnError(flag:Boolean):Factory {
             converter.deleteOutputOnError = flag
+            return this
+        }
+
+        fun rotate(rotation: Rotation):Factory {
+            converter.rotation = rotation
             return this
         }
 
@@ -464,7 +470,7 @@ class Converter {
                 report = Report().apply { start() }
                 AudioTrack.create(inPath, audioStrategy,report).use { audioTrack->
                 VideoTrack.create(inPath, videoStrategy,report).use { videoTrack->
-                Muxer(inPath, outPath, audioTrack!=null).use { muxer->
+                Muxer(inPath, outPath, audioTrack!=null, rotation).use { muxer->
                     trimmingRangeList.closeBy(muxer.durationUs)
                     report.updateInputFileInfo(inPath.getLength(), muxer.durationUs/1000L)
                     Progress.create(trimmingRangeList, onProgress).use { progress ->
