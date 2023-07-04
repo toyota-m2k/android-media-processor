@@ -6,6 +6,7 @@ import android.media.MediaMetadataRetriever
 import android.media.MediaMuxer
 import io.github.toyota32k.media.lib.converter.AndroidFile
 import io.github.toyota32k.media.lib.converter.Converter
+import io.github.toyota32k.media.lib.converter.Rotation
 import io.github.toyota32k.media.lib.misc.ISO6709LocationParser
 import io.github.toyota32k.utils.UtLog
 import java.io.Closeable
@@ -13,7 +14,7 @@ import java.lang.IllegalStateException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
-class Muxer(inPath:AndroidFile, outPath: AndroidFile, val hasAudio:Boolean): Closeable {
+class Muxer(inPath:AndroidFile, outPath: AndroidFile, val hasAudio:Boolean, val rotation: Rotation?): Closeable {
     companion object {
         val logger = UtLog("Muxer", Converter.logger)
         const val BUFFER_SIZE = 64 * 1024
@@ -32,15 +33,18 @@ class Muxer(inPath:AndroidFile, outPath: AndroidFile, val hasAudio:Boolean): Clo
     private var audioTrackIndex = -1
 
     init {
-        setupMetaDataBy(inPath)
+        setupMetaDataBy(inPath, rotation)
     }
 
-    private fun setupMetaDataBy(inPath: AndroidFile) {
+    private fun setupMetaDataBy(inPath: AndroidFile, rotation: Rotation?) {
         inPath.fileDescriptorToRead { fd-> MediaMetadataRetriever().apply { setDataSource(fd) }}.use { mediaMetadataRetriever ->
-            val rotation = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull()
-            if (rotation != null) {
-                muxer.setOrientationHint(rotation)
-                logger.info("metadata: rotation=$rotation")
+            val metaRotation = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull()
+            if (metaRotation != null) {
+                val r = rotation?.rotate(metaRotation) ?: metaRotation
+                muxer.setOrientationHint(r)
+                logger.info("metadata: rotation=$metaRotation --> $r")
+            } else if(rotation!=null){
+                muxer.setOrientationHint(rotation.rotate(0))
             }
 
             val locationString = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_LOCATION)
