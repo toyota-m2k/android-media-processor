@@ -7,11 +7,11 @@ import android.media.MediaFormat
 enum class Codec(val media: Media, val mime:String, val alias:String?=null) {
     Invalid(Media.Video, "n/a"),
 
-    AVC(Media.Video, MediaFormat.MIMETYPE_VIDEO_AVC),
+    AVC(Media.Video, MediaFormat.MIMETYPE_VIDEO_AVC),       // H.264
     H263(Media.Video, MediaFormat.MIMETYPE_VIDEO_H263),
     MPEG2(Media.Video, MediaFormat.MIMETYPE_VIDEO_MPEG2),
     MPEG4(Media.Video, MediaFormat.MIMETYPE_VIDEO_MPEG4),
-    HEVC(Media.Video, MediaFormat.MIMETYPE_VIDEO_HEVC),
+    HEVC(Media.Video, MediaFormat.MIMETYPE_VIDEO_HEVC),     // H.265
 
     VP8(Media.Video, MediaFormat.MIMETYPE_VIDEO_VP8),
     VP9(Media.Video, MediaFormat.MIMETYPE_VIDEO_VP9),

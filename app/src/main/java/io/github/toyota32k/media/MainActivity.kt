@@ -1,16 +1,20 @@
 package io.github.toyota32k.media
 
+import android.content.ContentValues
 import android.content.Context
 import android.net.Uri
 import android.os.Bundle
+import android.provider.MediaStore
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.*
 import androidx.compose.runtime.*
 import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.tooling.preview.Preview
@@ -20,11 +24,16 @@ import io.github.toyota32k.media.lib.converter.ConvertResult
 import io.github.toyota32k.media.lib.converter.Converter
 import io.github.toyota32k.media.lib.converter.IAwaiter
 import io.github.toyota32k.media.lib.converter.IProgress
+import io.github.toyota32k.media.lib.converter.FastStart
 import io.github.toyota32k.media.lib.strategy.PresetAudioStrategies
 import io.github.toyota32k.media.lib.strategy.PresetVideoStrategies
 import io.github.toyota32k.media.ui.theme.AndroidMediaProcessorTheme
 import io.github.toyota32k.utils.UtLog
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 
 class MainViewModel(savedStateHandle: SavedStateHandle): ViewModel() {
     val inputUri = savedStateHandle.getLiveData<Uri>("inputUri", Uri.EMPTY)
@@ -38,6 +47,7 @@ class MainViewModel(savedStateHandle: SavedStateHandle): ViewModel() {
     var job: IAwaiter<ConvertResult>? = null
 
     var repeat:Int = 0
+
     private fun onProgress(p: IProgress) {
         val percent = p.percentage
         val remain = p.remainingTime / 1000
@@ -94,7 +104,7 @@ class MainViewModel(savedStateHandle: SavedStateHandle): ViewModel() {
     /**
      * 普通のコンバートテスト用
      */
-    fun convert(context: Context) {
+    fun convert(context: Context, awaiter:MutableStateFlow<Boolean?>?=null) {
         if(job!=null) return
         val input = inputUri.value ?: return
         val output = outputUri.value ?: return
@@ -120,6 +130,7 @@ class MainViewModel(savedStateHandle: SavedStateHandle): ViewModel() {
                 result.cancelled -> "Cancelled"
                 else -> result.errorMessage
             }
+            awaiter?.value = result.succeeded
         }
     }
 
@@ -162,7 +173,7 @@ class MainActivity : ComponentActivity() {
             viewModel.inputUri.value = uri
         }
     }
-    private val openOutputFile = registerForActivityResult(ActivityResultContracts.CreateDocument()) { uri ->
+    private val openOutputFile = registerForActivityResult(ActivityResultContracts.CreateDocument("video/mp4")) { uri ->
         if(uri!=null) {
             viewModel.message.value = ""
             viewModel.outputUri.value = uri
@@ -229,47 +240,153 @@ class MainActivity : ComponentActivity() {
         val message by viewModel.message.observeAsState()
         val progress by viewModel.progress.observeAsState()
 
-        Column(modifier= Modifier.padding(5.dp)) {
-            Button(onClick= {openInputFile.launch("video/*") }) {
-                Text("Input Video File")
-            }
-            UriDisplay(input)
-            Spacer(Modifier.height(5.dp))
-            Button(onClick={openOutputFile.launch("output.mp4")}) {
-                Text("Output Video File")
-            }
-            UriDisplay(output)
+        var state: Boolean by remember { mutableStateOf(true) }
+        var outputBaseName:String by remember { mutableStateOf("a")}
+        var convert by remember { mutableStateOf(false) }
 
-            if(input.isValid()&&output.isValid()) {
-                TrimmingPosition(label = "Start", value = trimStart?:0L) {
-                    viewModel.trimStart.value = try { it.toLong() } catch (_:Throwable) { 0L }
+        Column {
+            Row(Modifier.selectableGroup()) {
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(
+                        selected = state,
+                        onClick = { state = true }
+                    )
+                    Text(
+                        text = "Transcode Test",
+                    )
                 }
-                TrimmingPosition(label = "End", value = trimEnd?:0) {
-                    viewModel.trimEnd.value = try { it.toLong() } catch (_:Throwable) { 0L }
-                }
-                Spacer(modifier = Modifier.height(5.dp))
-                Button(onClick={viewModel.convert(this@MainActivity)}, enabled = processing==false) {
-                    Text("Convert")
-                }
-            }
-            Text(message?:"")
-
-            if(processing==true) {
-                Button(onClick={viewModel.cancel()}) {
-                    Text("Cancel")
-                }
-                if(progress!=null) {
-                    Text("  ${progress}")
+                Row(verticalAlignment = Alignment.CenterVertically) {
+                    RadioButton(
+                        selected = !state,
+                        onClick = { state = false }
+                    )
+                    Text(text = "Fast Start Test")
                 }
             }
 
+            if (state) {
+                Column(modifier = Modifier.padding(5.dp)) {
+                    Button(onClick = { openInputFile.launch("video/*") }) {
+                        Text("Input Video File")
+                    }
+                    UriDisplay(input)
+                    Spacer(Modifier.height(5.dp))
+                    Button(onClick = { openOutputFile.launch("output.mp4") }) {
+                        Text("Output Video File")
+                    }
+                    UriDisplay(output)
+
+                    if (input.isValid() && output.isValid()) {
+//                Button(onClick = { fastStart(input, output)}) {
+//                    Text("Fast Start")
+//                }
+                        TrimmingPosition(label = "Start", value = trimStart ?: 0L) {
+                            viewModel.trimStart.value = try {
+                                it.toLong()
+                            } catch (_: Throwable) {
+                                0L
+                            }
+                        }
+                        TrimmingPosition(label = "End", value = trimEnd ?: 0) {
+                            viewModel.trimEnd.value = try {
+                                it.toLong()
+                            } catch (_: Throwable) {
+                                0L
+                            }
+                        }
+                        Spacer(modifier = Modifier.height(5.dp))
+                        Button(onClick = { viewModel.convert(this@MainActivity) }, enabled = processing == false) {
+                            Text("Convert")
+                        }
+                    }
+                    Text(message ?: "")
+
+                    if (processing == true) {
+                        Button(onClick = { viewModel.cancel() }) {
+                            Text("Cancel")
+                        }
+                        if (progress != null) {
+                            Text("  ${progress}")
+                        }
+                    }
 
 
 //            Spacer(Modifier.height(5.dp))
 //            Button(onClick=this@MainActivity::unregister) {
 //                Text("Unregister")
 //            }
+                }
+            } else {
+                Button(onClick = { openInputFile.launch("video/*") }) {
+                    Text("Input Video File")
+                }
+                UriDisplay(input)
+                Spacer(Modifier.height(5.dp))
+                TextField(
+                    value = outputBaseName,
+                    onValueChange = { newValue ->
+                        outputBaseName = newValue
+                    })
+                Spacer(Modifier.height(5.dp))
+                Checkbox(
+                    checked = convert,
+                    onCheckedChange = { convert = it }
+                )
+                Button(onClick = {fastStartTest(input, outputBaseName, convert)}) {
+                    Text("Execute Test")
+                }
+                if (processing == true) {
+                    Button(onClick = { viewModel.cancel() }) {
+                        Text("Cancel")
+                    }
+                    if (progress != null) {
+                        Text("  ${progress}")
+                    }
+                }
+            }
         }
+    }
+
+//    private fun fastStart(input: Uri?, output:Uri?) {
+//        input ?: return
+//        output?: return
+//        logger.debug("Fast Start (input) = ${FastStart.isFastStart(input,applicationContext)}")
+//        FastStart.fastStart(input, output, applicationContext)
+//        logger.debug("Fast Start (output) = ${FastStart.isFastStart(output,applicationContext)}")
+//    }
+
+    private fun fastStartTest(input: Uri?, outputBaseName:String, convert:Boolean) {
+        var fsSource:Uri = input ?: return
+        logger.debug("Fast Start (input) = ${FastStart.check(input,applicationContext)}")
+
+        lifecycleScope.launch {
+            if (convert) {
+                val name = "$outputBaseName-conv.mp4"
+                val awaiter = MutableStateFlow<Boolean?>(null)
+                val values = ContentValues().apply {
+                    put(MediaStore.Video.Media.DISPLAY_NAME, name)
+                    put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
+                }
+                fsSource = contentResolver.insert(MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY), values) ?: return@launch
+                viewModel.outputUri.value = fsSource
+                viewModel.convert(this@MainActivity, awaiter)
+                if(false == awaiter.first { it!=null }) {
+                    return@launch
+                }
+                logger.debug("Fast Start ($name) = ${FastStart.check(fsSource,applicationContext)}")
+            }
+            val name = "$outputBaseName-fast.mp4"
+            val values = ContentValues().apply {
+                put(MediaStore.Video.Media.DISPLAY_NAME, name)
+                put(MediaStore.Video.Media.MIME_TYPE, "video/mp4")
+            }
+            val lastUri = contentResolver.insert(MediaStore.Video.Media.getContentUri(MediaStore.VOLUME_EXTERNAL_PRIMARY), values) ?: return@launch
+            withContext(Dispatchers.IO) {
+                FastStart.process(fsSource, lastUri, this@MainActivity, null)
+            }
+            logger.info("done")
+        }
+
     }
 
     @Preview(showBackground = true)

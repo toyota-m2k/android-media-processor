@@ -3,7 +3,6 @@ buildscript {
     ext {
         // compose_version によって kotlin versionが制限される。
         // https://developer.android.google.cn/jetpack/androidx/releases/compose-kotlin?hl=ja
-        compose_version = '1.4.3'
         kotlin_version= '1.8.10'
     }
     repositories {
@@ -12,7 +11,7 @@ buildscript {
         maven { url "https://jitpack.io" }
     }
     dependencies {
-        classpath 'com.android.tools.build:gradle:8.0.2'
+        classpath 'com.android.tools.build:gradle:8.1.2'
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
 
         // NOTE: Do not place your application dependencies here; they belong

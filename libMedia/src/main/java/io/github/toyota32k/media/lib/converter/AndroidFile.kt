@@ -8,6 +8,8 @@ import android.provider.OpenableColumns
 import androidx.documentfile.provider.DocumentFile
 import java.io.File
 import java.io.FileDescriptor
+import java.io.FileInputStream
+import java.io.FileOutputStream
 import java.io.RandomAccessFile
 
 /**
@@ -92,6 +94,17 @@ class AndroidFile {
 
     fun <T> fileDescriptorToWrite(fn:(FileDescriptor)->T):T = withFileDescriptor("rw", fn)
 
+    fun <T> fileInputStream(fn:(FileInputStream)->T):T {
+        return fileDescriptorToRead {
+            FileInputStream(it).use(fn)
+        }
+    }
+    fun <T> fileOutputStream(fn:(FileOutputStream)->T):T {
+        return fileDescriptorToWrite {
+            FileOutputStream(it).use(fn)
+        }
+    }
+
     fun openParcelFileDescriptor(mode:String):ParcelFileDescriptor {
         return if(hasUri) {
             context!!.contentResolver.openFileDescriptor(uri!!, mode )!!
@@ -112,6 +125,13 @@ class AndroidFile {
             path!!.delete()
         } else if (hasUri) {
             DocumentFile.fromSingleUri(context!!, uri!!)?.delete()
+        }
+    }
+    fun safeDelete() {
+        try {
+            delete()
+        } catch(_:Throwable) {
+
         }
     }
 
