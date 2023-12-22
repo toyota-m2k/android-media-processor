@@ -75,7 +75,7 @@ class Extractor(inPath: AndroidFile) : Closeable {
         val decoder = output.decoder
         val inputBufferIdx = decoder.dequeueInputBuffer(BaseCodec.TIMEOUT_IMMEDIATE)
         if(inputBufferIdx<0) {
-            logger.debug("no buffer in the decoder.")
+//            logger.debug("no buffer in the decoder.")
             return false
         }
 

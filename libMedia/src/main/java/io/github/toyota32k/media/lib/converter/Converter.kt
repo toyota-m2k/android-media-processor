@@ -381,7 +381,7 @@ class Converter {
                     // ビデオトラックの処理がオーディオトラックより遅れている
                     if(videoNoEffectContext>MaxNoEffectedCount) {
                         // N回以上、ビデオトラックから応答がなければ、オーディオトラックに処理をまわしてみる
-                        logger.debug {"no response from video track ($videoNoEffectContext) ... try audio track."}
+//                        logger.debug {"no response from video track ($videoNoEffectContext) ... try audio track."}
                         videoNoEffectContext = 0
                         audioTrack
                     } else {
@@ -393,7 +393,7 @@ class Converter {
                     // オーディオトラックの処理がビデオトラックより遅れている
                     if(audioNoEffectedCount>MaxNoEffectedCount) {
                         // N回以上、オーディオトラックから応答がなければ、ビデオトラックに処理をまわしてみる。
-                        logger.debug {"no response from audio track ($audioNoEffectedCount)... try video track."}
+//                        logger.debug {"no response from audio track ($audioNoEffectedCount)... try video track."}
                         audioNoEffectedCount = 0
                         videoTrack
                     } else {
