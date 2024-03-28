@@ -153,3 +153,11 @@ fun MediaExtractor.setDataSource(source:AndroidFile) {
         this.setDataSource(source.path!!.toString())
     }
 }
+
+fun Uri.toAndroidFile(context:Context):AndroidFile {
+    return AndroidFile(this, context)
+}
+
+fun File.toAndroidFile():AndroidFile {
+    return AndroidFile(this)
+}

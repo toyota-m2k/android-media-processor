@@ -23,7 +23,7 @@ class Extractor(inPath: AndroidFile) : Closeable {
 //            val org = field
             field = v
 //            logger.assert(false, "don't set trimmingRange twice.")
-            extractor.seekTo(0L, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
+            extractor.seekTo(0L, MediaExtractor.SEEK_TO_CLOSEST_SYNC)
 //            if(v.hasStart) {
 //                extractor.seekTo(v.startUs, MediaExtractor.SEEK_TO_PREVIOUS_SYNC)
 //                logger.debug("SeekTo: ${trimmingRange.startUs/1000L} result: ${extractor.sampleTime/1000L}")
@@ -42,8 +42,9 @@ class Extractor(inPath: AndroidFile) : Closeable {
     var totalTime = 0L
         private set
     private var skipping = false
-    private var lastSampleTime = 0L
-    private var skippedTime = 0L
+//    private var lastSampleTime = 0L
+//    private var skippedTime = 0L
+    private var skippingTo = 0L
 
     fun chainTo(output: BaseDecoder) : Boolean {
         if(eos) return false
@@ -59,17 +60,22 @@ class Extractor(inPath: AndroidFile) : Closeable {
             val position = trimmingRangeList.getNextValidPosition(extractor.sampleTime)
             if (position != null) {
                 logger.info("seek to the next range.")
-                extractor.seekTo(position.startUs, MediaExtractor.SEEK_TO_NEXT_SYNC)
                 if(!skipping) {
-                    lastSampleTime = sampleTime
                     skipping = true
+                    skippingTo = trimmingRangeList.getPositionInTrimmedDuration(position.startUs)
+                    extractor.seekTo(position.startUs, MediaExtractor.SEEK_TO_CLOSEST_SYNC)
+                } else {
+                    logger.debug("CLOSEST_SYNC results in PREVIOUS_SYNC.")
+                    extractor.seekTo(position.startUs, MediaExtractor.SEEK_TO_NEXT_SYNC)
                 }
                 return true
             }
         }
-        if(skipping) {
-            skipping = false
-            skippedTime += (sampleTime-lastSampleTime)
+
+        val presentationTimeUs = if (skipping) {
+            skippingTo
+        } else {
+            trimmingRangeList.getPositionInTrimmedDuration(sampleTime)
         }
 
         val decoder = output.decoder
@@ -91,8 +97,8 @@ class Extractor(inPath: AndroidFile) : Closeable {
             if(sampleSize>0) {
                 logger.assert(sampleTime == extractor.sampleTime)
                 logger.verbose {"read $sampleSize bytes at ${sampleTime/1000} ms"}
-                totalTime = sampleTime - skippedTime
-                decoder.queueInputBuffer(inputBufferIdx, 0, sampleSize, totalTime, extractor.sampleFlags)
+                totalTime = presentationTimeUs
+                decoder.queueInputBuffer(inputBufferIdx, 0, sampleSize, presentationTimeUs, extractor.sampleFlags)
             } else {
                 logger.error("zero byte read.")
             }

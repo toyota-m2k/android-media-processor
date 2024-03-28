@@ -4,6 +4,7 @@ import android.content.Context
 import android.net.Uri
 import io.github.toyota32k.media.lib.misc.RingBuffer
 import io.github.toyota32k.media.lib.report.Report
+import io.github.toyota32k.media.lib.report.Summary
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
 import io.github.toyota32k.media.lib.strategy.PresetAudioStrategies
@@ -39,6 +40,14 @@ class Converter {
         // 両方のトラックが、デコーダーまでEOSになった後、NOPのまま待たされる時間の限界値
         private const val LimitOfPatience = 15*1000L        // 15秒
         private const val MaxRetryCount = 1000
+
+        fun analyze(file:AndroidFile) : Summary {
+            return try {
+                Summary.getSummary(file)
+            } catch(e:Throwable) {
+                Summary()
+            }
+        }
     }
 
     lateinit var inPath:AndroidFile

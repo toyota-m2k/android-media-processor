@@ -12,6 +12,7 @@ import io.github.toyota32k.media.lib.format.getHeight
 import io.github.toyota32k.media.lib.format.getIFrameInterval
 import io.github.toyota32k.media.lib.format.getMaxBitRate
 import io.github.toyota32k.media.lib.format.getWidth
+import java.lang.StringBuilder
 
 data class VideoSummary(
     val codec: Codec?,
@@ -24,7 +25,7 @@ data class VideoSummary(
     val bitRateMode: BitRateMode?,
     val frameRate: Int,
     val iFrameInterval: Int,
-    val colorFormat: ColorFormat?) {
+    val colorFormat: ColorFormat?) : IAttributes {
     constructor(format: MediaFormat) : this(
         Codec.fromFormat(format),
         Profile.fromFormat(format),
@@ -57,19 +58,27 @@ data class VideoSummary(
 //    }
 
     override fun toString(): String {
-        return StringBuilder()
-            .appendLine("  Video")
-            .appendLine("  - Codec = ${codec?:"n/a"}")
-            .appendLine("  - Profile = ${profile?:"n/a"}")
-            .appendLine("  - Level = ${level?:"n/a"}")
-            .appendLine("  - Width = $width")
-            .appendLine("  - Height = $height")
-            .appendLine("  - Bit Rate (bps) = ${bitRate.format()}")
-            .appendLine("  - Max Bit Rate (bps) = ${maxBitRate.format()}")
-            .appendLine("  - Bit Rate Mode = ${bitRateMode ?: "n/a"}")
-            .appendLine("  - Frame Rate = ${frameRate.format()} fps")
-            .appendLine("  - iFrame Interval = $iFrameInterval sec")
-            .appendLine("  - Color Format = ${colorFormat?:"n/a"}")
-            .toString()
+        return format(StringBuilder(), "- ").toString()
+    }
+
+    override val title: String
+        get() = "Video Summary"
+    override val subAttributes: List<IAttributes>
+        get() = emptyList()
+
+    override fun toList(): List<IAttributes.KeyValue> {
+        return listOf(
+            IAttributes.KeyValue("Codec", "${codec?:"n/a"}"),
+            IAttributes.KeyValue("Profile", "${profile?:"n/a"}"),
+            IAttributes.KeyValue("Level", "${level?:"n/a"}"),
+            IAttributes.KeyValue("Width", "$width"),
+            IAttributes.KeyValue("Height", "$height"),
+            IAttributes.KeyValue("Bit Rate", "${bitRate.format()} bps"),
+            IAttributes.KeyValue("Max Bit Rate","${maxBitRate.format()} bps"),
+            IAttributes.KeyValue("Bit Rate Mode", "${bitRateMode ?: "n/a"}"),
+            IAttributes.KeyValue("Frame Rate","${frameRate.format()} fps"),
+            IAttributes.KeyValue("iFrame Interval", "$iFrameInterval sec"),
+            IAttributes.KeyValue("Color Format", "${colorFormat?:"n/a"}"),
+        )
     }
 }
