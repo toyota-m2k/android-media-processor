@@ -1,3 +1,18 @@
 <resources>
     <string name="app_name">sample</string>
+    <string name="ref_text">...</string>
+    <string name="analyze_text">Analyze</string>
+    <string name="input_label">Input File</string>
+    <string name="output_label">Output File</string>
+    <string name="input">Input</string>
+    <string name="output">Output</string>
+    <string name="cancel">Cancel</string>
+    <string name="make_chapter">Make Chapter</string>
+    <string name="make_skip_chapter">Make Skipping Chapter</string>
+    <string name="make_region_skip">Make The Chapter Skipped</string>
+    <string name="remove_prev_chapter">Remote the Previous Chapter</string>
+    <string name="remove_next_chapter">Remote the Next Chapter</string>
+    <string name="undo">Undo</string>
+    <string name="redo">Redo</string>
+    <string name="convert">Convert</string>
 </resources>

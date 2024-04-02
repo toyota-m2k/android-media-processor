@@ -1,16 +1,18 @@
 package io.github.toyota32k.media.lib.converter
 
 import android.content.Context
+import android.database.Cursor
 import android.media.MediaExtractor
 import android.net.Uri
 import android.os.ParcelFileDescriptor
+import android.provider.MediaStore
 import android.provider.OpenableColumns
+import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
 import java.io.File
 import java.io.FileDescriptor
 import java.io.FileInputStream
 import java.io.FileOutputStream
-import java.io.RandomAccessFile
 
 /**
  * Androidのファイルパス指定を抽象化するためのクラス
@@ -135,6 +137,55 @@ class AndroidFile {
         }
     }
 
+    fun getFileName() : String? {
+        return if(hasPath) {
+            path?.name
+        } else {
+            when(uri?.scheme) {
+                "content"-> {
+                    val projection = arrayOf(MediaStore.MediaColumns.DISPLAY_NAME)
+                    val cursor: Cursor? = context?.contentResolver?.query(uri, projection, null, null, null)
+                    cursor?.use {
+                        if (it.moveToFirst()) {
+                            it.getString(it.getColumnIndexOrThrow(MediaStore.MediaColumns.DISPLAY_NAME))
+                        } else null
+                    }
+                }
+                "file"-> uri.path?.let { File(it).name }
+                else -> null
+            }
+        }
+    }
+
+    fun exists(): Boolean {
+        return if(hasPath) {
+            path?.exists()
+        } else {
+            when(uri?.scheme) {
+                "content"-> {
+                    val cursor: Cursor? = context?.contentResolver?.query(uri, null, null, null, null)
+                    cursor?.use {
+                        it.count > 0
+                    }
+                }
+                "file"-> uri.path?.let { File(it).exists() }
+                else -> false
+            }
+        } ?: false
+
+    }
+
+
+    val safeUri:Uri
+        get() = uri ?: path!!.toUri()
+
+    fun copyFrom(src:AndroidFile) {
+        src.fileInputStream { input->
+            this.fileOutputStream { output->
+                input.channel.transferTo(0, input.channel.size(), output.channel)
+            }
+        }
+    }
 
 //
 //    fun mediaMuxer(format:Int=MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4): MediaMuxer {

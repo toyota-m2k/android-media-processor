@@ -8,12 +8,157 @@
     tools:context=".MainActivity">
 
     <TextView
+        android:id="@+id/input_file_name"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toLeftOf="@+id/input_ref_button"
+        app:layout_constraintTop_toTopOf="@+id/input_analyze_button"
+        app:layout_constraintBottom_toBottomOf="@+id/input_analyze_button"
+
+        />
+    <ImageButton
+        android:id="@+id/input_ref_button"
+        android:layout_width="@dimen/media_button_width"
+        android:layout_height="@dimen/media_button_height"
+        app:layout_constraintRight_toLeftOf="@+id/input_analyze_button"
+        app:layout_constraintTop_toTopOf="parent"
+        android:src="@drawable/ic_ref"
+        app:tint="?attr/iconColor"
+        android:contentDescription="@string/ref_text" />
+
+    <ImageButton
+        android:id="@+id/input_analyze_button"
+        android:layout_width="@dimen/media_button_width"
+        android:layout_height="@dimen/media_button_height"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintTop_toTopOf="parent"
+        android:src="@drawable/ic_detail"
+        android:contentDescription="@string/analyze_text" />
+
+    <LinearLayout
+        android:id="@+id/chapter_buttons"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Hello World!"
+        app:layout_constraintTop_toBottomOf="@+id/input_analyze_button"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        android:background="?attr/panelBackgroundColor"
+        >
+        <ImageButton
+            android:id="@+id/make_chapter"
+            android:layout_width="@dimen/media_button_width"
+            android:layout_height="@dimen/media_button_height"
+            app:srcCompat="@drawable/ic_marker"
+            android:rotationX="180"
+            app:tint="?attr/iconColor"
+            android:background="?attr/selectableItemBackground"
+            android:contentDescription="@string/make_chapter" />
+        <ImageButton
+            android:id="@+id/make_chapter_and_skip"
+            android:layout_width="@dimen/media_button_width"
+            android:layout_height="@dimen/media_button_height"
+            app:srcCompat="@drawable/ic_skip_marker"
+            app:tint="?attr/iconColor"
+            android:background="?attr/selectableItemBackground"
+            android:contentDescription="@string/make_skip_chapter" />
+        <ImageButton
+            android:id="@+id/make_region_skip"
+            android:layout_width="@dimen/media_button_width"
+            android:layout_height="@dimen/media_button_height"
+            app:srcCompat="@drawable/ic_forbidden"
+            app:tint="?attr/iconColor"
+            android:background="?attr/selectableItemBackground"
+            android:contentDescription="@string/make_region_skip" />
+        <ImageButton
+            android:id="@+id/remove_prev_chapter"
+            android:layout_width="@dimen/media_button_width"
+            android:layout_height="@dimen/media_button_height"
+            app:srcCompat="@drawable/ic_expand_right"
+            android:rotationY="180"
+            app:tint="?attr/iconColor"
+            android:background="?attr/selectableItemBackground"
+            android:contentDescription="@string/remove_prev_chapter" />
+        <ImageButton
+            android:id="@+id/remove_next_chapter"
+            android:layout_width="@dimen/media_button_width"
+            android:layout_height="@dimen/media_button_height"
+            app:srcCompat="@drawable/ic_expand_right"
+            app:tint="?attr/iconColor"
+            android:background="?attr/selectableItemBackground"
+            android:contentDescription="@string/remove_next_chapter" />
+        <ImageButton
+            android:id="@+id/undo"
+            android:layout_width="@dimen/media_button_width"
+            android:layout_height="@dimen/media_button_height"
+            app:srcCompat="@drawable/ic_undo"
+            app:tint="?attr/iconColor"
+            android:background="?attr/selectableItemBackground"
+            android:contentDescription="@string/undo" />
+        <ImageButton
+            android:id="@+id/redo"
+            android:layout_width="@dimen/media_button_width"
+            android:layout_height="@dimen/media_button_height"
+            app:srcCompat="@drawable/ic_redo"
+            app:tint="?attr/iconColor"
+            android:background="?attr/selectableItemBackground"
+            android:contentDescription="@string/redo" />
+        <ImageButton
+            android:id="@+id/save_video"
+            android:layout_width="@dimen/media_button_width"
+            android:layout_height="@dimen/media_button_height"
+            app:srcCompat="@drawable/ic_save"
+            app:tint="?attr/iconColor"
+            android:background="?attr/selectableItemBackground"
+            android:contentDescription="@string/convert" />
+
+    </LinearLayout>
+
+    <io.github.toyota32k.video.view.VideoPlayerView
+        android:id="@+id/video_viewer"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        app:layout_constraintBottom_toTopOf="@+id/output_play_button"
+        app:layout_constraintTop_toBottomOf="@+id/chapter_buttons"
+        app:layout_constraintVertical_bias="1.0"
+        tools:layout_editor_absoluteX="205dp" />
+
+
+    <TextView
+        android:id="@+id/output_file_name"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toLeftOf="@+id/output_ref_button"
+        app:layout_constraintTop_toTopOf="@+id/output_ref_button"
+        app:layout_constraintBottom_toBottomOf="@+id/output_ref_button"
+        />
+    <ImageButton
+        android:id="@+id/output_ref_button"
+        android:layout_width="@dimen/media_button_width"
+        android:layout_height="@dimen/media_button_height"
+        app:layout_constraintRight_toLeftOf="@+id/output_analyze_button"
         app:layout_constraintBottom_toBottomOf="parent"
-        app:layout_constraintEnd_toEndOf="parent"
-        app:layout_constraintStart_toStartOf="parent"
-        app:layout_constraintTop_toTopOf="parent" />
+        android:src="@drawable/ic_ref"
+        app:tint="?attr/iconColor"
+        android:contentDescription="@string/ref_text" />
+
+    <ImageButton
+        android:id="@+id/output_analyze_button"
+        android:layout_width="@dimen/media_button_width"
+        android:layout_height="@dimen/media_button_height"
+        app:layout_constraintRight_toLeftOf="@+id/output_play_button"
+        app:layout_constraintBottom_toBottomOf="parent"
+        android:src="@drawable/ic_detail"
+        android:contentDescription="@string/analyze_text" />
+    <ImageButton
+        android:id="@+id/output_play_button"
+        android:layout_width="@dimen/media_button_width"
+        android:layout_height="@dimen/media_button_height"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintBottom_toBottomOf="parent"
+        android:src="@drawable/ic_play"
+        android:contentDescription="@string/analyze_text" />
+
 
 </androidx.constraintlayout.widget.ConstraintLayout>

@@ -5,5 +5,10 @@
         <!-- <item name="colorPrimary">@color/my_light_primary</item> -->
     </style>
 
-    <style name="Theme.AndroidMediaProcessor" parent="Base.Theme.AndroidMediaProcessor" />
+    <style name="Theme.AndroidMediaProcessor" parent="Base.Theme.AndroidMediaProcessor">
+        <item name="controlPanelColor">#40FFFFFF</item>
+        <item name="panelBackgroundColor">#40FFFFFF</item>
+        <item name="iconColor">?attr/colorSecondary</item>
+    </style>
+
 </resources>
