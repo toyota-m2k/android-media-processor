@@ -4,15 +4,16 @@ import android.media.MediaCodec
 import android.media.MediaFormat
 import io.github.toyota32k.media.lib.format.Codec
 import io.github.toyota32k.media.lib.utils.TimeSpan
+import java.lang.StringBuilder
 
-class Report {
+class Report : IAttributes {
     var videoEncoderName: String? = null
     var audioEncoderName: String? = null
     var startTick:Long = 0L
     var endTick:Long = 0L
 
-    val input = Summary()
-    val output = Summary()
+    val input = Summary().apply { title = "Input Stream"}
+    val output = Summary().apply { title = "Output Stream"}
 
     fun start() {
         startTick = System.currentTimeMillis()
@@ -51,6 +52,18 @@ class Report {
         output.duration = duration
     }
 
+    override var title: String = "Conversion Results"
+    override val subAttributes: List<IAttributes?>
+        get() = listOf(input, output)
+
+    override fun toList(): List<IAttributes.KeyValue> {
+        return listOf(
+            IAttributes.KeyValue("Video Encoder", videoEncoderName ?: "n/a"),
+            IAttributes.KeyValue("Audio Encoder", audioEncoderName?:"n/a"),
+            IAttributes.KeyValue("Consumed Time", TimeSpan(endTick - startTick).formatH()),
+            )
+    }
+
 //    fun dump(logger: UtLog, message:String) {
 //        logger.info(message)
 //        logger.info("Video Encoder = ${videoEncoderName?:"n/a"}")
@@ -62,17 +75,6 @@ class Report {
 //    }
 
     override fun toString(): String {
-        val consumed = TimeSpan(endTick - startTick)
-        return StringBuilder()
-            .appendLine()
-            .appendLine("Conversion Result")
-            .appendLine("- Video Encoder = ${videoEncoderName ?: "n/a"}")
-            .appendLine("- Audio Encoder = ${audioEncoderName?:"n/a"}")
-            .appendLine("- Consumed Time = ${consumed.formatH()}")
-            .appendLine(" Input Stream")
-            .append(input.toString())
-            .appendLine(" Output Stream")
-            .append(output.toString())
-            .toString()
+        return format(StringBuilder(), "- ").toString()
     }
 }

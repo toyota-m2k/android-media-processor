@@ -1,10 +1,10 @@
 package io.github.toyota32k.media.lib.converter
 
 class TrimmingRangeListImpl : ITrimmingRangeList {
-    val list = mutableListOf<TrimmingRange>()
+    override val list = mutableListOf<TrimmingRange>()
     override val isEmpty: Boolean
         get() = list.isEmpty()
-    private var naturalDurationUs:Long = -1L
+    private var naturalDurationUs: Long = -1L
 
     override fun closeBy(naturalDurationUs:Long) {
         this.naturalDurationUs = naturalDurationUs

@@ -5,15 +5,27 @@ import io.github.toyota32k.media.lib.converter.AndroidFile
 import io.github.toyota32k.media.lib.extractor.Extractor
 import io.github.toyota32k.media.lib.track.Track
 import io.github.toyota32k.media.lib.utils.TimeSpan
+import java.lang.StringBuilder
 
-data class Summary(
+data class Summary (
     var size:Long = 0L,
     var duration:Long = 0L, //MS
     var videoSummary: VideoSummary? = null,
     var audioSummary: AudioSummary? = null,
-) {
+) : IAttributes {
     private fun stringInKb(size: Long): String {
         return String.format("%,d KB", size / 1000L)
+    }
+
+    override var title: String = "Summary"
+    override val subAttributes: List<IAttributes?>
+        get() = listOf(videoSummary, audioSummary)
+
+    override fun toList(): List<IAttributes.KeyValue> {
+        return listOf(
+            IAttributes.KeyValue("File Size", stringInKb(size)),
+            IAttributes.KeyValue("Duration", TimeSpan(duration).formatH()),
+        )
     }
 
 //    fun dump(logger: UtLog, message:String) {
@@ -24,13 +36,7 @@ data class Summary(
 //    }
 
     override fun toString(): String {
-        val d = TimeSpan(duration)
-        return StringBuilder()
-            .appendLine(" - File Size = ${stringInKb(size)}")
-            .appendLine(" - Duration = ${d.formatH()}")
-            .append(videoSummary.toString())
-            .append(audioSummary.toString())
-            .toString()
+        return format(StringBuilder(), "- ").toString()
     }
 
     companion object {

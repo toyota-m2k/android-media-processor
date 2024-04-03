@@ -38,8 +38,9 @@ object FastStart {
      * @return true: 処理した / false: 処理は不要だった、あるいはエラーのため処理できなかった
      */
     fun process(inUri:Uri, outUri:Uri, context:Context, progressCallback: ((IProgress) -> Unit)?):Boolean {
-        val inFile = AndroidFile(inUri, context)
-        val outFile = AndroidFile(outUri, context)
+        return process(AndroidFile(inUri, context), AndroidFile(outUri, context), progressCallback)
+    }
+    fun process(inFile:AndroidFile, outFile:AndroidFile, progressCallback: ((IProgress) -> Unit)?):Boolean {
         var result = false
         try {
             inFile.fileInputStream { inStream->
