@@ -480,12 +480,10 @@ class Converter {
                 AudioTrack.create(inPath, audioStrategy,report).use { audioTrack->
                 VideoTrack.create(inPath, videoStrategy,report).use { videoTrack->
                 Muxer(inPath, outPath, audioTrack!=null, rotation).use { muxer->
-                    trimmingRangeList.closeBy(muxer.durationUs)
+                    trimmingRangeList = videoTrack.extractor.adjustAndSetTrimmingRangeList(trimmingRangeList, muxer.durationUs)
+                    audioTrack?.extractor?.setTrimmingRangeList(trimmingRangeList)
                     report.updateInputFileInfo(inPath.getLength(), muxer.durationUs/1000L)
                     Progress.create(trimmingRangeList, onProgress).use { progress ->
-                        videoTrack.trimmingRangeList = trimmingRangeList
-                        audioTrack?.trimmingRangeList = trimmingRangeList
-//                    fun eos():Boolean = videoTrack.eos && audioTrack?.eos?:true
                         var tick = -1L
                         var count = 0
                         val tracks = TrackMediator(muxer, videoTrack, audioTrack)

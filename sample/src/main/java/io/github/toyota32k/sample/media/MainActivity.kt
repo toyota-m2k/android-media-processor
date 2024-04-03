@@ -102,12 +102,12 @@ class MainActivity : UtMortalActivity() {
         val analyzeInputFileCommand = LiteUnitCommand {
             val input = inputFile.value ?: return@LiteUnitCommand
             val summary = Converter.analyze(input.toAndroidFile(application))
-            MultilineTextDialog.show("Input File", "")
+            MultilineTextDialog.show("Input File", summary.toString())
         }
         val analyzeOutputFileCommand = LiteUnitCommand {
             val output = outputFile.value ?: return@LiteUnitCommand
             val summary = Converter.analyze(output.toAndroidFile(application))
-            MultilineTextDialog.show("Output File", "")
+            MultilineTextDialog.show("Output File", summary.toString())
         }
 
         val inputFile: MutableStateFlow<Uri?> = MutableStateFlow(null)
@@ -272,7 +272,7 @@ class MainActivity : UtMortalActivity() {
             }
         }
 
-        fun setSource(file:AndroidFile) {
+        private fun setSource(file:AndroidFile) {
             val videoSource = VideoSource(file)
             playerModel.setSource(videoSource, autoPlay = false)
             chapterEditor = ChapterEditor(videoSource.chapterList as IMutableChapterList)
@@ -316,6 +316,7 @@ class MainActivity : UtMortalActivity() {
             .bindCommand(viewModel.commandRedo, controls.redo)
             .bindCommand(viewModel.commandUndo, controls.undo)
             .bindCommand(viewModel.commandSave, controls.saveVideo)
+            .bindCommand(viewModel.commandToggleSkip, controls.makeRegionSkip)
             .multiVisibilityBinding(arrayOf(controls.chapterButtons, controls.videoViewer), viewModel.inputFileAvailable, hiddenMode = VisibilityBinding.HiddenMode.HideByInvisible)
             .multiEnableBinding(arrayOf(controls.inputAnalyzeButton, controls.outputRefButton), viewModel.inputFileAvailable)
             .multiEnableBinding(arrayOf(controls.outputAnalyzeButton, controls.outputPlayButton), combine(viewModel.outputFileAvailable, viewModel.converted) {o,c->o&&c})

@@ -1,8 +1,10 @@
 package io.github.toyota32k.media.lib.converter
 
 interface ITrimmingRangeList {
+    val list: List<TrimmingRange>
     val isEmpty:Boolean
     val isNotEmpty:Boolean get() = !isEmpty
+//    val naturalDurationUs:Long
 
     /**
      * 開区間を naturalDurationで閉じる

@@ -37,12 +37,13 @@ abstract class Track(val extractor:Extractor, val trackIdx:Int, type:Muxer.Sampl
     abstract val decoder: BaseDecoder
     abstract val encoder: BaseEncoder
 
-    var trimmingRangeList: ITrimmingRangeList
-        get() = extractor.trimmingRangeList
-        set(v) {
-            extractor.trimmingRangeList = v
-//            decoder.trimmingRangeList = v
-        }
+//    var trimmingRangeList: ITrimmingRangeList
+//        get() = extractor.trimmingRangeList
+//        set(v) {
+//            extractor.trimmingRangeList = v
+////            decoder.trimmingRangeList = v
+//        }
+
 
     val eos
         get() = extractor.eos && decoder.eos && encoder.eos
