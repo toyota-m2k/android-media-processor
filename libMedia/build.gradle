@@ -39,7 +39,6 @@ android {
     publishing {
         singleVariant('release') {
             withSourcesJar()
-            withJavadocJar()
         }
     }
     namespace 'io.github.toyota32k.media.lib'
