@@ -524,7 +524,7 @@ class Converter {
                         report.end()
                         logger.info(report.toString())
                         progress?.finish()
-                        ConvertResult.succeeded
+                        ConvertResult.succeeded(trimmingRangeList)
                     }
                 }}}
             }
