@@ -10,9 +10,11 @@ dependencyResolutionManagement {
     repositories {
         google()
         mavenCentral()
-        maven { url 'https://jitpack.io' }
+        mavenLocal()
+        maven { url = uri("https://jitpack.io") }
     }
 }
+
 rootProject.name = "Android Media Processor"
-include ':libMedia'
-include ':sample'
+include(":libMedia")
+include(":sample")
