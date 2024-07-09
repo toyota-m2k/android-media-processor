@@ -45,6 +45,7 @@ dependencies {
     implementation(libs.android.binding)
     implementation(libs.android.dialog)
     implementation(libs.android.camera)
+    implementation(libs.android.player)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.junitExt)

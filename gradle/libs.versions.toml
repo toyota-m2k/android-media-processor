@@ -15,9 +15,10 @@ coreKtx = "1.13.1"
 activityKtx = "1.9.0"
 constraintLayout = "2.1.4"
 androidUtilities = "2.0.7"
-androidBinding = "1.1.4"
-androidDialog = "3.7.3"
-androidCamera = "1.8.0"
+androidBinding = "1.1.4"    # for sample only
+androidDialog = "3.7.3"     # for sample only
+androidCamera = "2.0.0"     # for sample only
+androidPlayer = "1.1.1"     # for sample only
 
 [libraries]
 appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
@@ -33,6 +34,7 @@ android-utilities = { module = "com.github.toyota-m2k:android-utilities", versio
 android-binding = { module = "com.github.toyota-m2k:android-binding", version.ref = "androidBinding" }
 android-dialog = { module = "com.github.toyota-m2k:android-dialog", version.ref = "androidDialog" }
 android-camera = { module = "com.github.toyota-m2k:android-camera", version.ref = "androidCamera" }
+android-player = { module = "com.github.toyota-m2k:android-media-player", version.ref = "androidPlayer" }
 
 [plugins]
 jetbrains-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }

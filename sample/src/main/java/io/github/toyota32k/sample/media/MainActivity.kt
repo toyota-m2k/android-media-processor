@@ -169,7 +169,7 @@ class MainActivity : UtMortalActivity() {
         }
 
         // chapter editing
-        private lateinit var chapterEditor:ChapterEditor
+        private lateinit var chapterEditor: ChapterEditor
 
         val commandAddChapter = LiteUnitCommand {
             chapterEditor.addChapter(playerModel.currentPosition, "", null)
