@@ -19,12 +19,10 @@ import io.github.toyota32k.binder.enableBinding
 import io.github.toyota32k.binder.multiEnableBinding
 import io.github.toyota32k.binder.multiVisibilityBinding
 import io.github.toyota32k.binder.textBinding
-import io.github.toyota32k.binder.visibilityBinding
 import io.github.toyota32k.dialog.broker.pickers.UtFilePickerStore
 import io.github.toyota32k.dialog.task.UtImmortalAndroidViewModel
 import io.github.toyota32k.dialog.task.UtImmortalSimpleTask
 import io.github.toyota32k.dialog.task.UtMortalActivity
-import io.github.toyota32k.dialog.task.getActivity
 import io.github.toyota32k.dialog.task.showConfirmMessageBox
 import io.github.toyota32k.lib.player.model.IChapterList
 import io.github.toyota32k.lib.player.model.IMediaSourceWithChapter
@@ -49,13 +47,12 @@ import io.github.toyota32k.sample.media.dialog.ProgressDialog
 import io.github.toyota32k.utils.UtLog
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 import java.io.File
+import java.util.Locale
 import java.util.concurrent.atomic.AtomicLong
 
 class MainActivity : UtMortalActivity() {
@@ -205,7 +202,7 @@ class MainActivity : UtMortalActivity() {
         }
 
         private fun stringInKb(size: Long): String {
-            return String.format("%,d KB", size / 1000L)
+            return String.format(Locale.US, "%,d KB", size / 1000L)
         }
 
         val commandSave = LiteUnitCommand() {

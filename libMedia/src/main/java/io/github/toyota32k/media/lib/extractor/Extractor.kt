@@ -142,7 +142,6 @@ class Extractor(inPath: AndroidFile) : Closeable {
 
         var currentPositionUs = extractor.sampleTime
         val positionState = trimmingRangeList.positionState(currentPositionUs)
-        var skippedTime = 0L
 
         // シークする（＝デコーダーにデータを書き込まない）場合は、decoder.dequeueInputBuffer() を呼んではならない。
         // dequeueInputBuffer すると、dequeue済みバッファーとして予約され queueInputBuffer されるまで使えなくなる。
@@ -152,7 +151,7 @@ class Extractor(inPath: AndroidFile) : Closeable {
             val position = trimmingRangeList.getNextValidPosition(extractor.sampleTime)
             if (position != null) {
                 extractor.seekTo(position.startUs, SEEK_TO_CLOSEST_SYNC)
-                skippedTime = extractor.sampleTime - currentPositionUs
+                val skippedTime = extractor.sampleTime - currentPositionUs
                 logger.info("SKIPPED from ${currentPositionUs.toUsTimeString()} to ${extractor.sampleTime.toUsTimeString()}")
                 currentPositionUs = extractor.sampleTime
                 totalSkippedTime += skippedTime

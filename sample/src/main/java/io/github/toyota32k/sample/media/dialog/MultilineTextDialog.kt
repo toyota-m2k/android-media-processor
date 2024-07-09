@@ -2,7 +2,6 @@ package io.github.toyota32k.sample.media.dialog
 
 import android.os.Bundle
 import android.view.View
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import io.github.toyota32k.binder.textBinding
 import io.github.toyota32k.binder.visibilityBinding
@@ -13,7 +12,6 @@ import io.github.toyota32k.dialog.task.UtImmortalViewModel
 import io.github.toyota32k.dialog.task.createViewModel
 import io.github.toyota32k.dialog.task.immortalTaskContext
 import io.github.toyota32k.sample.media.databinding.DialogMultilineTextBinding
-import io.github.toyota32k.sample.media.databinding.DialogProgressBinding
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.map
 
@@ -54,7 +52,7 @@ class MultilineTextDialog : UtDialogEx() {
     companion object {
         fun show(label:String, message:String) {
             UtImmortalSimpleTask.run(MultilineTextDialog::class.java.name) {
-                val vm = MultilineTextViewModel.create(taskName).also {
+                MultilineTextViewModel.create(taskName).also {
                     it.label.value = label
                     it.message.value = message
                 }

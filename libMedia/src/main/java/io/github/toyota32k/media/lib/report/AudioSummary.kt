@@ -7,6 +7,7 @@ import io.github.toyota32k.media.lib.format.getBitRate
 import io.github.toyota32k.media.lib.format.getChannelCount
 import io.github.toyota32k.media.lib.format.getSampleRate
 import java.lang.StringBuilder
+import java.util.Locale
 
 data class AudioSummary(
     val codec: Codec?,
@@ -23,7 +24,7 @@ data class AudioSummary(
         get() = emptyList()
 
     private fun Int.format():String {
-        return String.format("%,d", this)
+        return String.format(Locale.US,"%,d", this)
     }
 
 //    fun dump(logger: UtLog, message:String) {
@@ -56,7 +57,7 @@ data class AudioSummary(
             IAttributes.KeyValue("Codec",   "${codec?:"n/a"}"),
             IAttributes.KeyValue("Profile", "${profile?:"n/a"}"),
             IAttributes.KeyValue("Sample Rate", "${sampleRate.format()} Hz"),
-            IAttributes.KeyValue("Channels", "${channelCount?:"n/a"}"),
+            IAttributes.KeyValue("Channels", "$channelCount"),
             IAttributes.KeyValue("Bit Rate", "${bitRate.format()} bps"),
             )
     }

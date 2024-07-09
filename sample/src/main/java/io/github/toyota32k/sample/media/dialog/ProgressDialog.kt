@@ -2,7 +2,6 @@ package io.github.toyota32k.sample.media.dialog
 
 import android.os.Bundle
 import android.view.View
-import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import io.github.toyota32k.binder.command.LiteUnitCommand
 import io.github.toyota32k.binder.command.ReliableCommand
@@ -10,8 +9,6 @@ import io.github.toyota32k.binder.command.bindCommand
 import io.github.toyota32k.binder.progressBarBinding
 import io.github.toyota32k.binder.textBinding
 import io.github.toyota32k.dialog.UtDialogEx
-import io.github.toyota32k.dialog.task.IUtImmortalTaskContext
-import io.github.toyota32k.dialog.task.IUtImmortalTaskMutableContextSource
 import io.github.toyota32k.dialog.task.UtImmortalTaskManager
 import io.github.toyota32k.dialog.task.UtImmortalViewModel
 import io.github.toyota32k.dialog.task.createViewModel
