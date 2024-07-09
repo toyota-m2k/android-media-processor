@@ -1,23 +1,25 @@
 [versions]
-kotlin="1.9.22"
+#plugins
+kotlin = "1.9.23"
+agp = "8.5.0"
+
+#libraries
 kotlinStdLib = "2.0.0"
-androidGradlePlugin = "8.5.0"
 appcompat = "1.7.0"
 material = "1.12.0"
 coroutinesCore = "1.8.1"
-androidUtilities = "2.0.2"
 junit = "4.13.2"
 junitExt = "1.2.1"
 espressoCore = "3.6.1"
 coreKtx = "1.13.1"
 activityKtx = "1.9.0"
 constraintLayout = "2.1.4"
-androidBinding = "1.1.3"
-androidDialog = "3.7.2"
+androidUtilities = "2.0.7"
+androidBinding = "1.1.4"
+androidDialog = "3.7.3"
 androidCamera = "1.8.0"
 
 [libraries]
-kotlinStdlib = { module = "org.jetbrains.kotlin:kotlin-stdlib", version.ref = "kotlinStdLib" }
 appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
 material = { module = "com.google.android.material:material", version.ref = "material" }
 coroutinesCore = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-core", version.ref = "coroutinesCore" }
@@ -33,6 +35,6 @@ android-dialog = { module = "com.github.toyota-m2k:android-dialog", version.ref 
 android-camera = { module = "com.github.toyota-m2k:android-camera", version.ref = "androidCamera" }
 
 [plugins]
-androidApplication = { id = "com.android.application", version.ref = "androidGradlePlugin" }
-androidLibrary = { id = "com.android.library", version.ref = "androidGradlePlugin" }
-kotlinAndroid = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+jetbrains-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
+android-application = { id = "com.android.application", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "agp" }

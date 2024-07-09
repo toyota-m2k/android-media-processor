@@ -1,6 +1,6 @@
 plugins {
-    id("com.android.library")
-    id("kotlin-android")
+    alias(libs.plugins.jetbrains.kotlin.android)
+    alias(libs.plugins.android.library)
     id("maven-publish")
 }
 
@@ -59,10 +59,20 @@ publishing {
             // You can then customize attributes of the publication as shown below.
             groupId = "com.github.toyota-m2k"
             artifactId = "android-media-processor"
-            version = "1.0"
+            version = project.findProperty("githubReleaseTag") as String? ?: "LOCAL"
 
             afterEvaluate {
                 from(components["release"])
+            }
+        }
+    }
+    repositories {
+        maven {
+            name = "GitHubPackages"
+            url = uri("https://maven.pkg.github.com/toyota-m2k/android-media-processor")
+            credentials {
+                username = project.findProperty("gpr.user") as String? ?: System.getenv("USERNAME")
+                password = project.findProperty("gpr.token") as String? ?: System.getenv("TOKEN")
             }
         }
     }
