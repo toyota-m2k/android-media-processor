@@ -145,7 +145,7 @@ class MainActivity : UtMortalActivity() {
             }
         }
 
-        val outputPlayCommand = LiteUnitCommand() {
+        val outputPlayCommand = LiteUnitCommand {
             if(!converted.value) return@LiteUnitCommand
             val uri = outputFile.value ?: return@LiteUnitCommand
             UtImmortalSimpleTask.run {

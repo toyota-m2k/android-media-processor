@@ -139,7 +139,7 @@ enum class Level(val codec: Codec, val value:Int) {
 
     companion object {
         fun fromValue(codec: Codec, value:Int):Level? {
-            return values().firstOrNull {
+            return entries.firstOrNull {
                 it.codec == codec && it.value == value
             }
         }

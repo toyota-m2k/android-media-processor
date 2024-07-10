@@ -14,7 +14,7 @@ enum class BitRateMode(val value:Int) {
     ;
     companion object {
         fun fromValue(value:Int):BitRateMode? {
-            return BitRateMode.values().firstOrNull {
+            return entries.firstOrNull {
                 it.value == value
             }
         }

@@ -30,7 +30,7 @@ enum class Codec(val media: Media, val mime:String, val alias:String?=null) {
 
     companion object {
         fun fromMime(type:String): Codec? {
-            return values().firstOrNull {
+            return entries.firstOrNull {
                 it.mime.compareTo(type, true) == 0 || it.alias?.compareTo(type, true)==0
             }
         }

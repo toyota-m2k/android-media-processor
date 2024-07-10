@@ -52,7 +52,7 @@ class TrimmingRangeListImpl : ITrimmingRangeList {
 
     override fun getPositionInTrimmedDuration(positionUs: Long): Long {
         if(list.isEmpty()) return positionUs
-        var pos:Long = 0L
+        var pos = 0L
         for(t in list) {
             // ------| range-1 |-------| range-2 | -----
             //    V

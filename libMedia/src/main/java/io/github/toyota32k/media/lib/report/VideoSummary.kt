@@ -13,6 +13,7 @@ import io.github.toyota32k.media.lib.format.getIFrameInterval
 import io.github.toyota32k.media.lib.format.getMaxBitRate
 import io.github.toyota32k.media.lib.format.getWidth
 import java.lang.StringBuilder
+import java.util.Locale
 
 data class VideoSummary(
     val codec: Codec?,
@@ -41,7 +42,7 @@ data class VideoSummary(
         colorFormat = ColorFormat.fromFormat(format))
 
     private fun Int.format():String {
-        return if(this<0) "n/a" else String.format("%,d", this)
+        return if(this<0) "n/a" else String.format(Locale.US, "%,d", this)
     }
 
 //    fun dump(logger: UtLog, message:String) {

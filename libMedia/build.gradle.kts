@@ -31,6 +31,7 @@ android {
     kotlinOptions {
         jvmTarget = "17"
     }
+    @Suppress("UnstableApiUsage")
     testOptions {
         unitTests.isIncludeAndroidResources = true
     }

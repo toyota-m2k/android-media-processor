@@ -114,7 +114,7 @@
 
     </LinearLayout>
 
-    <io.github.toyota32k.video.view.VideoPlayerView
+    <io.github.toyota32k.lib.player.view.VideoPlayerView
         android:id="@+id/video_viewer"
         android:layout_width="match_parent"
         android:layout_height="0dp"

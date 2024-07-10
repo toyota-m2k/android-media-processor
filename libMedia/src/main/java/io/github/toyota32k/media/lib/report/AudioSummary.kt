@@ -53,7 +53,7 @@ data class AudioSummary(
     }
 
     override fun toList(): List<IAttributes.KeyValue> {
-        return listOf<IAttributes.KeyValue>(
+        return listOf(
             IAttributes.KeyValue("Codec",   "${codec?:"n/a"}"),
             IAttributes.KeyValue("Profile", "${profile?:"n/a"}"),
             IAttributes.KeyValue("Sample Rate", "${sampleRate.format()} Hz"),

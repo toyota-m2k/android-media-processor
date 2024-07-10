@@ -2,7 +2,6 @@ package io.github.toyota32k.media.lib.codec
 
 import android.media.MediaCodec
 import android.media.MediaFormat
-import io.github.toyota32k.media.lib.converter.ITrimmingRangeList
 import io.github.toyota32k.media.lib.format.dump
 import io.github.toyota32k.media.lib.report.Report
 

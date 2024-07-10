@@ -8,13 +8,14 @@ import io.github.toyota32k.media.lib.converter.AndroidFile
 import io.github.toyota32k.media.lib.converter.Converter
 import io.github.toyota32k.media.lib.converter.Rotation
 import io.github.toyota32k.media.lib.misc.ISO6709LocationParser
+import io.github.toyota32k.media.lib.misc.safeUse
 import io.github.toyota32k.utils.UtLog
 import java.io.Closeable
 import java.lang.IllegalStateException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
-class Muxer(inPath:AndroidFile, outPath: AndroidFile, val hasAudio:Boolean, val rotation: Rotation?): Closeable {
+class Muxer(inPath:AndroidFile, outPath: AndroidFile, private val hasAudio:Boolean, rotation: Rotation?): Closeable {
     companion object {
         val logger = UtLog("Muxer", Converter.logger)
         const val BUFFER_SIZE = 64 * 1024
@@ -37,35 +38,28 @@ class Muxer(inPath:AndroidFile, outPath: AndroidFile, val hasAudio:Boolean, val 
     }
 
     private fun setupMetaDataBy(inPath: AndroidFile, rotation: Rotation?) {
-        inPath.fileDescriptorToRead { fd ->
-            val mediaMetadataRetriever = MediaMetadataRetriever().apply { setDataSource(fd) }
-            try {
-                val metaRotation = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull()
-                if (metaRotation != null) {
-                    val r = rotation?.rotate(metaRotation) ?: metaRotation
-                    muxer.setOrientationHint(r)
-                    logger.info("metadata: rotation=$metaRotation --> $r")
-                } else if (rotation != null) {
-                    muxer.setOrientationHint(rotation.rotate(0))
+        inPath.fileDescriptorToRead { fd-> MediaMetadataRetriever().apply { setDataSource(fd) }}.safeUse { mediaMetadataRetriever ->
+            val metaRotation = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull()
+            if (metaRotation != null) {
+                val r = rotation?.rotate(metaRotation) ?: metaRotation
+                muxer.setOrientationHint(r)
+                logger.info("metadata: rotation=$metaRotation --> $r")
+            } else if(rotation!=null){
+                muxer.setOrientationHint(rotation.rotate(0))
+            }
+            val locationString = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_LOCATION)
+            if (locationString != null) {
+                val location: FloatArray? = ISO6709LocationParser.parse(locationString)
+                if (location != null) {
+                    muxer.setLocation(location[0], location[1])
+                    logger.info("metadata: latitude=${location[0]}, longitude=${location[1]}")
+                } else {
+                    logger.error("metadata: failed to parse the location metadata: $locationString")
                 }
-
-                val locationString = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_LOCATION)
-                if (locationString != null) {
-                    val location: FloatArray? = ISO6709LocationParser.parse(locationString)
-                    if (location != null) {
-                        muxer.setLocation(location[0], location[1])
-                        logger.info("metadata: latitude=${location[0]}, longitude=${location[1]}")
-                    } else {
-                        logger.error("metadata: failed to parse the location metadata: $locationString")
-                    }
-                }
-
-                mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()?.also {
-                    durationUs = it * 1000
-                    logger.info("metadata: duration=${durationUs / 1000} ms")
-                }
-            } finally {
-                mediaMetadataRetriever.release()
+            }
+            mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()?.also {
+                durationUs = it * 1000
+                logger.info("metadata: duration=${durationUs / 1000} ms")
             }
         }
     }
@@ -76,7 +70,7 @@ class Muxer(inPath:AndroidFile, outPath: AndroidFile, val hasAudio:Boolean, val 
     private var mByteBuffer: ByteBuffer? = null
     private val mSampleInfoList = mutableListOf<SampleInfo>()
 
-    fun trackIndexOf(sampleType: SampleType): Int {
+    private fun trackIndexOf(sampleType: SampleType): Int {
         return when (sampleType) {
             SampleType.Video -> videoTrackIndex
             SampleType.Audio -> audioTrackIndex
@@ -152,7 +146,7 @@ class Muxer(inPath:AndroidFile, outPath: AndroidFile, val hasAudio:Boolean, val 
         }
     }
 
-    fun stopMuxer() {
+    private fun stopMuxer() {
         if(!muxerStopped) {
             muxerStopped = true
             try {

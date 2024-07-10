@@ -1,5 +1,7 @@
 package io.github.toyota32k.media.lib.utils
 
+import java.util.Locale
+
 class TimeSpan (private val ms : Long) {
     val milliseconds: Long
         get() = ms % 1000
@@ -14,22 +16,22 @@ class TimeSpan (private val ms : Long) {
         get() = (ms / 1000 / 60 / 60)
 
     fun formatH(format:String="%02d:%02d'%02d\"") : String {
-        return String.format(format, hours, minutes, seconds)
+        return String.format(Locale.US, format, hours, minutes, seconds)
     }
     fun formatHm(format:String="%02d:%02d'%02d\"%03d") : String {
-        return String.format(format, hours, minutes, seconds, milliseconds)
+        return String.format(Locale.US, format, hours, minutes, seconds, milliseconds)
     }
     fun formatM(format:String="%02d'%02d\"") : String {
-        return String.format(format, minutes, seconds)
+        return String.format(Locale.US, format, minutes, seconds)
     }
     fun formatMm(format:String="%02d\"%02d\"%03d") : String {
-        return String.format(format, minutes, seconds, milliseconds)
+        return String.format(Locale.US, format, minutes, seconds, milliseconds)
     }
     fun formatS(format:String="%02d\"%02d") : String {
-        return String.format(format, seconds, milliseconds/10)
+        return String.format(Locale.US, format, seconds, milliseconds/10)
     }
     fun formatSm(format:String="%02d\"%03d") : String {
-        return String.format(format, seconds, milliseconds)
+        return String.format(Locale.US, format, seconds, milliseconds)
     }
     fun formatAuto() : String {
         return when {

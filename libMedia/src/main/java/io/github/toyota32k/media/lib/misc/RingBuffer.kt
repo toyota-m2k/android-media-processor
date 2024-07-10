@@ -6,7 +6,7 @@ class RingBuffer<T>(val capacity: Int) {
     private val list = ArrayList<T>(capacity)
     private var pos = 0
     var count = 0
-        private set;
+        private set
 
     fun put(v:T) {
         if (count < capacity) {
@@ -44,6 +44,7 @@ class RingBuffer<T>(val capacity: Int) {
                 }
             }
         }
+    @Suppress("unused")
     fun toList():List<T> = iterable.toList()
 
     val head:T

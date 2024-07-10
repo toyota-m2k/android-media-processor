@@ -1,7 +1,5 @@
 package io.github.toyota32k.media.lib.misc
 
-import java.lang.RuntimeException
-
 object MediaConstants {
     // https://android.googlesource.com/platform/frameworks/av/+/lollipop-release/media/libstagefright/ACodec.cpp#2621
     // NOTE: native code enforces baseline profile.

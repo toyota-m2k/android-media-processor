@@ -3,9 +3,11 @@ package io.github.toyota32k.media.lib.report
 import android.media.MediaMetadataRetriever
 import io.github.toyota32k.media.lib.converter.AndroidFile
 import io.github.toyota32k.media.lib.extractor.Extractor
+import io.github.toyota32k.media.lib.misc.safeUse
 import io.github.toyota32k.media.lib.track.Track
 import io.github.toyota32k.media.lib.utils.TimeSpan
 import java.lang.StringBuilder
+import java.util.Locale
 
 data class Summary (
     var size:Long = 0L,
@@ -14,7 +16,7 @@ data class Summary (
     var audioSummary: AudioSummary? = null,
 ) : IAttributes {
     private fun stringInKb(size: Long): String {
-        return String.format("%,d KB", size / 1000L)
+        return String.format(Locale.US, "%,d KB", size / 1000L)
     }
 
     override var title: String = "Summary"
@@ -51,7 +53,7 @@ data class Summary (
             val audioSummary = if(audioTrack >= 0) {
                 AudioSummary(Track.getMediaFormat(extractor.extractor, audioTrack))
             } else null
-            val duration = file.fileDescriptorToRead { fd-> MediaMetadataRetriever().apply { setDataSource(fd) }}.use { mediaMetadataRetriever ->
+            val duration = file.fileDescriptorToRead { fd-> MediaMetadataRetriever().apply { setDataSource(fd) }}.safeUse { mediaMetadataRetriever ->
                 mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLong() ?: -1L
             }
             return Summary(file.getLength(), duration, videoSummary, audioSummary)

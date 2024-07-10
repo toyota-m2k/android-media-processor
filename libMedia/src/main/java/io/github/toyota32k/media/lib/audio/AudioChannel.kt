@@ -15,6 +15,8 @@ class AudioChannel {
     companion object {
         val BUFFER_INDEX_END_OF_STREAM = -1
         val logger = UtLog("AC", Converter.logger)
+        private const val BYTES_PER_SHORT = 2
+        private const val MICROSECS_PER_SEC: Long = 1000000
     }
     private class AudioBuffer {
         var bufferIndex = 0
@@ -22,15 +24,11 @@ class AudioChannel {
         var data: ShortBuffer? = null
     }
 
-    private val BYTES_PER_SHORT = 2
-    private val MICROSECS_PER_SEC: Long = 1000000
-
     private val mEmptyBuffers: Queue<AudioBuffer> = ArrayDeque()
     private val mFilledBuffers: Queue<AudioBuffer> = ArrayDeque()
 
     private val hasData:Boolean get() = mFilledBuffers.isNotEmpty()
     private var inputEos:Boolean = false
-        private set
     val eos:Boolean
         get() = inputEos && !hasData
 

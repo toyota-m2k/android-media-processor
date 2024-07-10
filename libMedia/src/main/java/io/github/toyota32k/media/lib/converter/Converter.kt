@@ -33,13 +33,14 @@ import kotlin.math.min
 class Converter {
     companion object {
         val logger = UtLog("AMP", null, "io.github.toyota32k.media.lib.")
+        @Suppress("unused")
         val factory
             get() = Factory()
         // 片方のトラックがN回以上、応答なしになったとき、もう片方のトラックに処理をまわす、そのNの定義（数は適当）
-        private const val MaxNoEffectedCount = 20
+        private const val MAX_NO_EFFECTED_COUNT = 20
         // 両方のトラックが、デコーダーまでEOSになった後、NOPのまま待たされる時間の限界値
-        private const val LimitOfPatience = 15*1000L        // 15秒
-        private const val MaxRetryCount = 1000
+        private const val LIMIT_OF_PATIENCE = 15*1000L        // 15秒
+        private const val MAX_RETRY_COUNT = 1000
 
         fun analyze(file:AndroidFile) : Summary {
             return try {
@@ -388,7 +389,7 @@ class Converter {
                 }
                 else if(videoTrack.convertedLength<=audioTrack.convertedLength) {
                     // ビデオトラックの処理がオーディオトラックより遅れている
-                    if(videoNoEffectContext>MaxNoEffectedCount) {
+                    if(videoNoEffectContext>MAX_NO_EFFECTED_COUNT) {
                         // N回以上、ビデオトラックから応答がなければ、オーディオトラックに処理をまわしてみる
 //                        logger.debug {"no response from video track ($videoNoEffectContext) ... try audio track."}
                         videoNoEffectContext = 0
@@ -400,7 +401,7 @@ class Converter {
                 }
                 else {
                     // オーディオトラックの処理がビデオトラックより遅れている
-                    if(audioNoEffectedCount>MaxNoEffectedCount) {
+                    if(audioNoEffectedCount>MAX_NO_EFFECTED_COUNT) {
                         // N回以上、オーディオトラックから応答がなければ、ビデオトラックに処理をまわしてみる。
 //                        logger.debug {"no response from audio track ($audioNoEffectedCount)... try video track."}
                         audioNoEffectedCount = 0
@@ -501,7 +502,7 @@ class Converter {
                                     count++
                                     if (tick < 0) {
                                         tick = System.currentTimeMillis()
-                                    } else if (System.currentTimeMillis() - tick > LimitOfPatience && count > MaxRetryCount) {
+                                    } else if (System.currentTimeMillis() - tick > LIMIT_OF_PATIENCE && count > MAX_RETRY_COUNT) {
                                         logger.info("decoders reached EOS but encoder not working ... forced to stop muxer")
                                         videoTrack.encoder.forceEos(muxer)
                                         audioTrack?.encoder?.forceEos(muxer)

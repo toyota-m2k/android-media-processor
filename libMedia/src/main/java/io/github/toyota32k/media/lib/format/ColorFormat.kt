@@ -338,7 +338,7 @@ enum class ColorFormat(val value:Int) {
     ;
     companion object {
         fun fromValue(value:Int):ColorFormat? {
-            return values().firstOrNull {
+            return entries.firstOrNull {
                 it.value == value
             }
         }

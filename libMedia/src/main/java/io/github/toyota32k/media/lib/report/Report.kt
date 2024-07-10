@@ -23,7 +23,7 @@ class Report : IAttributes {
     }
 
     private fun updateSummary(summary:Summary, format: MediaFormat) {
-        val codec = Codec.Companion.fromFormat(format) ?: return
+        val codec = Codec.fromFormat(format) ?: return
         if(codec.media.isVideo()) {
             summary.videoSummary = VideoSummary(format)
         } else {

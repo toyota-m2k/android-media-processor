@@ -5,7 +5,6 @@ import io.github.toyota32k.utils.TimeSpan
 /**
  * 進捗報告用 i/f
  */
-@Suppress("unused")
 interface IProgress {
     val permyriad:Int       // progress in permyriad (0: not available)
         get() = if(total==0L) 0 else ((current * 10000L)/total).coerceIn(0L,10000L).toInt()

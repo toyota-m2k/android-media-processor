@@ -3,23 +3,23 @@ package io.github.toyota32k.media.lib.extractor
 import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaExtractor.SEEK_TO_CLOSEST_SYNC
-import android.os.Build
 import io.github.toyota32k.media.lib.codec.BaseCodec
 import io.github.toyota32k.media.lib.codec.BaseDecoder
-import io.github.toyota32k.media.lib.converter.*
+import io.github.toyota32k.media.lib.converter.AndroidFile
+import io.github.toyota32k.media.lib.converter.Converter
+import io.github.toyota32k.media.lib.converter.ITrimmingRangeList
+import io.github.toyota32k.media.lib.converter.TrimmingRangeListImpl
 import io.github.toyota32k.media.lib.track.Muxer
 import io.github.toyota32k.media.lib.utils.TimeSpan
 import io.github.toyota32k.utils.UtLog
 import java.io.Closeable
 import java.nio.ByteBuffer
-import kotlin.math.abs
-import kotlin.math.max
 
 class Extractor(inPath: AndroidFile) : Closeable {
     lateinit var logger: UtLog
     val extractor = inPath.fileDescriptorToRead { fd-> MediaExtractor().apply { setDataSource(fd) }}
-    var trackIdx:Int = -1
-    lateinit var mediaType: Muxer.SampleType
+    private var trackIdx:Int = -1
+    private lateinit var mediaType: Muxer.SampleType
 //    lateinit var inputFormat:MediaFormat
     private fun Long.toUsTimeString():String {
         return TimeSpan.formatAutoM(this/1000L)
@@ -84,11 +84,11 @@ class Extractor(inPath: AndroidFile) : Closeable {
         val newList = TrimmingRangeListImpl()
         for (range in originalList.list) {
             if (range.startUs>0) {
-                extractor.seekTo(range.startUs, MediaExtractor.SEEK_TO_CLOSEST_SYNC)
+                extractor.seekTo(range.startUs, SEEK_TO_CLOSEST_SYNC)
                 newList.addRange(extractor.sampleTime, range.endUs)
             }
         }
-        extractor.seekTo(0, MediaExtractor.SEEK_TO_CLOSEST_SYNC)
+        extractor.seekTo(0, SEEK_TO_CLOSEST_SYNC)
         newList.closeBy(durationUs)
         this.trimmingRangeList = newList
         return newList
