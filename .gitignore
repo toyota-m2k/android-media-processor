@@ -19,3 +19,4 @@ local.properties
 .idea/gradle.xml
 .idea/deploymentTargetSelector.xml
 .idea/other.xml
+app/build
