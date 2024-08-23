@@ -76,7 +76,7 @@ data class VideoSummary(
             IAttributes.KeyValue("Width", "$width"),
             IAttributes.KeyValue("Height", "$height"),
             IAttributes.KeyValue("Bit Rate", "${bitRate.format()} bps"),
-            IAttributes.KeyValue("Max Bit Rate","${maxBitRate.format()} bps"),
+//            IAttributes.KeyValue("Max Bit Rate","${maxBitRate.format()} bps"),     そもそも MediaFormat に存在しない情報
             IAttributes.KeyValue("Bit Rate Mode", "${bitRateMode ?: "n/a"}"),
             IAttributes.KeyValue("Frame Rate","${frameRate.format()} fps"),
             IAttributes.KeyValue("iFrame Interval", "${iFrameInterval.format()} sec"),
