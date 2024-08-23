@@ -2,7 +2,10 @@ package io.github.toyota32k.media.lib.report
 
 import android.media.MediaMetadataRetriever
 import io.github.toyota32k.media.lib.converter.AndroidFile
+import io.github.toyota32k.media.lib.converter.Converter
 import io.github.toyota32k.media.lib.extractor.Extractor
+import io.github.toyota32k.media.lib.format.getBitRate
+import io.github.toyota32k.media.lib.format.getDuration
 import io.github.toyota32k.media.lib.misc.safeUse
 import io.github.toyota32k.media.lib.track.Track
 import io.github.toyota32k.media.lib.utils.TimeSpan
@@ -43,20 +46,23 @@ data class Summary (
 
     companion object {
         fun getSummary(file:AndroidFile):Summary {
-
-            val extractor = Extractor(file)
-            val videoTrack = Track.findTrackIdx(extractor.extractor, "video")
-            val videoSummary = if (videoTrack >= 0) {
-                VideoSummary(Track.getMediaFormat(extractor.extractor, videoTrack))
-            } else null
-            val audioTrack = Track.findTrackIdx(extractor.extractor, "audio")
-            val audioSummary = if(audioTrack >= 0) {
-                AudioSummary(Track.getMediaFormat(extractor.extractor, audioTrack))
-            } else null
-            val duration = file.fileDescriptorToRead { fd-> MediaMetadataRetriever().apply { setDataSource(fd) }}.safeUse { mediaMetadataRetriever ->
-                mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLong() ?: -1L
+            return Extractor(file).use { extractor ->
+                file.fileDescriptorToRead { fd -> MediaMetadataRetriever().apply { setDataSource(fd) } }
+                    .safeUse { mediaMetadataRetriever ->
+                        val videoTrack = Track.findTrackIdx(extractor.extractor, "video")
+                        val videoSummary = if (videoTrack >= 0) {
+                            val videoFormat = Track.getMediaFormat(extractor.extractor, videoTrack)
+                            Converter.logger.info("BitRate = ${videoFormat.getBitRate()?:-1L} / ${mediaMetadataRetriever.getBitRate()?:-1L}")
+                            VideoSummary(videoFormat, mediaMetadataRetriever)
+                        } else null
+                        val audioTrack = Track.findTrackIdx(extractor.extractor, "audio")
+                        val audioSummary = if(audioTrack >= 0) {
+                            AudioSummary(Track.getMediaFormat(extractor.extractor, audioTrack))
+                        } else null
+                        val duration = mediaMetadataRetriever.getDuration() ?: -1L
+                        Summary(file.getLength(), duration, videoSummary, audioSummary)
+                    }
             }
-            return Summary(file.getLength(), duration, videoSummary, audioSummary)
         }
     }
 }

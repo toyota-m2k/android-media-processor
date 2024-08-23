@@ -16,7 +16,7 @@ import java.io.Closeable
 import java.nio.ByteBuffer
 
 class Extractor(inPath: AndroidFile) : Closeable {
-    lateinit var logger: UtLog
+    var logger: UtLog = UtLog("Extractor", Converter.logger)
     val extractor = inPath.fileDescriptorToRead { fd-> MediaExtractor().apply { setDataSource(fd) }}
     private var trackIdx:Int = -1
     private lateinit var mediaType: Muxer.SampleType

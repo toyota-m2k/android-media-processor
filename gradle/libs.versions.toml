@@ -13,11 +13,11 @@ espressoCore = "3.6.1"
 coreKtx = "1.13.1"
 activityKtx = "1.9.1"
 constraintLayout = "2.1.4"
-androidUtilities = "2.1.0"
-androidBinding = "1.2.0"    # for sample only
-androidDialog = "3.7.5"     # for sample only
+androidUtilities = "2.2.0"
+androidBinding = "1.3.1"    # for sample only
+androidDialog = "3.8.0"     # for sample only
 androidCamera = "2.0.0"     # for sample only
-androidPlayer = "1.2.0"     # for sample only
+androidPlayer = "1.3.0"     # for sample only
 
 [libraries]
 appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }

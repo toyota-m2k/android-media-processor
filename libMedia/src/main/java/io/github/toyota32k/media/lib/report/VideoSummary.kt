@@ -1,6 +1,7 @@
 package io.github.toyota32k.media.lib.report
 
 import android.media.MediaFormat
+import android.media.MediaMetadataRetriever
 import io.github.toyota32k.media.lib.format.BitRateMode
 import io.github.toyota32k.media.lib.format.Codec
 import io.github.toyota32k.media.lib.format.ColorFormat
@@ -27,17 +28,17 @@ data class VideoSummary(
     val frameRate: Int,
     val iFrameInterval: Int,
     val colorFormat: ColorFormat?) : IAttributes {
-    constructor(format: MediaFormat) : this(
+    constructor(format: MediaFormat, retriever: MediaMetadataRetriever?) : this(
         Codec.fromFormat(format),
         Profile.fromFormat(format),
         Level.fromFormat(format),
 
         width = format.getWidth()?:-1,
         height = format.getHeight()?:-1,
-        bitRate = format.getBitRate()?:-1,
+        bitRate = format.getBitRate()?: retriever?.getBitRate() ?: -1,
         maxBitRate = format.getMaxBitRate()?:-1,
         bitRateMode = BitRateMode.fromFormat(format),
-        frameRate = format.getFrameRate()?:-1,
+        frameRate = format.getFrameRate()?: retriever?.getFrameRate() ?: -1,
         iFrameInterval = format.getIFrameInterval()?:-1,
         colorFormat = ColorFormat.fromFormat(format))
 
@@ -78,7 +79,7 @@ data class VideoSummary(
             IAttributes.KeyValue("Max Bit Rate","${maxBitRate.format()} bps"),
             IAttributes.KeyValue("Bit Rate Mode", "${bitRateMode ?: "n/a"}"),
             IAttributes.KeyValue("Frame Rate","${frameRate.format()} fps"),
-            IAttributes.KeyValue("iFrame Interval", "$iFrameInterval sec"),
+            IAttributes.KeyValue("iFrame Interval", "${iFrameInterval.format()} sec"),
             IAttributes.KeyValue("Color Format", "${colorFormat?:"n/a"}"),
         )
     }

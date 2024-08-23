@@ -2,6 +2,7 @@ package io.github.toyota32k.media.lib.format
 
 import android.annotation.SuppressLint
 import android.media.MediaFormat
+import android.media.MediaMetadataRetriever
 
 @SuppressLint("InlinedApi")
 enum class Codec(val media: Media, val mime:String, val alias:String?=null) {

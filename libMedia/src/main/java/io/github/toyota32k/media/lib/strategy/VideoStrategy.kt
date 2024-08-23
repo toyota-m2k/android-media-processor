@@ -5,6 +5,7 @@ import android.media.MediaCodecInfo
 import android.media.MediaCodecInfo.CodecCapabilities
 import android.media.MediaCodecList
 import android.media.MediaFormat
+import android.media.MediaMetadataRetriever
 import android.util.Size
 import io.github.toyota32k.media.lib.format.BitRateMode
 import io.github.toyota32k.media.lib.format.Codec
@@ -13,6 +14,7 @@ import io.github.toyota32k.media.lib.format.Level
 import io.github.toyota32k.media.lib.format.Profile
 import io.github.toyota32k.media.lib.format.getBitRate
 import io.github.toyota32k.media.lib.format.getBitRateMode
+import io.github.toyota32k.media.lib.format.getDuration
 import io.github.toyota32k.media.lib.format.getFrameRate
 import io.github.toyota32k.media.lib.format.getHeight
 import io.github.toyota32k.media.lib.format.getIFrameInterval
@@ -44,12 +46,14 @@ open class VideoStrategy(
 //        return if(v!=null) String.format("0x%x",v) else "n/a"
 //    }
 
-    override fun createOutputFormat(inputFormat: MediaFormat, encoder: MediaCodec): MediaFormat {
-        val bitRate = this.bitRate.value(inputFormat.getBitRate())
-        val frameRate = this.frameRate.value(inputFormat.getFrameRate())
+    override fun createOutputFormat(inputFormat: MediaFormat, retriever: MediaMetadataRetriever, encoder: MediaCodec): MediaFormat {
+        // bitRate は、MediaFormat に含まれず、MetaDataにのみ含まれるケースがあるようなので、
+        // 両方をチェックするようにしてみた。
+        val bitRate = this.bitRate.value(inputFormat.getBitRate(), retriever.getBitRate())
+        val frameRate = this.frameRate.value(inputFormat.getFrameRate(), retriever.getFrameRate())
         val iFrameInterval = this.iFrameInterval.value(inputFormat.getIFrameInterval())
-        var width = inputFormat.getWidth() ?: throw IllegalArgumentException("inputFormat have no size params.")
-        var height = inputFormat.getHeight() ?: throw IllegalArgumentException("inputFormat have no size params.")
+        var width = inputFormat.getWidth() ?: retriever.getWidth() ?: throw IllegalArgumentException("inputFormat have no size params.")
+        var height = inputFormat.getHeight() ?: retriever.getHeight() ?: throw IllegalArgumentException("inputFormat have no size params.")
         if(sizeCriteria!=null) {
             val size = calcVideoSize(width, height, sizeCriteria)
             width = size.width
@@ -62,13 +66,18 @@ open class VideoStrategy(
         logger.info("- Type           ${inputFormat.getMime()?:"n/a"} --> ${codec.mime}")
         logger.info("- Profile        ${Profile.fromFormat(inputFormat)?:"n/a"} --> ${Profile.fromValue(codec, pl.profile)?:"n/a"}")
         logger.info("- Level          ${Level.fromFormat(inputFormat)} --> ${Level.fromValue(codec,pl.level)?:"n/a"}")
-        logger.info("- Width          ${inputFormat.getWidth()?:"n/a"} --> $width")
-        logger.info("- Height         ${inputFormat.getHeight()?:"n/a"} --> $height")
-        logger.info("- BitRate        ${inputFormat.getBitRate()?:"n/a"} --> $bitRate")
+        logger.info("- Width          ${inputFormat.getWidth()?:"n/a"}")
+        logger.info("- Width(MT)      ${retriever.getWidth()?:"n/a"} --> $width")
+        logger.info("- Height         ${inputFormat.getHeight()?:"n/a"}")
+        logger.info("- Height(MT)     ${retriever.getHeight()?:"n/a"} --> $height")
+        logger.info("- BitRate        ${inputFormat.getBitRate()?:"n/a"}")
+        logger.info("- BitRate(MT)    ${retriever.getBitRate()?:"n/a"} --> $bitRate")
         logger.info("- BitRateMode    ${inputFormat.getBitRateMode()?:"n/a"} --> ${brm?:"n/a"}")
-        logger.info("- FrameRate      ${inputFormat.getFrameRate()?:"n/a"} --> $frameRate")
+        logger.info("- FrameRate      ${inputFormat.getFrameRate()?:"n/a"}")
+        logger.info("- FrameRate(MT)  ${retriever.getFrameRate()?:"n/a"} --> $frameRate")
         logger.info("- iFrameInterval ${inputFormat.getIFrameInterval()?:"n/a"} --> $iFrameInterval")
         logger.info("- colorFormat    ${ColorFormat.fromFormat(inputFormat)?:"n/a"} --> ${colorFormat?:"n/a"}")
+        logger.info("- Duration       ${retriever.getDuration()?:"n/a"}")
         logger.info("-------------------------------------------------------------------")
 
         return MediaFormat.createVideoFormat(codec.mime, width, height).apply {

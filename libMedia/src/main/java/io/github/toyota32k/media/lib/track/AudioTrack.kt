@@ -30,7 +30,7 @@ private constructor(extractor: Extractor, inputFormat:MediaFormat, outputFormat:
             val outputFormat = strategy.createOutputFormat(inputFormat, encoder)
 
             report.updateAudioEncoder(encoder)
-            report.updateInputSummary(inputFormat)
+            report.updateInputSummary(inputFormat, null)
             report.updateOutputSummary(outputFormat)
 
             return AudioTrack(extractor, inputFormat, outputFormat, encoder, trackIdx,report)

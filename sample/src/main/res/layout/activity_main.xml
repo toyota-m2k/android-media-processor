@@ -43,7 +43,7 @@
         app:layout_constraintTop_toBottomOf="@+id/input_analyze_button"
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintRight_toRightOf="parent"
-        android:background="?attr/panelBackgroundColor"
+        android:background="@color/black"
         >
         <ImageButton
             android:id="@+id/make_chapter"

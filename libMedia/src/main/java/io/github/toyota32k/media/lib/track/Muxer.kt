@@ -7,6 +7,8 @@ import android.media.MediaMuxer
 import io.github.toyota32k.media.lib.converter.AndroidFile
 import io.github.toyota32k.media.lib.converter.Converter
 import io.github.toyota32k.media.lib.converter.Rotation
+import io.github.toyota32k.media.lib.format.getLocation
+import io.github.toyota32k.media.lib.format.getRotation
 import io.github.toyota32k.media.lib.misc.ISO6709LocationParser
 import io.github.toyota32k.media.lib.misc.safeUse
 import io.github.toyota32k.utils.UtLog
@@ -39,7 +41,7 @@ class Muxer(inPath:AndroidFile, outPath: AndroidFile, private val hasAudio:Boole
 
     private fun setupMetaDataBy(inPath: AndroidFile, rotation: Rotation?) {
         inPath.fileDescriptorToRead { fd-> MediaMetadataRetriever().apply { setDataSource(fd) }}.safeUse { mediaMetadataRetriever ->
-            val metaRotation = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull()
+            val metaRotation = mediaMetadataRetriever.getRotation()
             if (metaRotation != null) {
                 val r = rotation?.rotate(metaRotation) ?: metaRotation
                 muxer.setOrientationHint(r)
@@ -47,7 +49,7 @@ class Muxer(inPath:AndroidFile, outPath: AndroidFile, private val hasAudio:Boole
             } else if(rotation!=null){
                 muxer.setOrientationHint(rotation.rotate(0))
             }
-            val locationString = mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_LOCATION)
+            val locationString = mediaMetadataRetriever.getLocation()
             if (locationString != null) {
                 val location: FloatArray? = ISO6709LocationParser.parse(locationString)
                 if (location != null) {
