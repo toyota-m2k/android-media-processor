@@ -86,8 +86,11 @@ class TrimmingRangeListImpl : ITrimmingRangeList {
         if(naturalDurationUs<0) throw java.lang.IllegalStateException("call closeBy() in advance.")
         return if(list.isEmpty()) {
             when {
-                positionUs<0 -> ITrimmingRangeList.PositionState.END
-                positionUs>=naturalDurationUs -> ITrimmingRangeList.PositionState.END
+                positionUs<0 -> ITrimmingRangeList.PositionState.END        // positionUs < 0 : EOS
+                // metadata から得た Durationが間違っているかもしれないので、このチェックはやめて、EOS まで読み込む
+                // Chromebook のカメラで撮影したウソクソメタ情報問題を回避できるかと思ったけど、Extractor が Duration位置で読み込みをやめてしまうのでダメだった。
+                // いずれにしても、このチェックは Extractor に任せたので良さそう。
+                // positionUs>=naturalDurationUs -> ITrimmingRangeList.PositionState.END
                 else -> ITrimmingRangeList.PositionState.VALID
             }
         } else {

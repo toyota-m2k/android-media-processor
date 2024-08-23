@@ -163,6 +163,9 @@ open class VideoStrategy(
         return supportedProfile(supported)
     }
 
+    fun calcSize(width:Int, height:Int) : Size {
+        return calcVideoSize(width, height, sizeCriteria ?: throw IllegalStateException("sizeCriteria is null."))
+    }
 
     data class SizeCriteria(val shortSize:Int, val longSide:Int)
 

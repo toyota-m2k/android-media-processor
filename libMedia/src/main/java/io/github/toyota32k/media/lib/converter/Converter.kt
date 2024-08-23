@@ -14,6 +14,8 @@ import io.github.toyota32k.media.lib.track.Muxer
 import io.github.toyota32k.media.lib.track.Track
 import io.github.toyota32k.media.lib.track.VideoTrack
 import io.github.toyota32k.utils.UtLog
+import io.github.toyota32k.utils.UtLogger
+import io.github.toyota32k.utils.UtLoggerInstance
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -48,6 +50,10 @@ class Converter {
             } catch(e:Throwable) {
                 Summary()
             }
+        }
+
+        fun setExternalLogger(externalLogger:IAmpLogger) {
+            UtLoggerInstance.externalLogger = externalLogger.asUtExternalLogger()
         }
     }
 
