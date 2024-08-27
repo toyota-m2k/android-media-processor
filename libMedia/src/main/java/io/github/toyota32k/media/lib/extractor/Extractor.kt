@@ -44,19 +44,10 @@ class Extractor private constructor(private val inPath: IInputMediaFile, private
         }
     }
 
-    private lateinit var closeableEextractor: CloseableExtractor
-    val extractor get() = closeableEextractor.obj
+    private val closeableExtractor: CloseableExtractor = inPath.openExtractor()
+    val extractor get() = closeableExtractor.obj
     private var trackIdx:Int = -1
     var logger: UtLog = UtLog("Extractor", Converter.logger)
-
-    private fun newExtractor(old:CloseableExtractor? = null) {
-        old?.close()
-        closeableEextractor = inPath.openExtractor()
-        val extractor = closeableEextractor.obj
-        trackIdx = findTrackIdx(extractor, type.trackName)
-        if(trackIdx<0) throw UnsupportedOperationException("not found track: ${type.trackName}")
-        extractor.selectTrack(trackIdx)
-    }
 
     fun getMediaFormat(): MediaFormat {
         return extractor.getTrackFormat(trackIdx)
@@ -64,7 +55,9 @@ class Extractor private constructor(private val inPath: IInputMediaFile, private
 
     init {
         logger = UtLog("Extractor($type)", Converter.logger)
-        newExtractor()
+        trackIdx = findTrackIdx(extractor, type.trackName)
+        if(trackIdx<0) throw UnsupportedOperationException("not found track: ${type.trackName}")
+        extractor.selectTrack(trackIdx)
     }
 
     private fun Long.toUsTimeString():String {
@@ -116,6 +109,12 @@ class Extractor private constructor(private val inPath: IInputMediaFile, private
      * 音声と映像のズレの最小化を図る。
      */
     fun adjustAndSetTrimmingRangeList(originalList: ITrimmingRangeList, durationUs:Long):ITrimmingRangeList {
+        if(originalList.list.isEmpty()) return originalList
+
+        if(!inPath.seekable) {
+            logger.assert(false, "trimming may not work because input file is not seekable")
+        }
+
         // 与えられたRangeList の開始位置を、実際にビデオトラックでシーク可能な位置に調整する。
         // 終了位置は、readSampleData()が適当に刻んでくるので、そのまま使う。
         val newList = TrimmingRangeListImpl()
@@ -134,11 +133,7 @@ class Extractor private constructor(private val inPath: IInputMediaFile, private
         // logger.debug { "sought to: ${extractor.sampleTime.toUsTimeString()} (req: 0)" }
         // ローカルファイルの場合は、seekTo(0) で先頭に戻れるが、
         // httpの場合に、微妙にずれるし、そのあとのデータ読込みに失敗するので、MediaExtractorを作り直す。
-        if(inPath.seekable) {
-            extractor.seekTo(0L, SEEK_TO_CLOSEST_SYNC)
-        } else {
-            newExtractor(closeableEextractor)
-        }
+        extractor.seekTo(0L, SEEK_TO_CLOSEST_SYNC)
 
         newList.closeBy(durationUs)
         this.trimmingRangeList = newList
@@ -235,6 +230,10 @@ class Extractor private constructor(private val inPath: IInputMediaFile, private
         val idx = extractor.sampleTrackIndex
         if(idx<0||positionState == ITrimmingRangeList.PositionState.END) {
             logger.debug("found eos")
+            if(currentPositionUs - totalSkippedTime < trimmingRangeList.trimmedDurationUs - 3*1000*1000) {
+                // 読み込んだ時間が、期待する時間より３秒以上短ければ、たぶんなんかエラーが起きている。
+                logger.assertStrongly(false, "conversion may be failed.")
+            }
             eos = true
             decoder.queueInputBuffer(inputBufferIdx, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
         } else {
@@ -262,7 +261,7 @@ class Extractor private constructor(private val inPath: IInputMediaFile, private
     override fun close() {
         if(!disposed) {
             disposed = true
-            closeableEextractor.close()
+            closeableExtractor.close()
             logger.debug("disposed")
         }
     }

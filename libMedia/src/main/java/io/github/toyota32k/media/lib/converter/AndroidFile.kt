@@ -18,7 +18,9 @@ import java.io.FileInputStream
 import java.io.FileOutputStream
 
 /**
- * Androidのファイルパス指定を抽象化するためのクラス
+ * Converterの入・出力に利用できるファイルクラス
+ *
+ * Androidのファイルパス指定を抽象化
  * java.io.Fileによる指定と、android.net.Uri (+Context) による指定をサポート
  * ただし、Uriによる指定は、 android.provider.DocumentsProvider ベースのuri、すなわち、
  * Intent.ACTION_OPEN_DOCUMENTなどによって、取得されたuriであることを前提としている。
