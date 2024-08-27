@@ -95,9 +95,14 @@ class Converter {
             return this
         }
 
-        fun input(url: String, headers:Map<String,String>?=null): Factory {
+        fun input(url: String, context: Context): Factory {
             if(!url.startsWith("http")) throw IllegalArgumentException("url must be http or https")
-            converter.inPath = HttpFile(url, headers)
+            converter.inPath = HttpInputFile(context, url)
+            return this
+        }
+
+        fun input(source: IHttpStreamSource, context: Context): Factory {
+            converter.inPath = HttpInputFile(context, source)
             return this
         }
 
@@ -497,10 +502,9 @@ class Converter {
         return withContext(Dispatchers.IO) {
             try {
                 report = Report().apply { start() }
-                val inputMetaData = MetaData.fromFile(inPath)
                 AudioTrack.create(inPath, audioStrategy,report).use { audioTrack->
-                VideoTrack.create(inPath, inputMetaData, videoStrategy,report).use { videoTrack->
-                Muxer(inputMetaData, outPath, audioTrack!=null, rotation, containerFormat).use { muxer->
+                VideoTrack.create(inPath, videoStrategy,report).use { videoTrack->
+                Muxer(videoTrack.metaData, outPath, audioTrack!=null, rotation, containerFormat).use { muxer->
                     trimmingRangeList = videoTrack.extractor.adjustAndSetTrimmingRangeList(trimmingRangeList, muxer.durationUs)
                     audioTrack?.extractor?.setTrimmingRangeList(trimmingRangeList)
                     report.updateInputFileInfo(inPath.getLength(), muxer.durationUs/1000L)

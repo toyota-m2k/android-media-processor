@@ -6,8 +6,9 @@ import android.media.MediaMetadataRetriever
 /**
  * HTTP上のファイルを Converter の入力として利用するための IInputMediaFile の実装クラス。
  * ただし、trimming を指定していると、seek がうまく動作しないようなので、利用はお勧めしない。
- * ちゃんと動く実装は、android-camera の、HttpInputFile / HttpMediaDataSource を参考にしてください。
+ * 当面は、一時ファイルにキャッシュしてシークをサポートする httpInputFile を使うことにする。
  */
+@Deprecated("use HttpInputFil")
 class HttpFile(private val url: String, private val headers: Map<String, String>?=null) : IInputMediaFile {
     override fun openExtractor(): CloseableExtractor {
         val extractor = MediaExtractor().apply {

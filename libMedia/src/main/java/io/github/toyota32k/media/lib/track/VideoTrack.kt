@@ -14,7 +14,7 @@ import io.github.toyota32k.media.lib.strategy.IVideoStrategy
 import io.github.toyota32k.utils.UtLog
 
 class VideoTrack
-    private constructor(extractor:Extractor, inputFormat:MediaFormat, outputFormat:MediaFormat, encoder: MediaCodec, report: Report)
+    private constructor(extractor:Extractor, inputFormat:MediaFormat, outputFormat:MediaFormat, encoder: MediaCodec, report: Report, val metaData: MetaData)
         : Track(extractor, /*inputFormat, outputFormat,*/ Muxer.SampleType.Video /*,report*/) {
 
     // 必ず、Encoder-->Decoder の順に初期化＆開始する。そうしないと、Decoder側の inputSurfaceの初期化に失敗する。
@@ -22,8 +22,9 @@ class VideoTrack
     override val decoder: VideoDecoder = VideoDecoder(inputFormat,report).apply { start() }
 
     companion object {
-        fun create(inPath: IInputMediaFile, metaData: MetaData, strategy: IVideoStrategy, report: Report) : VideoTrack {
+        fun create(inPath: IInputMediaFile, strategy: IVideoStrategy, report: Report) : VideoTrack {
             val extractor = Extractor.create(inPath, Muxer.SampleType.Video)
+            val metaData = MetaData.fromFile(inPath)
 //            val trackIdx = findTrackIdx(extractor.extractor, "video")
             if (extractor==null) {
                 UtLog("Track(Video)", Converter.logger, ).info("no video truck")
@@ -42,7 +43,7 @@ class VideoTrack
                 report.updateInputSummary(inputFormat, metaData)
                 report.updateOutputSummary(outputFormat)
 
-                return VideoTrack(extractor, inputFormat, outputFormat, encoder, report)
+                return VideoTrack(extractor, inputFormat, outputFormat, encoder, report, metaData)
         }
     }
 }
