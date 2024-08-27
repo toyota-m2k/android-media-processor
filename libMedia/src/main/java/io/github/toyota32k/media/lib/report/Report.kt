@@ -4,6 +4,7 @@ import android.media.MediaCodec
 import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
 import io.github.toyota32k.media.lib.format.Codec
+import io.github.toyota32k.media.lib.format.MetaData
 import io.github.toyota32k.media.lib.utils.TimeSpan
 import java.lang.StringBuilder
 
@@ -23,17 +24,17 @@ class Report : IAttributes {
         endTick = System.currentTimeMillis()
     }
 
-    private fun updateSummary(summary:Summary, format: MediaFormat, retriever: MediaMetadataRetriever?=null) {
+    private fun updateSummary(summary:Summary, format: MediaFormat, metaData: MetaData?=null) {
         val codec = Codec.fromFormat(format) ?: return
         if(codec.media.isVideo()) {
-            summary.videoSummary = VideoSummary(format, retriever)
+            summary.videoSummary = VideoSummary(format, metaData)
         } else {
             summary.audioSummary = AudioSummary(format)
         }
     }
 
-    fun updateInputSummary(format: MediaFormat, retriever: MediaMetadataRetriever?) {
-        updateSummary(input, format, retriever)
+    fun updateInputSummary(format: MediaFormat, metaData: MetaData?) {
+        updateSummary(input, format, metaData)
     }
     fun updateOutputSummary(format: MediaFormat) {
         updateSummary(output, format)

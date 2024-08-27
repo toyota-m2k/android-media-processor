@@ -2,6 +2,8 @@ package io.github.toyota32k.media.lib.converter
 
 import android.content.Context
 import android.net.Uri
+import io.github.toyota32k.media.lib.format.ContainerFormat
+import io.github.toyota32k.media.lib.format.MetaData
 import io.github.toyota32k.media.lib.misc.RingBuffer
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.report.Summary
@@ -14,7 +16,6 @@ import io.github.toyota32k.media.lib.track.Muxer
 import io.github.toyota32k.media.lib.track.Track
 import io.github.toyota32k.media.lib.track.VideoTrack
 import io.github.toyota32k.utils.UtLog
-import io.github.toyota32k.utils.UtLogger
 import io.github.toyota32k.utils.UtLoggerInstance
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -44,7 +45,7 @@ class Converter {
         private const val LIMIT_OF_PATIENCE = 15*1000L        // 15秒
         private const val MAX_RETRY_COUNT = 1000
 
-        fun analyze(file:AndroidFile) : Summary {
+        fun analyze(file:IInputMediaFile) : Summary {
             return try {
                 Summary.getSummary(file)
             } catch(e:Throwable) {
@@ -57,14 +58,15 @@ class Converter {
         }
     }
 
-    lateinit var inPath:AndroidFile
-    lateinit var outPath: AndroidFile
+    lateinit var inPath:IInputMediaFile
+    lateinit var outPath: IOutputMediaFile
 
     var videoStrategy: IVideoStrategy = PresetVideoStrategies.AVC720Profile
     var audioStrategy:IAudioStrategy=PresetAudioStrategies.AACDefault
     var trimmingRangeList : ITrimmingRangeList = ITrimmingRangeList.empty() // TrimmingRange.Empty
     var deleteOutputOnError:Boolean = true
     var rotation: Rotation? = null
+    var containerFormat: ContainerFormat = ContainerFormat.MPEG_4
     var onProgress : ((IProgress)->Unit)? = null
     lateinit var report :Report
 
@@ -93,7 +95,13 @@ class Converter {
             return this
         }
 
-        fun input(src:AndroidFile): Factory {
+        fun input(url: String, headers:Map<String,String>?=null): Factory {
+            if(!url.startsWith("http")) throw IllegalArgumentException("url must be http or https")
+            converter.inPath = HttpFile(url, headers)
+            return this
+        }
+
+        fun input(src:IInputMediaFile): Factory {
             converter.inPath = src
             return this
         }
@@ -108,7 +116,7 @@ class Converter {
             return this
         }
 
-        fun output(dst:AndroidFile):Factory {
+        fun output(dst:IOutputMediaFile):Factory {
             converter.outPath = dst
             return this
         }
@@ -162,6 +170,11 @@ class Converter {
 
         fun rotate(rotation: Rotation):Factory {
             converter.rotation = rotation
+            return this
+        }
+
+        fun containerFormat(format: ContainerFormat):Factory {
+            converter.containerFormat = format
             return this
         }
 
@@ -484,9 +497,10 @@ class Converter {
         return withContext(Dispatchers.IO) {
             try {
                 report = Report().apply { start() }
+                val inputMetaData = MetaData.fromFile(inPath)
                 AudioTrack.create(inPath, audioStrategy,report).use { audioTrack->
-                VideoTrack.create(inPath, videoStrategy,report).use { videoTrack->
-                Muxer(inPath, outPath, audioTrack!=null, rotation).use { muxer->
+                VideoTrack.create(inPath, inputMetaData, videoStrategy,report).use { videoTrack->
+                Muxer(inputMetaData, outPath, audioTrack!=null, rotation, containerFormat).use { muxer->
                     trimmingRangeList = videoTrack.extractor.adjustAndSetTrimmingRangeList(trimmingRangeList, muxer.durationUs)
                     audioTrack?.extractor?.setTrimmingRangeList(trimmingRangeList)
                     report.updateInputFileInfo(inPath.getLength(), muxer.durationUs/1000L)

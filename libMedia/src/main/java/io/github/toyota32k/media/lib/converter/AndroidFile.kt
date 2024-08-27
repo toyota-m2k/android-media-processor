@@ -3,12 +3,15 @@ package io.github.toyota32k.media.lib.converter
 import android.content.Context
 import android.database.Cursor
 import android.media.MediaExtractor
+import android.media.MediaMetadataRetriever
+import android.media.MediaMuxer
 import android.net.Uri
 import android.os.ParcelFileDescriptor
 import android.provider.MediaStore
 import android.provider.OpenableColumns
 import androidx.core.net.toUri
 import androidx.documentfile.provider.DocumentFile
+import io.github.toyota32k.media.lib.format.ContainerFormat
 import java.io.File
 import java.io.FileDescriptor
 import java.io.FileInputStream
@@ -20,7 +23,7 @@ import java.io.FileOutputStream
  * ただし、Uriによる指定は、 android.provider.DocumentsProvider ベースのuri、すなわち、
  * Intent.ACTION_OPEN_DOCUMENTなどによって、取得されたuriであることを前提としている。
  */
-class AndroidFile {
+class AndroidFile : IInputMediaFile, IOutputMediaFile {
     val uri:Uri?
     val context:Context?
     val path: File?
@@ -70,7 +73,7 @@ class AndroidFile {
         }
         return -1L
     }
-    fun getLength():Long {
+    override fun getLength():Long {
         return if(hasPath) {
             path!!.length()
         } else if(hasUri){
@@ -80,7 +83,7 @@ class AndroidFile {
         }
     }
 
-    fun <T> withFileDescriptor(mode:String, fn:(FileDescriptor)->T):T {
+    private fun <T> withFileDescriptor(mode:String, fn:(FileDescriptor)->T):T {
         return if(hasUri) {
             context!!.contentResolver.openAssetFileDescriptor(uri!!, mode)!!.use {
                 fn(it.fileDescriptor)
@@ -92,9 +95,9 @@ class AndroidFile {
         }
     }
 
-    fun <T> fileDescriptorToRead(fn:(FileDescriptor)->T):T = withFileDescriptor("r", fn)
+    private fun <T> fileDescriptorToRead(fn:(FileDescriptor)->T):T = withFileDescriptor("r", fn)
 
-    fun <T> fileDescriptorToWrite(fn:(FileDescriptor)->T):T = withFileDescriptor("rw", fn)
+    private fun <T> fileDescriptorToWrite(fn:(FileDescriptor)->T):T = withFileDescriptor("rw", fn)
 
     fun <T> fileInputStream(fn:(FileInputStream)->T):T {
         return fileDescriptorToRead {
@@ -107,7 +110,7 @@ class AndroidFile {
         }
     }
 
-    fun openParcelFileDescriptor(mode:String):ParcelFileDescriptor {
+    private fun openParcelFileDescriptor(mode:String):ParcelFileDescriptor {
         return if(hasUri) {
             context!!.contentResolver.openFileDescriptor(uri!!, mode )!!
         } else { // Use RandomAccessFile so we can open the file with RW access;
@@ -115,20 +118,42 @@ class AndroidFile {
         }
     }
 
-    fun openParcelFileDescriptorToRead() = openParcelFileDescriptor("r")
-    fun openParcelFileDescriptorToWrite() = openParcelFileDescriptor("rw")
+    private fun openParcelFileDescriptorToRead() = openParcelFileDescriptor("r")
+    private fun openParcelFileDescriptorToWrite() = openParcelFileDescriptor("rw")
+
+
+    override fun openExtractor(): CloseableExtractor {
+        val pfd = openParcelFileDescriptorToRead()
+        val extractor = MediaExtractor().apply { setDataSource(pfd.fileDescriptor) }
+        return CloseableExtractor(extractor, pfd)
+    }
+
+    override fun openMetadataRetriever(): CloseableMediaMetadataRetriever {
+        val pfd = openParcelFileDescriptorToRead()
+        val retriever = MediaMetadataRetriever().apply { setDataSource(pfd.fileDescriptor) }
+        return CloseableMediaMetadataRetriever(retriever, pfd)
+    }
+
+    override fun openMuxer(format: ContainerFormat): CloseableMuxer {
+        val pfd = openParcelFileDescriptorToWrite()
+        val muxer = MediaMuxer(pfd.fileDescriptor, format.mof)
+        return CloseableMuxer(muxer, pfd)
+    }
 
     override fun toString(): String {
         return path?.toString() ?: uri?.toString() ?: "*invalid-path*"
     }
 
-    fun delete() {
+    override fun delete() {
         if (hasPath) {
             path!!.delete()
         } else if (hasUri) {
             DocumentFile.fromSingleUri(context!!, uri!!)?.delete()
         }
     }
+
+    override val seekable: Boolean = true
+
     fun safeDelete() {
         try {
             delete()

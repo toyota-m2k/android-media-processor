@@ -2,30 +2,34 @@ package io.github.toyota32k.media.lib.track
 
 import android.media.MediaCodec
 import android.media.MediaFormat
-import android.media.MediaMetadataRetriever
 import android.media.MediaMuxer
-import io.github.toyota32k.media.lib.converter.AndroidFile
 import io.github.toyota32k.media.lib.converter.Converter
+import io.github.toyota32k.media.lib.converter.IInputMediaFile
+import io.github.toyota32k.media.lib.converter.IOutputMediaFile
 import io.github.toyota32k.media.lib.converter.Rotation
+import io.github.toyota32k.media.lib.format.ContainerFormat
+import io.github.toyota32k.media.lib.format.MetaData
 import io.github.toyota32k.media.lib.format.getLocation
 import io.github.toyota32k.media.lib.format.getRotation
 import io.github.toyota32k.media.lib.misc.ISO6709LocationParser
-import io.github.toyota32k.media.lib.misc.safeUse
 import io.github.toyota32k.utils.UtLog
 import java.io.Closeable
-import java.lang.IllegalStateException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
-class Muxer(inPath:AndroidFile, outPath: AndroidFile, private val hasAudio:Boolean, rotation: Rotation?): Closeable {
+class Muxer(inputMetaData: MetaData, outPath: IOutputMediaFile, private val hasAudio:Boolean, rotation: Rotation?, private val containerFormat: ContainerFormat): Closeable {
     companion object {
         val logger = UtLog("Muxer", Converter.logger)
         const val BUFFER_SIZE = 64 * 1024
     }
 
-    enum class SampleType { Audio, Video }
+    enum class SampleType(val trackName: String) {
+        Audio("audio"),
+        Video("video")
+    }
 
-    private val muxer:MediaMuxer = outPath.fileDescriptorToWrite { fd-> MediaMuxer(fd, MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4) }
+    private val closeableMuxer = outPath.openMuxer(containerFormat)
+    private val muxer:MediaMuxer get() = closeableMuxer.obj
     var durationUs: Long = -1L   // for progress
         private set
 
@@ -36,12 +40,11 @@ class Muxer(inPath:AndroidFile, outPath: AndroidFile, private val hasAudio:Boole
     private var audioTrackIndex = -1
 
     init {
-        setupMetaDataBy(inPath, rotation)
+        setupMetaDataBy(inputMetaData, rotation)
     }
 
-    private fun setupMetaDataBy(inPath: AndroidFile, rotation: Rotation?) {
-        inPath.fileDescriptorToRead { fd-> MediaMetadataRetriever().apply { setDataSource(fd) }}.safeUse { mediaMetadataRetriever ->
-            val metaRotation = mediaMetadataRetriever.getRotation()
+    private fun setupMetaDataBy(metaData: MetaData, rotation: Rotation?) {
+            val metaRotation = metaData.rotation
             if (metaRotation != null) {
                 val r = rotation?.rotate(metaRotation) ?: metaRotation
                 muxer.setOrientationHint(r)
@@ -49,7 +52,7 @@ class Muxer(inPath:AndroidFile, outPath: AndroidFile, private val hasAudio:Boole
             } else if(rotation!=null){
                 muxer.setOrientationHint(rotation.rotate(0))
             }
-            val locationString = mediaMetadataRetriever.getLocation()
+            val locationString = metaData.location
             if (locationString != null) {
                 val location: FloatArray? = ISO6709LocationParser.parse(locationString)
                 if (location != null) {
@@ -59,10 +62,10 @@ class Muxer(inPath:AndroidFile, outPath: AndroidFile, private val hasAudio:Boole
                     logger.error("metadata: failed to parse the location metadata: $locationString")
                 }
             }
-            mediaMetadataRetriever.extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()?.also {
-                durationUs = it * 1000
-                logger.info("metadata: duration=${durationUs / 1000} ms")
-            }
+        val duration = metaData.duration
+        if(duration!=null) {
+            durationUs = duration*1000L
+            logger.info("metadata: duration=${durationUs / 1000} ms")
         }
     }
 
@@ -185,7 +188,7 @@ class Muxer(inPath:AndroidFile, outPath: AndroidFile, private val hasAudio:Boole
     override fun close() {
         if(!disposed) {
             disposed = true
-            muxer.release()
+            closeableMuxer.close()
             logger.debug("disposed")
         }
     }

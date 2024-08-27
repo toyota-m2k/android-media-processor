@@ -1,11 +1,11 @@
 package io.github.toyota32k.media.lib.report
 
 import android.media.MediaFormat
-import android.media.MediaMetadataRetriever
 import io.github.toyota32k.media.lib.format.BitRateMode
 import io.github.toyota32k.media.lib.format.Codec
 import io.github.toyota32k.media.lib.format.ColorFormat
 import io.github.toyota32k.media.lib.format.Level
+import io.github.toyota32k.media.lib.format.MetaData
 import io.github.toyota32k.media.lib.format.Profile
 import io.github.toyota32k.media.lib.format.getBitRate
 import io.github.toyota32k.media.lib.format.getFrameRate
@@ -13,7 +13,6 @@ import io.github.toyota32k.media.lib.format.getHeight
 import io.github.toyota32k.media.lib.format.getIFrameInterval
 import io.github.toyota32k.media.lib.format.getMaxBitRate
 import io.github.toyota32k.media.lib.format.getWidth
-import java.lang.StringBuilder
 import java.util.Locale
 
 data class VideoSummary(
@@ -28,17 +27,17 @@ data class VideoSummary(
     val frameRate: Int,
     val iFrameInterval: Int,
     val colorFormat: ColorFormat?) : IAttributes {
-    constructor(format: MediaFormat, retriever: MediaMetadataRetriever?) : this(
+    constructor(format: MediaFormat, metaData: MetaData?) : this(
         Codec.fromFormat(format),
         Profile.fromFormat(format),
         Level.fromFormat(format),
 
         width = format.getWidth()?:-1,
         height = format.getHeight()?:-1,
-        bitRate = format.getBitRate()?: retriever?.getBitRate() ?: -1,
+        bitRate = format.getBitRate()?: metaData?.bitRate ?: -1,
         maxBitRate = format.getMaxBitRate()?:-1,
         bitRateMode = BitRateMode.fromFormat(format),
-        frameRate = format.getFrameRate()?: retriever?.getFrameRate() ?: -1,
+        frameRate = format.getFrameRate()?: metaData?.frameRate ?: -1,
         iFrameInterval = format.getIFrameInterval()?:-1,
         colorFormat = ColorFormat.fromFormat(format))
 

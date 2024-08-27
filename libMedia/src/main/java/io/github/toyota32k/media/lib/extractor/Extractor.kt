@@ -3,10 +3,13 @@ package io.github.toyota32k.media.lib.extractor
 import android.media.MediaCodec
 import android.media.MediaExtractor
 import android.media.MediaExtractor.SEEK_TO_CLOSEST_SYNC
+import android.media.MediaFormat
+import android.util.Log
 import io.github.toyota32k.media.lib.codec.BaseCodec
 import io.github.toyota32k.media.lib.codec.BaseDecoder
-import io.github.toyota32k.media.lib.converter.AndroidFile
+import io.github.toyota32k.media.lib.converter.CloseableExtractor
 import io.github.toyota32k.media.lib.converter.Converter
+import io.github.toyota32k.media.lib.converter.IInputMediaFile
 import io.github.toyota32k.media.lib.converter.ITrimmingRangeList
 import io.github.toyota32k.media.lib.converter.TrimmingRangeListImpl
 import io.github.toyota32k.media.lib.track.Muxer
@@ -14,13 +17,56 @@ import io.github.toyota32k.media.lib.utils.TimeSpan
 import io.github.toyota32k.utils.UtLog
 import java.io.Closeable
 import java.nio.ByteBuffer
+import kotlin.math.abs
 
-class Extractor(inPath: AndroidFile) : Closeable {
-    var logger: UtLog = UtLog("Extractor", Converter.logger)
-    val extractor = inPath.fileDescriptorToRead { fd-> MediaExtractor().apply { setDataSource(fd) }}
+class Extractor private constructor(private val inPath: IInputMediaFile, private val type: Muxer.SampleType) : Closeable {
+    companion object {
+        fun create(inPath: IInputMediaFile, type: Muxer.SampleType) : Extractor? {
+            return try {
+                Extractor(inPath, type)
+            } catch (e:UnsupportedOperationException) {
+                return null
+            }
+        }
+        fun findTrackIdx(extractor: MediaExtractor, type: String): Int {
+            for (idx in 0 until extractor.trackCount) {
+                val format = extractor.getTrackFormat(idx)
+                val mime = format.getString(MediaFormat.KEY_MIME)
+                if (mime?.startsWith(type) == true) {
+                    return idx
+                }
+            }
+            return -1
+        }
+
+        fun getMediaFormat(extractor: MediaExtractor, idx:Int): MediaFormat {
+            return extractor.getTrackFormat(idx)
+        }
+    }
+
+    private lateinit var closeableEextractor: CloseableExtractor
+    val extractor get() = closeableEextractor.obj
     private var trackIdx:Int = -1
-    private lateinit var mediaType: Muxer.SampleType
-//    lateinit var inputFormat:MediaFormat
+    var logger: UtLog = UtLog("Extractor", Converter.logger)
+
+    private fun newExtractor(old:CloseableExtractor? = null) {
+        old?.close()
+        closeableEextractor = inPath.openExtractor()
+        val extractor = closeableEextractor.obj
+        trackIdx = findTrackIdx(extractor, type.trackName)
+        if(trackIdx<0) throw UnsupportedOperationException("not found track: ${type.trackName}")
+        extractor.selectTrack(trackIdx)
+    }
+
+    fun getMediaFormat(): MediaFormat {
+        return extractor.getTrackFormat(trackIdx)
+    }
+
+    init {
+        logger = UtLog("Extractor($type)", Converter.logger)
+        newExtractor()
+    }
+
     private fun Long.toUsTimeString():String {
         return TimeSpan.formatAutoM(this/1000L)
     }
@@ -64,33 +110,42 @@ class Extractor(inPath: AndroidFile) : Closeable {
 //        }
 //    }
 
-    fun selectTrack(idx:Int, type: Muxer.SampleType) {
-        logger = UtLog("Extractor($type)", Converter.logger)
-        this.mediaType = type
-        trackIdx = idx
-        extractor.selectTrack(idx)
-    }
-
     /**
      * オーディオトラックはだいたいどこへでもシーク可能なのに対して、ビデオトラックは、キーフレームにしかシークできないので、
      * あらかじめ、与えられたチャプターの先頭位置を、CLOSESTなシーク可能位置に調整しておき、音声トラックもこれを参照することで、
      * 音声と映像のズレの最小化を図る。
      */
     fun adjustAndSetTrimmingRangeList(originalList: ITrimmingRangeList, durationUs:Long):ITrimmingRangeList {
-        assert(::mediaType.isInitialized)
-
         // 与えられたRangeList の開始位置を、実際にビデオトラックでシーク可能な位置に調整する。
         // 終了位置は、readSampleData()が適当に刻んでくるので、そのまま使う。
         val newList = TrimmingRangeListImpl()
+        val trackIdx = findTrackIdx(extractor, "video")
+        extractor.selectTrack(trackIdx)
         for (range in originalList.list) {
-            if (range.startUs>0) {
+            if (range.startUs == 0L) {
+                newList.addRange(0, range.endUs)
+            } else {
                 extractor.seekTo(range.startUs, SEEK_TO_CLOSEST_SYNC)
+                logger.debug { "actually sought to: ${extractor.sampleTime.toUsTimeString()} (req: ${range.startUs.toUsTimeString()})" }
                 newList.addRange(extractor.sampleTime, range.endUs)
             }
         }
-        extractor.seekTo(0, SEEK_TO_CLOSEST_SYNC)
+        // extractor.seekTo(0, SEEK_TO_CLOSEST_SYNC)
+        // logger.debug { "sought to: ${extractor.sampleTime.toUsTimeString()} (req: 0)" }
+        // ローカルファイルの場合は、seekTo(0) で先頭に戻れるが、
+        // httpの場合に、微妙にずれるし、そのあとのデータ読込みに失敗するので、MediaExtractorを作り直す。
+        if(inPath.seekable) {
+            extractor.seekTo(0L, SEEK_TO_CLOSEST_SYNC)
+        } else {
+            newExtractor(closeableEextractor)
+        }
+
         newList.closeBy(durationUs)
         this.trimmingRangeList = newList
+        logger.verbose("adjusted trimming ranges:")
+        trimmingRangeList.list.forEach {
+            logger.verbose {"  ${it.startUs.toUsTimeString()} - ${it.endUs.toUsTimeString()}"}
+        }
         return newList
     }
     fun setTrimmingRangeList(list:ITrimmingRangeList) {
@@ -150,9 +205,15 @@ class Extractor(inPath: AndroidFile) : Closeable {
             logger.debug("FOUND End Of Chapter: ${TimeSpan.formatAutoM(extractor.sampleTime/1000)}")
             val position = trimmingRangeList.getNextValidPosition(extractor.sampleTime)
             if (position != null) {
-                extractor.seekTo(position.startUs, SEEK_TO_CLOSEST_SYNC)
+                logger.chronos(msg="extractor.seekTo", level = Log.INFO) {
+                    try {
+                        extractor.seekTo(position.startUs, SEEK_TO_CLOSEST_SYNC)
+                    } catch(e:Throwable) {
+                        logger.error(e)
+                    }
+                }
+                logger.info("SKIPPED from ${currentPositionUs.toUsTimeString()} to ${extractor.sampleTime.toUsTimeString()} (req:${position.startUs.toUsTimeString()} Δ=${abs(position.startUs-extractor.sampleTime).toUsTimeString()})")
                 val skippedTime = extractor.sampleTime - currentPositionUs
-                logger.info("SKIPPED from ${currentPositionUs.toUsTimeString()} to ${extractor.sampleTime.toUsTimeString()}")
                 currentPositionUs = extractor.sampleTime
                 totalSkippedTime += skippedTime
             }
@@ -165,9 +226,9 @@ class Extractor(inPath: AndroidFile) : Closeable {
 //        }
 
         val decoder = output.decoder
-        val inputBufferIdx = decoder.dequeueInputBuffer(BaseCodec.TIMEOUT_IMMEDIATE)
+        val inputBufferIdx = decoder.dequeueInputBuffer(BaseCodec.TIMEOUT_INFINITE)
         if(inputBufferIdx<0) {
-//            logger.debug("no buffer in the decoder.")
+            logger.verbose("no buffer in the decoder.")
             return false
         }
 
@@ -185,7 +246,7 @@ class Extractor(inPath: AndroidFile) : Closeable {
 
             if(sampleSize>0) {
 //                logger.assert(currentPositionUs == extractor.sampleTime)
-//                logger.debug {"READING: read $sampleSize bytes at ${TimeSpan.formatAutoM(currentPositionUs/1000)}"}
+                logger.verbose {"READING: read $sampleSize bytes at ${TimeSpan.formatAutoM(currentPositionUs/1000)}"}
                 totalTime = currentPositionUs - totalSkippedTime
                 decoder.queueInputBuffer(inputBufferIdx, 0, sampleSize, totalTime, extractor.sampleFlags)
             } else {
@@ -201,7 +262,7 @@ class Extractor(inPath: AndroidFile) : Closeable {
     override fun close() {
         if(!disposed) {
             disposed = true
-            extractor.release()
+            closeableEextractor.close()
             logger.debug("disposed")
         }
     }

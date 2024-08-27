@@ -11,7 +11,7 @@ import java.io.Closeable
 abstract class BaseCodec(val mediaFormat:MediaFormat, val report: Report) : Closeable {
     companion object {
         const val TIMEOUT_IMMEDIATE:Long = 0    // -1: infinite / 0:immediate / >0 milliseconds
-//        const val TIMEOUT_INFINITE:Long = -1L    // -1: infinite / 0:immediate / >0 milliseconds
+        const val TIMEOUT_INFINITE:Long = -1L    // -1: infinite / 0:immediate / >0 milliseconds
 //        const val TIMEOUT_1SEC:Long = 1000L
     }
     abstract val sampleType: Muxer.SampleType
