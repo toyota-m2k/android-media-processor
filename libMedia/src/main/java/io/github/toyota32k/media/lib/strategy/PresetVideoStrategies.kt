@@ -1,6 +1,7 @@
 package io.github.toyota32k.media.lib.strategy
 
 import android.media.MediaCodecInfo
+import io.github.toyota32k.media.lib.format.BitRateMode
 import io.github.toyota32k.media.lib.format.Codec
 import io.github.toyota32k.media.lib.format.ColorFormat
 import io.github.toyota32k.media.lib.format.Level
@@ -84,6 +85,18 @@ object PresetVideoStrategies {
 
     // HEVC - H.265
     // FullHD 1080p
+    object HEVC1080LowProfile : VideoStrategy(
+        codec = Codec.HEVC,
+        profile = Profile.HEVCProfileMain,
+        level = Level.HEVCMainTierLevel4,
+        fallbackProfiles = null,
+        sizeCriteria = FHD1080SizeCriteria,
+        bitRate = MaxDefault(4*1000*1000, 2*1000*1000),
+        frameRate = MaxDefault(30),
+        iFrameInterval =MinDefault(1),
+        colorFormat =ColorFormat.COLOR_FormatSurface,
+        BitRateMode.VBR,
+    )
 
     object HEVC1080Profile : VideoStrategy(
         codec = Codec.HEVC,
@@ -110,4 +123,34 @@ object PresetVideoStrategies {
         colorFormat =ColorFormat.COLOR_FormatSurface,
         bitRateMode = null,
     )
+
+    // HEVC - H.265
+    // HD 720p
+
+    object HEVC720Profile : VideoStrategy(
+        codec = Codec.HEVC,
+        profile = Profile.HEVCProfileMain,
+        level = Level.HEVCMainTierLevel3,
+        fallbackProfiles = null,
+        sizeCriteria = HD720SizeCriteria,
+        bitRate = MaxDefault(5*1000*1000, 3*1000*1000),
+        frameRate = MaxDefault(30),
+        iFrameInterval = MinDefault(1),
+        colorFormat = ColorFormat.COLOR_FormatSurface,
+        bitRateMode = BitRateMode.VBR,
+    )
+
+    object HEVC720LowProfile : VideoStrategy(
+        codec = Codec.HEVC,
+        profile = Profile.HEVCProfileMain,
+        level = Level.HEVCMainTierLevel3,
+        fallbackProfiles = null,
+        sizeCriteria = HD720SizeCriteria,
+        bitRate = MaxDefault(2*1000*1000, 1*1000*1000),
+        frameRate = MaxDefault(30),
+        iFrameInterval = MinDefault(1),
+        colorFormat = ColorFormat.COLOR_FormatSurface,
+        bitRateMode = BitRateMode.VBR,
+    )
+
 }
