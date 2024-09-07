@@ -17,7 +17,7 @@ androidUtilities = "2.3.0"
 androidBinding = "1.3.3"    # for sample only
 androidDialog = "3.8.1"     # for sample only
 androidCamera = "2.0.0"     # for sample only
-androidPlayer = "2.2.0"     # for sample only
+androidPlayer = "2.0.0"     # for sample only
 
 [libraries]
 appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
