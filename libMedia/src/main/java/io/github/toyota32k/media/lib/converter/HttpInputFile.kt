@@ -16,6 +16,7 @@ import java.io.File
 import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
+import kotlin.math.max
 
 /**
  * HTTPサーバーからのデータ読み込み処理を抽象化する i/f定義
@@ -64,23 +65,27 @@ class HttpInputFile(context: Context, private val streamSource: IHttpStreamSourc
     private class HttpMediaDataSource(context: Context, private val streamSource: IHttpStreamSource) : MediaDataSource() {
         private val tempFile = File.createTempFile("amp_", ".tmp", context.cacheDir)
         private val logger = UtLog("HMD", Converter.logger)
-        var totalLength: Long = -1
-        private var currentLength: Long = -1
+        var contentLength: Long = -1
+        private var receivedLength: Long = -1
+        private var eos:Boolean = false
         private var error: Throwable? = null
         private val completed = FlowableEvent()
 
         private data class WaitingEvent(val requiredLength:Long) {
             private val event = FlowableEvent()
-            suspend fun notify(length: Long) {
-                if (length >= requiredLength) {
+            private var actualLength:Long = -1
+            suspend fun notify(length: Long, eos:Boolean) {
+                if (length >= requiredLength||eos) {
+                    actualLength = length
                     event.set()
                 }
             }
             suspend fun error() {
                 event.set()
             }
-            suspend fun wait() {
+            suspend fun wait():Long {
                 event.waitOne()
+                return actualLength
             }
         }
         private val waitingEvents = mutableListOf<WaitingEvent>()
@@ -100,14 +105,22 @@ class HttpInputFile(context: Context, private val streamSource: IHttpStreamSourc
         }
         private suspend fun onReceived(length: Long) {
             val total:Long
+            val eos:Boolean
             val events = synchronized(this) {
-                currentLength += length
-                total = currentLength
+                if(length==0L) {
+                    logger.debug("reached to eos ($receivedLength / $contentLength)")
+                    this.eos = true
+                } else {
+                    receivedLength += length
+                    logger.debug("received $length ($receivedLength / $contentLength)")
+                }
+                eos = this.eos
+                total = receivedLength
                 waitingEvents.toList()
             }
 //        logger.debug("onReceived $length ($total")
             events.forEach {
-                it.notify(total)
+                it.notify(total,eos)
             }
         }
 
@@ -116,14 +129,15 @@ class HttpInputFile(context: Context, private val streamSource: IHttpStreamSourc
                 try {
                     tempFile.outputStream().use { output ->
                         streamSource.open().use { input ->
-                            totalLength = streamSource.length
+                            contentLength = streamSource.length
                             val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
                             var bytes = input.read(buffer)
                             while (bytes > 0) {
                                 output.write(buffer, 0, bytes)
-                                bytes = input.read(buffer)
                                 onReceived(bytes.toLong())
+                                bytes = input.read(buffer)
                             }
+                            onReceived(0L)  // eos
                         }
                     }
                 } catch (e: Throwable) {
@@ -132,6 +146,7 @@ class HttpInputFile(context: Context, private val streamSource: IHttpStreamSourc
                 } finally {
                     streamSource.close()
                     completed.set()
+                    logger.debug("completed.")
                 }
             }
         }
@@ -153,17 +168,21 @@ class HttpInputFile(context: Context, private val streamSource: IHttpStreamSourc
             }
             val awaiter = synchronized(this) {
                 checkError()
-                if (currentLength >= length) {
-                    return length - position
+                if (receivedLength >= length) {
+//                    logger.debug("already received $receivedLength")
+                    return max(0L, length - position)
+                } else if (eos) {
+                    logger.debug("already reached to eos")
+                    return max(0L,receivedLength - position)
                 } else {
                     WaitingEvent(length).apply {
                         waitingEvents.add(this)
                     }
                 }
             }
-            runBlocking { awaiter.wait() }
+            val actualLength = runBlocking { awaiter.wait() }
             checkError()
-            return length - position
+            return max(0, actualLength - position)
         }
 
         override fun close() {
@@ -182,9 +201,13 @@ class HttpInputFile(context: Context, private val streamSource: IHttpStreamSourc
 
         @WorkerThread
         override fun readAt(position: Long, buffer: ByteArray?, offset: Int, size: Int): Int {
-            logger.debug("readAt $position $size")
+//            logger.debug("readAt $position $size")
             val length = waitFor(position, size.toLong())
             checkError()
+            if(length<=0) {
+                logger.debug("no more data.")
+                return 0
+            }
             return tempFile.inputStream().use { input ->
                 input.skip(position)
                 input.read(buffer, offset, length.toInt())
@@ -195,8 +218,8 @@ class HttpInputFile(context: Context, private val streamSource: IHttpStreamSourc
         override fun getSize(): Long {
             val awaiter = synchronized(this) {
                 checkError()
-                if(totalLength > 0) {
-                    return totalLength
+                if(contentLength > 0) {
+                    return contentLength
                 } else {
                     WaitingEvent(0).apply {
                         waitingEvents.add(this)
@@ -205,7 +228,7 @@ class HttpInputFile(context: Context, private val streamSource: IHttpStreamSourc
             }
             runBlocking { awaiter.wait() }
             checkError()
-            return totalLength
+            return contentLength
         }
 
     }
@@ -273,7 +296,7 @@ class HttpInputFile(context: Context, private val streamSource: IHttpStreamSourc
             if(length>=0) {
                 length
             } else {
-                dataSource?.totalLength ?: -1L
+                dataSource?.contentLength ?: -1L
             }
         }
     }
