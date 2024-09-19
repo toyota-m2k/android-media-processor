@@ -5,10 +5,11 @@ import android.media.MediaMetadataRetriever
 
 /**
  * HTTP上のファイルを Converter の入力として利用するための IInputMediaFile の実装クラス。
- * ただし、trimming を指定していると、seek がうまく動作しないようなので、利用はお勧めしない。
- * 当面は、一時ファイルにキャッシュしてシークをサポートする httpInputFile を使うことにする。
+ * ただし、trimming を指定していると、Extractorでの seek（前方へのskipのみ）がうまく動作しないようなので、
+ * トリミング＋コンバート目的での利用はNG。代わりに、HttpInputFile を使うこと。
+ * Converter.analyze() にのみ使う場合は、こちらの方が効率的だと思われるので残しておく。
  */
-@Deprecated("use HttpInputFil")
+@Suppress("unused")
 class HttpFile(private val url: String, private val headers: Map<String, String>?=null) : IInputMediaFile {
     override fun openExtractor(): CloseableExtractor {
         val extractor = MediaExtractor().apply {
