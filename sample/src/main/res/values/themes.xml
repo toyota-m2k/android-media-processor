@@ -27,9 +27,9 @@
         <item name="recIconColor">@color/pink_a400</item>
         <item name="stopIconColor">@color/blue_a400</item>
 
-        <item name="panelBackgroundColor">#40000000</item>
+        <item name="ampPanelBackgroundColor">#40000000</item>
         <!-- libPlayer theme -->
-        <item name="playerBackground">@color/white</item>
+        <item name="ampPlayerBackground">@color/white</item>
     </style>
 
     <style name="Theme.AndroidMediaProcessor" parent="Base.Theme.AndroidMediaProcessor">
