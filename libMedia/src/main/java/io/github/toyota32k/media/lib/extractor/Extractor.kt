@@ -109,7 +109,11 @@ class Extractor private constructor(private val inPath: IInputMediaFile, private
      * 音声と映像のズレの最小化を図る。
      */
     fun adjustAndSetTrimmingRangeList(originalList: ITrimmingRangeList, durationUs:Long):ITrimmingRangeList {
-        if(originalList.list.isEmpty()) return originalList
+        if(originalList.list.isEmpty()) {
+            originalList.closeBy(durationUs)
+            this.trimmingRangeList = originalList
+            return originalList
+        }
 
         if(!inPath.seekable) {
             logger.assert(false, "trimming may not work because input file is not seekable")

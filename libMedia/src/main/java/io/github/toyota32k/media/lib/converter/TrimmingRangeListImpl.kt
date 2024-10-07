@@ -83,7 +83,6 @@ class TrimmingRangeListImpl : ITrimmingRangeList {
 //    }
 
     override fun positionState(positionUs: Long): ITrimmingRangeList.PositionState {
-        if(naturalDurationUs<0) throw java.lang.IllegalStateException("call closeBy() in advance.")
         return if(list.isEmpty()) {
             when {
                 positionUs<0 -> ITrimmingRangeList.PositionState.END        // positionUs < 0 : EOS
@@ -94,6 +93,7 @@ class TrimmingRangeListImpl : ITrimmingRangeList {
                 else -> ITrimmingRangeList.PositionState.VALID
             }
         } else {
+            if(naturalDurationUs<0) throw java.lang.IllegalStateException("call closeBy() in advance.")
             when {
                 positionUs<0 -> ITrimmingRangeList.PositionState.END
                 list.firstOrNull { it.contains(positionUs) } != null -> ITrimmingRangeList.PositionState.VALID
