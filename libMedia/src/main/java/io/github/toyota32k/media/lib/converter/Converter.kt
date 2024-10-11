@@ -545,11 +545,12 @@ class Converter {
                                 }
                             }
                         }
-                        report.updateOutputFileInfo(outPath.getLength(), videoTrack.extractor.totalTime / 1000L)
+                        report.updateOutputFileInfo(outPath.getLength(), videoTrack.extractor.naturalDurationUs / 1000L)
                         report.end()
+                        report.setDurationInfo(trimmingRangeList.trimmedDurationUs, videoTrack.extractor.naturalDurationUs, audioTrack?.extractor?.naturalDurationUs?:0L, muxer.naturalDurationUs)
                         logger.info(report.toString())
                         progress?.finish()
-                        ConvertResult.succeeded(trimmingRangeList)
+                        ConvertResult.succeeded(trimmingRangeList, report)
                     }
                 }}}
             }

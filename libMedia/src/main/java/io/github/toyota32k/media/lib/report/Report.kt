@@ -54,6 +54,22 @@ class Report : IAttributes {
         output.duration = duration
     }
 
+    var sourceDurationUs:Long = 0L
+    var videoExtractedDurationUs:Long = 0L
+    var audioExtractedDurationUs:Long = 0L
+    var muxerDurationUs:Long = 0L
+    fun setDurationInfo(
+        sourceDurationUs: Long,
+        videoExtractedDurationUs: Long,
+        audioExtractedDurationUs: Long,
+        muxerDurationUs: Long
+    ) {
+        this.sourceDurationUs = sourceDurationUs
+        this.videoExtractedDurationUs = videoExtractedDurationUs
+        this.audioExtractedDurationUs = audioExtractedDurationUs
+        this.muxerDurationUs = muxerDurationUs
+    }
+
     override var title: String = "Conversion Results"
     override val subAttributes: List<IAttributes?>
         get() = listOf(input, output)
@@ -63,6 +79,10 @@ class Report : IAttributes {
             IAttributes.KeyValue("Video Encoder", videoEncoderName ?: "n/a"),
             IAttributes.KeyValue("Audio Encoder", audioEncoderName?:"n/a"),
             IAttributes.KeyValue("Consumed Time", TimeSpan(endTick - startTick).formatH()),
+            IAttributes.KeyValue("Duration(Input)", TimeSpan(sourceDurationUs/1000).formatH()),
+            IAttributes.KeyValue("Extracted(Video)", TimeSpan(videoExtractedDurationUs/1000).formatH()),
+            IAttributes.KeyValue("Extracted(Audio)", TimeSpan(audioExtractedDurationUs/1000).formatH()),
+            IAttributes.KeyValue("Muxer", TimeSpan(muxerDurationUs/1000).formatH()),
             )
     }
 

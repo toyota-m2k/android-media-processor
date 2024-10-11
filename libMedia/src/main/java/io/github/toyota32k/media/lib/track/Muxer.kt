@@ -12,6 +12,7 @@ import io.github.toyota32k.media.lib.format.MetaData
 import io.github.toyota32k.media.lib.format.getLocation
 import io.github.toyota32k.media.lib.format.getRotation
 import io.github.toyota32k.media.lib.misc.ISO6709LocationParser
+import io.github.toyota32k.media.lib.utils.DurationEstimator
 import io.github.toyota32k.utils.UtLog
 import java.io.Closeable
 import java.nio.ByteBuffer
@@ -119,6 +120,9 @@ class Muxer(inputMetaData: MetaData, outPath: IOutputMediaFile, private val hasA
     }
 
     fun writeSampleData(sampleType: SampleType, byteBuf: ByteBuffer, bufferInfo: MediaCodec.BufferInfo) {
+        if(sampleType== SampleType.Video) {
+            durationEstimator.update(bufferInfo)
+        }
         if (isReady) {
             muxer.writeSampleData(trackIndexOf(sampleType), byteBuf, bufferInfo)
             if(bufferInfo.flags.and(MediaCodec.BUFFER_FLAG_END_OF_STREAM)!=0) {
@@ -163,9 +167,6 @@ class Muxer(inputMetaData: MetaData, outPath: IOutputMediaFile, private val hasA
         }
     }
 
-
-
-
     private class SampleInfo(sampleType: SampleType, size: Int, bufferInfo: MediaCodec.BufferInfo) {
         val sampleType: SampleType
         val size: Int
@@ -192,4 +193,8 @@ class Muxer(inputMetaData: MetaData, outPath: IOutputMediaFile, private val hasA
             logger.debug("disposed")
         }
     }
+
+    private fun DurationEstimator.update(bufferInfo: MediaCodec.BufferInfo) = update(bufferInfo.presentationTimeUs, bufferInfo.size.toLong())
+    private val durationEstimator = DurationEstimator()
+    val naturalDurationUs:Long get() = durationEstimator.estimatedDurationUs
 }

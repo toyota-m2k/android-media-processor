@@ -13,6 +13,7 @@ import io.github.toyota32k.media.lib.converter.IInputMediaFile
 import io.github.toyota32k.media.lib.converter.ITrimmingRangeList
 import io.github.toyota32k.media.lib.converter.TrimmingRangeListImpl
 import io.github.toyota32k.media.lib.track.Muxer
+import io.github.toyota32k.media.lib.utils.DurationEstimator
 import io.github.toyota32k.media.lib.utils.TimeSpan
 import io.github.toyota32k.utils.UtLog
 import java.io.Closeable
@@ -151,9 +152,10 @@ class Extractor private constructor(private val inPath: IInputMediaFile, private
         this.trimmingRangeList = list
     }
 
-    var totalTime = 0L
-        private set
+    private var totalTime = 0L
     private var totalSkippedTime = 0L
+    private val durationEstimator = DurationEstimator()
+    val naturalDurationUs:Long get() = durationEstimator.estimatedDurationUs
 
 //    private var _sinkBuffer : ByteBuffer? = null
 //    private fun getSinkBuffer(size:Long) : ByteBuffer {
@@ -251,6 +253,7 @@ class Extractor private constructor(private val inPath: IInputMediaFile, private
 //                logger.assert(currentPositionUs == extractor.sampleTime)
                 logger.verbose {"READING: read $sampleSize bytes at ${TimeSpan.formatAutoM(currentPositionUs/1000)}"}
                 totalTime = currentPositionUs - totalSkippedTime
+                durationEstimator.update(totalTime, sampleSize.toLong())
                 decoder.queueInputBuffer(inputBufferIdx, 0, sampleSize, totalTime, extractor.sampleFlags)
             } else {
                 logger.error("zero byte read.")
