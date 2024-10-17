@@ -19,6 +19,8 @@ import io.github.toyota32k.binder.enableBinding
 import io.github.toyota32k.binder.multiEnableBinding
 import io.github.toyota32k.binder.multiVisibilityBinding
 import io.github.toyota32k.binder.textBinding
+import io.github.toyota32k.dialog.UtDialog
+import io.github.toyota32k.dialog.UtDialogConfig
 import io.github.toyota32k.dialog.broker.pickers.UtFilePickerStore
 import io.github.toyota32k.dialog.task.UtImmortalAndroidViewModel
 import io.github.toyota32k.dialog.task.UtImmortalSimpleTask
@@ -236,6 +238,7 @@ class MainActivity : UtMortalActivity() {
                     val result = try {
                         awaiter.await().also { convertResult ->
                             if (convertResult.succeeded) {
+                                logger.debug(convertResult.toString())
                                 vm.message.value = "Optimizing Now..."
                                 if (!FastStart.process(inFile = trimFile, outFile = optFile) {
                                         vm.progress.value = it.percentage
@@ -290,6 +293,7 @@ class MainActivity : UtMortalActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        UtDialogConfig.useLegacyTheme()
         controls = ActivityMainBinding.inflate(layoutInflater)
         setContentView(controls.root)
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->

@@ -28,6 +28,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import kotlin.math.max
 import kotlin.math.min
 
 /**
@@ -254,14 +255,14 @@ class Converter {
             set(v) {
                 if (field < v) {
                     field = v
-                    progressInUs = min(videoProgressInUs, v)
+                    progressInUs = max(videoProgressInUs, v)
                 }
             }
         var videoProgressInUs: Long = 0L
             set(v) {
                 if (field < v) {
                     field = v
-                    progressInUs = min(audioProgressInUs, v)
+                    progressInUs = max(audioProgressInUs, v)
                 }
             }
         fun finish() {
