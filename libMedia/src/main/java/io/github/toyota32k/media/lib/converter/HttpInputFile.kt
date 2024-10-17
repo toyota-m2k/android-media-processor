@@ -99,7 +99,7 @@ class HttpInputFile(context: Context, private val streamSource: IHttpStreamSourc
             if(refCount>0) {
                 refCount--
                 if (refCount == 0) {
-                    length = dataSource?.getSize() ?: -1
+//                    length = dataSource?.getSize() ?: -1
                     dataSource?.dispose()
                     dataSource = null
                 }

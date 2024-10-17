@@ -11,6 +11,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.io.File
 import kotlin.math.max
+import kotlin.math.min
 
 /**
  * IHttpStreamSourceを入力とする HTTPベースの MediaDataSource の実装クラス
@@ -192,7 +193,7 @@ class HttpMediaDataSource(context: Context, private val streamSource: IHttpStrea
         }
         return tempFile.inputStream().use { input ->
             input.skip(position)
-            input.read(buffer, offset, length.toInt())
+            input.read(buffer, offset, min(size,length.toInt()))
         }
     }
 
