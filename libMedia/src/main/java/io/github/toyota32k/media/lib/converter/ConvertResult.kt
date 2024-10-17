@@ -2,6 +2,7 @@ package io.github.toyota32k.media.lib.converter
 
 import io.github.toyota32k.media.lib.report.Report
 import kotlinx.coroutines.CancellationException
+import kotlin.text.appendLine
 
 /**
  * Converterの結果（成功/失敗/キャンセル）を返すためのデータクラス
@@ -16,5 +17,35 @@ data class ConvertResult(val succeeded:Boolean, val adjustedTrimmingRangeList: I
         fun error(exception:Throwable):ConvertResult {
             return if(exception is CancellationException) cancelled else ConvertResult(false, null, null, false, exception.message,exception)
         }
+    }
+
+    // for debug log
+    override fun toString(): String {
+        return StringBuilder().apply {
+            append("Convert Result: ")
+            when {
+                succeeded -> {
+                    appendLine("Succeeded")
+                    if (report != null) {
+                        appendLine(report.toString())
+                    }
+                }
+                cancelled -> {
+                    appendLine("Cancelled")
+                }
+                exception != null -> {
+                    appendLine("Failed")
+                    appendLine(exception.toString())
+                }
+                errorMessage != null -> {
+                    appendLine("Failed")
+                    appendLine(errorMessage)
+                }
+                else -> {
+                    appendLine("Failed")
+                    appendLine("Unknown Error")
+                }
+            }
+        }.toString()
     }
 }

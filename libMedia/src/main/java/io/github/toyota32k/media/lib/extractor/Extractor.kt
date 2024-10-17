@@ -227,7 +227,7 @@ class Extractor private constructor(private val inPath: IInputMediaFile, private
 //        }
 
         val decoder = output.decoder
-        val inputBufferIdx = decoder.dequeueInputBuffer(BaseCodec.TIMEOUT_INFINITE)
+        val inputBufferIdx = decoder.dequeueInputBuffer(BaseCodec.TIMEOUT_IMMEDIATE)
         if(inputBufferIdx<0) {
             logger.verbose("no buffer in the decoder.")
             return false
@@ -236,9 +236,9 @@ class Extractor private constructor(private val inPath: IInputMediaFile, private
         val idx = extractor.sampleTrackIndex
         if(idx<0||positionState == ITrimmingRangeList.PositionState.END) {
             logger.debug("found eos")
-            if(currentPositionUs - totalSkippedTime < trimmingRangeList.trimmedDurationUs - 3*1000*1000) {
-                // 読み込んだ時間が、期待する時間より３秒以上短ければ、たぶんなんかエラーが起きている。
-                logger.assertStrongly(false, "conversion may be failed.")
+            if(durationEstimator.estimatedDurationUs < trimmingRangeList.trimmedDurationUs - 2*1000*1000) {
+                // 読み込んだ時間が、期待する時間より2秒以上短ければ、たぶんなんかエラーが起きている。
+                logger.warn("conversion may be failed.")
             }
             eos = true
             decoder.queueInputBuffer(inputBufferIdx, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)

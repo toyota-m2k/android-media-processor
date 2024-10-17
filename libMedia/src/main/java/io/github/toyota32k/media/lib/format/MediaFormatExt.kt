@@ -48,7 +48,7 @@ fun MediaFormat.dump(logger: UtLog, message:String) {
     logger.info("### $message")
     val codec = Codec.fromFormat(this)
     if(codec == null) {
-        logger.error("unknown codec.")
+        logger.error("unknown codec. (${getMime()})")
         return
     }
     logger.info("- $codec")

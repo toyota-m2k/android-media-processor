@@ -13,6 +13,7 @@ enum class Codec(val media: Media, val mime:String, val alias:String?=null) {
     MPEG2(Media.Video, MediaFormat.MIMETYPE_VIDEO_MPEG2),
     MPEG4(Media.Video, MediaFormat.MIMETYPE_VIDEO_MPEG4),
     HEVC(Media.Video, MediaFormat.MIMETYPE_VIDEO_HEVC),     // H.265
+    VIDEO_RAW(Media.Video, MediaFormat.MIMETYPE_VIDEO_RAW),
 
     VP8(Media.Video, MediaFormat.MIMETYPE_VIDEO_VP8),
     VP9(Media.Video, MediaFormat.MIMETYPE_VIDEO_VP9),
@@ -26,6 +27,7 @@ enum class Codec(val media: Media, val mime:String, val alias:String?=null) {
     AAC_HE_LC(Media.Audio, MediaFormat.MIMETYPE_AUDIO_AAC_LC, MediaFormat.MIMETYPE_AUDIO_AAC),
     AAC_HE_ELD(Media.Audio, MediaFormat.MIMETYPE_AUDIO_AAC_ELD, MediaFormat.MIMETYPE_AUDIO_AAC),
     AAC_HE_XHE(Media.Audio, MediaFormat.MIMETYPE_AUDIO_AAC_XHE, MediaFormat.MIMETYPE_AUDIO_AAC),
+    AUDIO_RAW(Media.Audio, MediaFormat.MIMETYPE_AUDIO_RAW)
 
     ;
 
