@@ -47,12 +47,16 @@ import io.github.toyota32k.sample.media.databinding.ActivityMainBinding
 import io.github.toyota32k.sample.media.dialog.MultilineTextDialog
 import io.github.toyota32k.sample.media.dialog.ProgressDialog
 import io.github.toyota32k.utils.UtLog
+import io.github.toyota32k.utils.disposableObserve
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
+import kotlinx.coroutines.flow.forEach
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import java.io.File
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicLong
@@ -154,10 +158,10 @@ class MainActivity : UtMortalActivity() {
                 withOwner {
                     val activity = it.asActivity() ?: return@withOwner false
                     val intent = Intent(Intent.ACTION_VIEW)
-                    intent.setDataAndType(uri, "video/*")
-                    if (intent.resolveActivity(activity.packageManager) != null) {
+                    intent.setDataAndType(uri, "video/mp4")
+//                    if (intent.resolveActivity(activity.packageManager) != null) {
                         activity.startActivity(intent)
-                    }
+//                    }
                     true
                 }
             }
@@ -215,60 +219,59 @@ class MainActivity : UtMortalActivity() {
             val ranges = chapterEditor.enabledRanges(Range.empty)
 
             UtImmortalSimpleTask.run("trimming") {
-                val vm = ProgressDialog.ProgressViewModel.create(taskName)
-                vm.message.value = "Trimming Now..."
-
-                // Trimming & Conversion
-                val rotation = if(playerModel.rotation.value!=0) Rotation(playerModel.rotation.value, relative = true) else Rotation.nop
-                val converter = Converter.Factory()
-                    .input(srcFile)
-                    .output(trimFile)
-                    .audioStrategy(PresetAudioStrategies.AACDefault)
-                    .videoStrategy(PresetVideoStrategies.HEVC1080Profile)
-                    .rotate(rotation)
-                    .addTrimmingRanges(*ranges.map { Converter.Factory.RangeMs(it.start, it.end) }.toTypedArray())
-                    .setProgressHandler {
-                        vm.progress.value = it.percentage
-                        vm.progressText.value = it.format()
+                val result = ProgressDialog.withProgressDialog<ConvertResult> { sink ->
+                    sink.message = "Trimming Now"
+                    val rotation = if(playerModel.rotation.value!=0) Rotation(playerModel.rotation.value, relative = true) else Rotation.nop
+                    val converter = Converter.Factory()
+                        .input(srcFile)
+                        .output(trimFile)
+                        .audioStrategy(PresetAudioStrategies.AACDefault)
+                        .videoStrategy(PresetVideoStrategies.HEVC1080Profile)
+                        .rotate(rotation)
+                        .addTrimmingRanges(*ranges.map { Converter.Factory.RangeMs(it.start, it.end) }.toTypedArray())
+                        .setProgressHandler {
+                            sink.progress = it.percentage
+                            sink.progressText = it.format()
+                        }
+                        .build()
+                    val awaiter = converter.executeAsync()
+                    sink.cancelled.disposableObserve(currentCoroutineContext()) { cancelled->
+                        if(cancelled) {
+                            awaiter.cancel()
+                        }
                     }
-                    .build()
-                val awaiter = converter.executeAsync()
-                vm.cancelCommand.bindForever { awaiter.cancel() }
-                CoroutineScope(Dispatchers.IO).launch {
-                    val result = try {
-                        awaiter.await().also { convertResult ->
-                            if (convertResult.succeeded) {
-                                logger.debug(convertResult.toString())
-                                vm.message.value = "Optimizing Now..."
-                                if (!FastStart.process(inFile = trimFile, outFile = optFile) {
-                                        vm.progress.value = it.percentage
-                                        vm.progressText.value = it.format()
-                                    }) {
-                                    // 変換不要
-                                    optFile.copyFrom(trimFile)
+                    withContext(Dispatchers.IO) {
+                        try {
+                            awaiter.await().also { convertResult ->
+                                if (convertResult.succeeded) {
+                                    logger.debug(convertResult.toString())
+                                    sink.message = "Optimizing Now..."
+                                    if (!FastStart.process(inFile = trimFile, outFile = optFile) {
+                                            sink.progress = it.percentage
+                                            sink.progressText = it.format()
+                                        }) {
+                                        // 変換不要
+                                        optFile.copyFrom(trimFile)
+                                    }
+                                    converted.value = true
                                 }
-                                converted.value = true
                             }
+                        } catch (e: Throwable) {
+                            ConvertResult.error(e)
+                        } finally {
+                            trimFile.safeDelete()
                         }
-                    } catch (e: Throwable) {
-                        ConvertResult.error(e)
-                    } finally {
-                        trimFile.safeDelete()
-                    }
-                    UtImmortalSimpleTask.run("trimming result") {
-                        vm.closeCommand.invoke(true)
-                        if (result.succeeded) {
-                            // 変換成功
-                            val srcLen = srcFile.getLength()
-                            val dstLen = optFile.getLength()
-                            showConfirmMessageBox("Completed.", "${stringInKb(srcLen)} → ${stringInKb(dstLen)}")
-                        } else if (!result.cancelled) {
-                            showConfirmMessageBox("Error.", result.errorMessage ?: result.exception?.message ?: "unknown")
-                        }
-                        true
                     }
                 }
-                showDialog(taskName) { ProgressDialog() }.status.ok
+                if (result.succeeded) {
+                    // 変換成功
+                    val srcLen = srcFile.getLength()
+                    val dstLen = optFile.getLength()
+                    showConfirmMessageBox("Completed.", "${stringInKb(srcLen)} → ${stringInKb(dstLen)}")
+                } else if (!result.cancelled) {
+                    showConfirmMessageBox("Error.", result.errorMessage ?: result.exception?.message ?: "unknown")
+                }
+                true
             }
         }
 
