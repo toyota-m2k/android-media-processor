@@ -20,3 +20,4 @@ local.properties
 .idea/deploymentTargetSelector.xml
 .idea/other.xml
 app/build
+.idea/runConfigurations.xml
