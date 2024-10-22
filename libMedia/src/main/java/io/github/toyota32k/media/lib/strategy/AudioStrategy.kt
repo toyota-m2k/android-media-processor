@@ -19,6 +19,20 @@ open class AudioStrategy (
     val bitRatePerChannel:MaxDefault,         //      // 1ch当たりのビットレート
 ) : AbstractStrategy(codec, profile, null, fallbackProfiles), IAudioStrategy {
 
+    /**
+     * 既存のAudioStrategyから、必要なパラメータを書き換えて新しいAudioStrategyを作成する。
+     */
+    fun derived(
+        codec:Codec = this.codec,
+        profile: Profile = this.profile,                            // profile は AAC Profile として扱う。AAC以外のAudioコーデックは知らん。
+        fallbackProfiles: Array<Profile>? = this.fallbackProfiles,
+        sampleRate:MaxDefault = this.sampleRate,
+        channelCount: MaxDefault = this.channelCount,
+        bitRatePerChannel:MaxDefault = this.bitRatePerChannel,         //      // 1ch当たりのビットレート
+    ):AudioStrategy {
+        return AudioStrategy(codec, profile, fallbackProfiles, sampleRate, channelCount, bitRatePerChannel)
+    }
+
     override fun createOutputFormat(inputFormat: MediaFormat, encoder:MediaCodec): MediaFormat {
         val sampleRate = this.sampleRate.value(inputFormat.getSampleRate())
         val channelCount = this.channelCount.value(inputFormat.getChannelCount())

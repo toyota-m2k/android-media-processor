@@ -6,6 +6,7 @@ import android.media.MediaCodecInfo.CodecCapabilities
 import android.media.MediaCodecList
 import android.media.MediaFormat
 import android.media.MediaMetadataRetriever
+import android.os.Build
 import android.util.Size
 import io.github.toyota32k.media.lib.format.BitRateMode
 import io.github.toyota32k.media.lib.format.Codec
@@ -46,6 +47,37 @@ open class VideoStrategy(
 //    private fun hex(v:Int?):String {
 //        return if(v!=null) String.format("0x%x",v) else "n/a"
 //    }
+    /**
+     * 既存のVideoStrategy（Preset*とか）から、必要なパラメータを書き換えて、新しいVideoStrategyを作成する。
+     */
+    fun derived(
+        codec: Codec = this.codec,
+        profile: Profile = this.profile,
+        level: Level? = this.level,
+        fallbackProfiles:Array<Profile>? = this.fallbackProfiles,
+        sizeCriteria: SizeCriteria? = this.sizeCriteria,
+        bitRate: MaxDefault = this.bitRate, // = Int.MAX_VALUE,
+        frameRate: MaxDefault = this.frameRate, // = Int.MAX_VALUE,
+        iFrameInterval:MinDefault = this.iFrameInterval, // = DEFAULT_IFRAME_INTERVAL,
+        colorFormat:ColorFormat? = this.colorFormat, // = DEFAULT_COLOR_FORMAT,
+        bitRateMode: BitRateMode? = this.bitRateMode,
+    ):VideoStrategy {
+        return VideoStrategy(
+            codec,
+            profile,
+            level,
+            fallbackProfiles,
+            sizeCriteria,
+            bitRate,
+            frameRate,
+            iFrameInterval,
+            colorFormat,
+            bitRateMode)
+    }
+
+    fun toSoftwareEncoder(): VideoStrategy {
+        return VideoStrategyPreferSoftwareEncoder(this)
+    }
 
     override fun createOutputFormat(inputFormat: MediaFormat, metaData: MetaData, encoder: MediaCodec): MediaFormat {
         // bitRate は、MediaFormat に含まれず、MetaDataにのみ含まれるケースがあるようなので、
@@ -97,17 +129,10 @@ open class VideoStrategy(
     }
 
     fun dumpCodecs() {
-        logger.info("#### dump codecs ####")
-        MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.filter { it.isEncoder }.forEach { ci->
-            val cap = try { ci.getCapabilitiesForType(codec.mime) } catch(_:Throwable) { return@forEach }
-            cap.profileLevels.forEach { pl->
-                logger.info("${ci.name} : ${Profile.fromValue(codec, pl.profile)?:"?"}@${Level.fromValue(codec, pl.level)?:"?"}")
-                logger.info("- - - - - - -")
-            }
-        }
+        dumpEncodingCodecs(codec)
     }
 
-    private fun supportedProfile(supported: List<MediaCodecInfo.CodecProfileLevel>) : MediaCodecInfo.CodecProfileLevel? {
+    protected fun supportedProfile(supported: List<MediaCodecInfo.CodecProfileLevel>) : MediaCodecInfo.CodecProfileLevel? {
         fun findProfile(profile:Profile, level:Level?): MediaCodecInfo.CodecProfileLevel? {
             return supported.firstOrNull { it.profile == profile.value && (level==null || it.level>=level.value) }
         }
@@ -193,6 +218,21 @@ open class VideoStrategy(
             // widthは4の倍数でないとgoogleのエンコーダーはエラー、QualcommはWidth指定を無視する。
             // heightは2の倍数でないとエラーになるエンコーダーがあるらしい。
             return Size(w-w%4, h-h%2)
+        }
+
+        fun dumpEncodingCodecs(codec:Codec) {
+            logger.info("#### dump codecs ####")
+            MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.filter { it.isEncoder }.forEach { ci->
+                val cap = try { ci.getCapabilitiesForType(codec.mime) } catch(_:Throwable) { return@forEach }
+                val hw = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                    if(ci.isHardwareAccelerated()) "HW" else "SW"
+                } else {
+                    ""
+                }
+                cap.profileLevels.forEach { pl->
+                    logger.info("${ci.name} : ${Profile.fromValue(codec, pl.profile)?:"?"}@${Level.fromValue(codec, pl.level)?:"?"} ($hw)")
+                }
+            }
         }
     }
 }

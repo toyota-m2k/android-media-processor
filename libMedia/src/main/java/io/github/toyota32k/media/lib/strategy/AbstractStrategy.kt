@@ -3,6 +3,7 @@ package io.github.toyota32k.media.lib.strategy
 import android.media.MediaCodec
 import android.media.MediaCodecInfo.CodecProfileLevel
 import android.media.MediaCodecList
+import android.os.Build
 import io.github.toyota32k.media.lib.format.Codec
 import io.github.toyota32k.media.lib.format.Level
 import io.github.toyota32k.media.lib.format.Profile
@@ -30,7 +31,12 @@ abstract class AbstractStrategy(
 ) : IStrategy {
     override fun createEncoder(): MediaCodec {
         return MediaCodec.createEncoderByType(codec.mime).apply {
-            IStrategy.logger.info("using [$name] as encoder")
+            val hw = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                if(this.codecInfo.isHardwareAccelerated) "H/W" else "S/W"
+            } else {
+                ""
+            }
+            IStrategy.logger.info("using [$name] as encoder ($hw)")
         }
     }
 }
