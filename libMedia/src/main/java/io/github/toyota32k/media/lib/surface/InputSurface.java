@@ -1,7 +1,7 @@
 package io.github.toyota32k.media.lib.surface;
 
-// https://android.googlesource.com/platform/cts/+/refs/heads/android13-s3-release/tests/media/src/android/mediav2?autodive=0
-// https://cs.android.com/android/platform/superproject/main/+/main:cts/tests/mediapc/src/android/mediapc/cts/InputSurface.java
+// https://android.googlesource.com/platform/cts/+/refs/heads/android15-s1-release/tests/mediapc/src/android/mediapc/cts/InputSurface.java
+// (https://cs.android.com/android/platform/superproject/main/+/main:cts/tests/mediapc/src/android/mediapc/cts/InputSurface.javaI)
 
 /*
  * Copyright (C) 2021 The Android Open Source Project
@@ -18,7 +18,6 @@ package io.github.toyota32k.media.lib.surface;
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
 import android.opengl.EGL14;
 import android.opengl.EGLConfig;
 import android.opengl.EGLContext;
@@ -27,18 +26,15 @@ import android.opengl.EGLExt;
 import android.opengl.EGLSurface;
 import android.util.Log;
 import android.view.Surface;
-
 public class InputSurface {
     private static final String LOG_TAG = InputSurface.class.getSimpleName();
     private EGLDisplay mEGLDisplay = EGL14.EGL_NO_DISPLAY;
     private EGLContext mEGLContext = EGL14.EGL_NO_CONTEXT;
     private EGLSurface mEGLSurface = EGL14.EGL_NO_SURFACE;
     private EGLConfig[] mConfigs = new EGLConfig[1];
-
     private Surface mSurface;
     private int mWidth;
     private int mHeight;
-
     /**
      * Checks for EGL errors.
      */
@@ -48,7 +44,6 @@ public class InputSurface {
             throw new RuntimeException(msg + ": EGL error: 0x" + Integer.toHexString(error));
         }
     }
-
     /**
      * Prepares EGL.  We want a GLES 2.0 context and a surface that supports recording.
      */
@@ -62,7 +57,6 @@ public class InputSurface {
             mEGLDisplay = null;
             throw new RuntimeException("unable to initialize EGL14");
         }
-
         // Configure EGL for recordable and OpenGL ES 2.0.  We want enough RGB bits
         // to minimize artifacts from possible YUV conversion.
         int[] attribList = {
@@ -78,7 +72,6 @@ public class InputSurface {
                 numConfigs, 0)) {
             throw new RuntimeException("unable to find RGB888+recordable ES2 EGL config");
         }
-
         // Configure context for OpenGL ES 2.0.
         int[] attrib_list = {
                 EGL14.EGL_CONTEXT_CLIENT_VERSION, 2,
@@ -90,13 +83,11 @@ public class InputSurface {
         if (mEGLContext == null) {
             throw new RuntimeException("null context");
         }
-
         // Create a window surface, and attach it to the Surface we received.
         createEGLSurface();
         mWidth = getWidth();
         mHeight = getHeight();
     }
-
     private void createEGLSurface() {
         //EGLConfig[] configs = new EGLConfig[1];
         int[] surfaceAttribs = {
@@ -109,7 +100,6 @@ public class InputSurface {
             throw new RuntimeException("surface was null");
         }
     }
-
     /**
      * Queries the surface's width.
      */
@@ -118,7 +108,6 @@ public class InputSurface {
         EGL14.eglQuerySurface(mEGLDisplay, mEGLSurface, EGL14.EGL_WIDTH, value, 0);
         return value[0];
     }
-
     /**
      * Queries the surface's height.
      */
@@ -127,7 +116,6 @@ public class InputSurface {
         EGL14.eglQuerySurface(mEGLDisplay, mEGLSurface, EGL14.EGL_HEIGHT, value, 0);
         return value[0];
     }
-
     /**
      * Creates an InputSurface from a Surface.
      */
@@ -138,7 +126,6 @@ public class InputSurface {
         mSurface = surface;
         eglSetup();
     }
-
     /**
      * Discard all resources held by this class, notably the EGL context.
      */
@@ -149,14 +136,11 @@ public class InputSurface {
             EGL14.eglReleaseThread();
             EGL14.eglTerminate(mEGLDisplay);
         }
-
         mEGLDisplay = EGL14.EGL_NO_DISPLAY;
         mEGLContext = EGL14.EGL_NO_CONTEXT;
         mEGLSurface = EGL14.EGL_NO_SURFACE;
-
         mSurface = null;
     }
-
     /**
      * Makes our EGL context and surface current.
      */
@@ -165,30 +149,24 @@ public class InputSurface {
             throw new RuntimeException("eglMakeCurrent failed");
         }
     }
-
     /**
      * Calls eglSwapBuffers.  Use this to "publish" the current frame.
      */
     public boolean swapBuffers() {
         return EGL14.eglSwapBuffers(mEGLDisplay, mEGLSurface);
     }
-
     /**
      * Returns the Surface that the MediaCodec receives buffers from.
      */
     public Surface getSurface() {
         return mSurface;
     }
-
-
     /**
      * Sends the presentation time stamp to EGL.  Time is expressed in nanoseconds.
      */
     public void setPresentationTime(long nsecs) {
         EGLExt.eglPresentationTimeANDROID(mEGLDisplay, mEGLSurface, nsecs);
     }
-
-
     public void updateSize(int width, int height) {
         if (width != mWidth || height != mHeight) {
             Log.d(LOG_TAG, "re-create EGLSurface");
@@ -198,13 +176,10 @@ public class InputSurface {
             mHeight = getHeight();
         }
     }
-
-
     private void releaseEGLSurface() {
         if (mEGLDisplay != EGL14.EGL_NO_DISPLAY) {
             EGL14.eglDestroySurface(mEGLDisplay, mEGLSurface);
             mEGLSurface = EGL14.EGL_NO_SURFACE;
         }
     }
-
 }
