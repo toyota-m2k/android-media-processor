@@ -120,11 +120,7 @@ open class VideoStrategy(
             setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, iFrameInterval)
             setInteger(MediaFormat.KEY_COLOR_FORMAT, (colorFormat?:ColorFormat.COLOR_FormatSurface).value)
             setInteger(MediaFormat.KEY_PROFILE, pl.profile)
-            if (levelCritical && level!=null) {
-                setInteger(MediaFormat.KEY_LEVEL, level.value)
-            } else {
-                setInteger(MediaFormat.KEY_LEVEL, pl.level)
-            }
+            setInteger(MediaFormat.KEY_LEVEL, min(pl.level, level?.value?:Int.MAX_VALUE))
             if(brm!=null) {
                 setInteger(MediaFormat.KEY_BITRATE_MODE, brm.value)
             }
@@ -164,10 +160,11 @@ open class VideoStrategy(
 
         var pl = findProfile(profile, level)
         if(pl!=null) {
-            // profile / level ともに一致するものが見つかった
+            // profile / level ともに適合するものが見つかった
             return pl
         }
 
+        // levelCritical==false の場合は、profileだけでチェックする
         if(level!=null||!levelCritical) {
             pl = findProfile(profile, null)
             if(pl!=null) {
@@ -184,21 +181,23 @@ open class VideoStrategy(
                 hasLevel = hasLevel || v.level!=null
                 pl = findProfile(v.profile, v.level)
                 if(pl!=null) {
+                    // profile/level が合致するものが見つかった
                     return pl
                 }
             }
+            // levelCritical==false の場合は、profileだけでチェックする
             if (hasLevel && !levelCritical) {
-               // levelCriticalでなければ、レベル指定なしで再チェック
                 for (v in fallbackProfiles) {
                     pl = findProfile(v.profile, null)
                     if(pl!=null) {
+                        // レベルは無視してプロファイルだけが一致するものを見つけた
                         return pl
                     }
                 }
             }
         }
+        // ここまできて、条件に適合するものが見つからないなら、levelCritical を無視して再チェック。
         if(levelCritical) {
-            // levelCritical を false にして再試行
             if(level!=null) {
                 pl = findProfile(profile, null)
                 if(pl!=null) {
@@ -215,6 +214,7 @@ open class VideoStrategy(
                 }
             }
         }
+
         // どうやっても無理
         return null
     }
