@@ -130,7 +130,7 @@ class MainActivity : UtMortalActivity() {
                     val activity = it.asActivity() as MainActivity
                     inputFile.value = activity.pickers.openFilePicker.selectFile(arrayOf("video/*"))?.apply {
                         converted.value = false
-                        outputFile.value = null
+//                        outputFile.value = null
                         setSource(AndroidFile(this, application))
                     }
                 }
@@ -322,7 +322,7 @@ class MainActivity : UtMortalActivity() {
             .bindCommand(viewModel.commandSave, controls.saveVideo)
             .bindCommand(viewModel.commandToggleSkip, controls.makeRegionSkip)
             .multiVisibilityBinding(arrayOf(controls.chapterButtons, controls.videoViewer), viewModel.inputFileAvailable, hiddenMode = VisibilityBinding.HiddenMode.HideByInvisible)
-            .multiEnableBinding(arrayOf(controls.inputAnalyzeButton, controls.outputRefButton), viewModel.inputFileAvailable)
+            .multiEnableBinding(arrayOf(controls.inputAnalyzeButton, /*controls.outputRefButton*/), viewModel.inputFileAvailable)
             .multiEnableBinding(arrayOf(controls.outputAnalyzeButton, controls.outputPlayButton), combine(viewModel.outputFileAvailable, viewModel.converted) {o,c->o&&c})
             .enableBinding(controls.saveVideo, viewModel.readyToConvert)
             .textBinding(controls.inputFileName, viewModel.inputFileName)
