@@ -13,14 +13,20 @@ object PresetVideoStrategies {
     val FHD1080SizeCriteria =
         VideoStrategy.SizeCriteria(VideoStrategy.FHD1080_S_SIZE, VideoStrategy.FHD1080_L_SIZE)
 
+
+    fun noLevelProfiles(vararg elements: Profile): Array<ProfileLevel> {
+        return elements.map { ProfileLevel(it) }.toTypedArray()
+    }
+
     // AVC - H.264
     // HD-720p
 
     object AVC720LowProfile : VideoStrategy(
         codec = Codec.AVC,
         profile = Profile.AVCProfileMain,
-        level = Level.AVCLevel13,
-        fallbackProfiles = arrayOf(Profile.AVCProfileBaseline),
+        level = Level.AVCLevel4,
+        levelCritical = true,
+        fallbackProfiles = arrayOf(ProfileLevel(Profile.AVCProfileBaseline,Level.AVCLevel4)),
         sizeCriteria = HD720SizeCriteria,
         bitRate = MaxDefault(768*1000),
         frameRate = MaxDefault(30, 24),
@@ -32,8 +38,9 @@ object PresetVideoStrategies {
     object AVC720Profile : VideoStrategy(
         codec = Codec.AVC,
         profile = Profile.AVCProfileMain,
-        level = Level.AVCLevel31,
-        fallbackProfiles = arrayOf(Profile.AVCProfileBaseline),
+        level = Level.AVCLevel4,
+        levelCritical = true,
+        fallbackProfiles = arrayOf(ProfileLevel(Profile.AVCProfileBaseline,Level.AVCLevel4)),
         sizeCriteria = HD720SizeCriteria,
         bitRate = MaxDefault(4*1000*1000, 3*1000*1000),
         frameRate = MaxDefault(30),
@@ -44,8 +51,8 @@ object PresetVideoStrategies {
     object AVC720HighProfile : VideoStrategy(
         codec = Codec.AVC,
         profile = Profile.AVCProfileHigh,
-        level = Level.AVCLevel32,
-        fallbackProfiles = arrayOf(Profile.AVCProfileMain, Profile.AVCProfileBaseline),
+        level = Level.AVCLevel4,
+        fallbackProfiles = arrayOf(ProfileLevel(Profile.AVCProfileMain,Level.AVCLevel4), ProfileLevel(Profile.AVCProfileBaseline,Level.AVCLevel4)),
         sizeCriteria = HD720SizeCriteria,
         bitRate = MaxDefault(20*1000*1000, 10*1000*1000),
         frameRate = MaxDefault(60, 30),
@@ -61,7 +68,7 @@ object PresetVideoStrategies {
         codec = Codec.AVC,
         profile = Profile.AVCProfileHigh,
         level = Level.AVCLevel4,
-        fallbackProfiles = arrayOf(Profile.AVCProfileMain),
+        fallbackProfiles = noLevelProfiles(Profile.AVCProfileMain),
         sizeCriteria = FHD1080SizeCriteria,
         bitRate = MaxDefault(4*1000*1000, 2*1000*1000),
         frameRate = MaxDefault(30),
@@ -74,7 +81,7 @@ object PresetVideoStrategies {
         codec = Codec.AVC,
         profile = Profile.AVCProfileHigh10,
         level = Level.AVCLevel4,
-        fallbackProfiles =  arrayOf(Profile.AVCProfileHigh, Profile.AVCProfileMain),
+        fallbackProfiles =  noLevelProfiles(Profile.AVCProfileHigh, Profile.AVCProfileMain),
         sizeCriteria = FHD1080SizeCriteria,
         bitRate = MaxDefault(20*1000*1000, 10*1000*1000),
         frameRate = MaxDefault(60, 30),
@@ -95,7 +102,7 @@ object PresetVideoStrategies {
         frameRate = MaxDefault(30),
         iFrameInterval =MinDefault(1),
         colorFormat =ColorFormat.COLOR_FormatSurface,
-        BitRateMode.VBR,
+        bitRateMode = BitRateMode.VBR,
     )
 
     object HEVC1080Profile : VideoStrategy(
@@ -115,7 +122,7 @@ object PresetVideoStrategies {
         codec = Codec.HEVC,
         profile = Profile.HEVCProfileMain10,
         level = Level.HEVCHighTierLevel5,
-        fallbackProfiles =arrayOf(Profile.HEVCProfileMain),
+        fallbackProfiles =noLevelProfiles(Profile.HEVCProfileMain),
         sizeCriteria =FHD1080SizeCriteria,
         bitRate =MaxDefault(30*1000*1000, 15*1000*1000),
         frameRate =MaxDefault(30),

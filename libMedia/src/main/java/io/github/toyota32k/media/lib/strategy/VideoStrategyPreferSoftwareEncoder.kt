@@ -9,6 +9,7 @@ class VideoStrategyPreferSoftwareEncoder(baseStrategy: VideoStrategy) : VideoStr
     baseStrategy.codec,
     baseStrategy.profile,
     baseStrategy.level,
+    baseStrategy.levelCritical,
     baseStrategy.fallbackProfiles,
     baseStrategy.sizeCriteria,
     baseStrategy.bitRate,
@@ -21,34 +22,35 @@ class VideoStrategyPreferSoftwareEncoder(baseStrategy: VideoStrategy) : VideoStr
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
             !info.isHardwareAccelerated
         } else {
-            false
+            false   // どうせわからんからなんでも false
         }
     }
 
     override fun createEncoder(): MediaCodec {
-        val list = MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos
-        for (info in list) {
-            if (info.isEncoder && isSoftwareEncoder(info)) {
-                try {
-                    val cap = info.getCapabilitiesForType(codec.mime)
-                    val pls = cap.profileLevels
-                    for (pl in pls) {
-                        if (pl.profile == profile.value && (level == null || pl.level > level.value)) {
-                            return MediaCodec.createByCodecName(info.name)
-                        }
-                    }
-                } catch (e: Exception) {
-                    logger.error(e)
-                }
-            }
-        }
+//        val list = MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos
+//        for (info in list) {
+//            if (info.isEncoder && isSoftwareEncoder(info)) {
+//                try {
+//                    val cap = info.getCapabilitiesForType(codec.mime)
+//                    val pl = cap.profileLevels.find { pl -> pl.profile == profile.value && (level == null || pl.level > level.value) }
+//                    if (pl != null) {
+//                        return MediaCodec.createByCodecName(info.name)
+//                    }
+//                } catch (e: Exception) {
+//                    logger.error(e)
+//                }
+//            }
+//        }
         val supported = MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos
             .filter {
                 it.isEncoder
-                && if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) !it.isHardwareAccelerated else true
-                && it.getCapabilitiesForType(codec.mime).profileLevels.find {pl->pl.profile==profile.value && (level==null || pl.level>level.value) } != null
+                && isSoftwareEncoder(it)
             }
-        val codec = supported.firstOrNull() ?: throw IllegalStateException("no encoder found")
-        return MediaCodec.createByCodecName(codec.name)
+        var codec = supported.firstOrNull { getCapabilitiesOf(it)?.profileLevels?.find { pl -> pl.profile == profile.value && (level == null || pl.level >= level.value) }!=null}
+        return if(codec!=null) {
+            MediaCodec.createByCodecName(codec.name)
+        } else {
+            super.createEncoder()
+        }
     }
 }

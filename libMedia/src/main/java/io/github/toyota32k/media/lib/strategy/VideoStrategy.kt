@@ -5,7 +5,6 @@ import android.media.MediaCodecInfo
 import android.media.MediaCodecInfo.CodecCapabilities
 import android.media.MediaCodecList
 import android.media.MediaFormat
-import android.media.MediaMetadataRetriever
 import android.os.Build
 import android.util.Size
 import io.github.toyota32k.media.lib.format.BitRateMode
@@ -16,7 +15,6 @@ import io.github.toyota32k.media.lib.format.MetaData
 import io.github.toyota32k.media.lib.format.Profile
 import io.github.toyota32k.media.lib.format.getBitRate
 import io.github.toyota32k.media.lib.format.getBitRateMode
-import io.github.toyota32k.media.lib.format.getDuration
 import io.github.toyota32k.media.lib.format.getFrameRate
 import io.github.toyota32k.media.lib.format.getHeight
 import io.github.toyota32k.media.lib.format.getIFrameInterval
@@ -30,7 +28,8 @@ open class VideoStrategy(
     codec: Codec,
     profile: Profile,
     level: Level? = null,
-    fallbackProfiles: Array<Profile>? = null,
+    levelCritical:Boolean = false,
+    fallbackProfiles: Array<ProfileLevel>? = null,
 
     val sizeCriteria: SizeCriteria?,
     val bitRate: MaxDefault, // = Int.MAX_VALUE,
@@ -38,7 +37,7 @@ open class VideoStrategy(
     val iFrameInterval:MinDefault, // = DEFAULT_IFRAME_INTERVAL,
     val colorFormat:ColorFormat?, // = DEFAULT_COLOR_FORMAT,
     val bitRateMode: BitRateMode?,
-) : AbstractStrategy(codec,profile,level,fallbackProfiles), IVideoStrategy {
+) : AbstractStrategy(codec,profile,level,levelCritical, fallbackProfiles), IVideoStrategy {
 
 //    override fun createOutputFormat(inputFormat: MediaFormat, encoder: MediaCodec): MediaFormat {
 //        return createOutputFormat(MediaFormatCompat(inputFormat), encoder)
@@ -54,7 +53,8 @@ open class VideoStrategy(
         codec: Codec = this.codec,
         profile: Profile = this.profile,
         level: Level? = this.level,
-        fallbackProfiles:Array<Profile>? = this.fallbackProfiles,
+        levelCritical:Boolean = this.levelCritical,
+        fallbackProfiles:Array<ProfileLevel>? = this.fallbackProfiles,
         sizeCriteria: SizeCriteria? = this.sizeCriteria,
         bitRate: MaxDefault = this.bitRate, // = Int.MAX_VALUE,
         frameRate: MaxDefault = this.frameRate, // = Int.MAX_VALUE,
@@ -66,6 +66,7 @@ open class VideoStrategy(
             codec,
             profile,
             level,
+            levelCritical,
             fallbackProfiles,
             sizeCriteria,
             bitRate,
@@ -75,7 +76,7 @@ open class VideoStrategy(
             bitRateMode)
     }
 
-    fun toSoftwareEncoder(): VideoStrategy {
+    fun preferSoftwareEncoder(): VideoStrategy {
         return VideoStrategyPreferSoftwareEncoder(this)
     }
 
@@ -92,7 +93,7 @@ open class VideoStrategy(
             width = size.width
             height = size.height
         }
-        val pl = supportedProfile(encoder) ?: throw IllegalStateException("no supported profile.")
+        val pl = supportedProfileByEncoder(encoder) ?: throw IllegalStateException("no supported profile.")
         val brm = if(bitRateMode!=null && isBitrateModeSupported(encoder, bitRateMode)) bitRateMode else null
 
         logger.info("Video Format ------------------------------------------------------")
@@ -119,7 +120,11 @@ open class VideoStrategy(
             setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, iFrameInterval)
             setInteger(MediaFormat.KEY_COLOR_FORMAT, (colorFormat?:ColorFormat.COLOR_FormatSurface).value)
             setInteger(MediaFormat.KEY_PROFILE, pl.profile)
-            setInteger(MediaFormat.KEY_LEVEL, pl.level)
+            if (levelCritical && level!=null) {
+                setInteger(MediaFormat.KEY_LEVEL, level.value)
+            } else {
+                setInteger(MediaFormat.KEY_LEVEL, pl.level)
+            }
             if(brm!=null) {
                 setInteger(MediaFormat.KEY_BITRATE_MODE, brm.value)
             }
@@ -128,29 +133,89 @@ open class VideoStrategy(
         }
     }
 
+    /**
+     * エンコーダーがサポートしている Profile/Level のリストを返す。
+     */
+    protected fun supportedProfileByEncoder(encoder: MediaCodec): MediaCodecInfo.CodecProfileLevel? {
+        val cap = capabilities(encoder) ?: return null
+        val supported = cap.profileLevels
+            .sortedWith { v1, v2 ->
+                val r = v1.profile - v2.profile
+                if(r!=0) r else v1.level - v2.level
+            }
+        IStrategy.logger.info("Supported Profiles by [${encoder.name}] ---")
+        supported.forEach { IStrategy.logger.info("  ${Profile.fromValue(codec, it.profile)?:"?"}@${Level.fromValue(codec, it.level)?:"?"}") }
+        IStrategy.logger.info("-------------------------------------------")
+        return selectMostSuitableProfile(supported)
+    }
+
     fun dumpCodecs() {
         dumpEncodingCodecs(codec)
     }
 
-    protected fun supportedProfile(supported: List<MediaCodecInfo.CodecProfileLevel>) : MediaCodecInfo.CodecProfileLevel? {
+    /**
+     * Profile/Levelリストの中から、VideoStrategyに対して、最も適切なProfileLevelを返す。
+     * これがEncoderのMediaFormatに設定するパラメータとなる。
+     */
+    protected fun selectMostSuitableProfile(supported: List<MediaCodecInfo.CodecProfileLevel>) : MediaCodecInfo.CodecProfileLevel? {
         fun findProfile(profile:Profile, level:Level?): MediaCodecInfo.CodecProfileLevel? {
             return supported.firstOrNull { it.profile == profile.value && (level==null || it.level>=level.value) }
         }
 
         var pl = findProfile(profile, level)
-        if(pl!=null) return pl
-
-        if(level!=null) {
-            pl = findProfile(profile, null)
-            if(pl!=null) return pl
+        if(pl!=null) {
+            // profile / level ともに一致するものが見つかった
+            return pl
         }
 
-        if(fallbackProfiles!=null) {
-            for (v in fallbackProfiles) {
-                pl = findProfile(v,null)
-                if(pl!=null) return pl
+        if(level!=null||!levelCritical) {
+            pl = findProfile(profile, null)
+            if(pl!=null) {
+                // レベルは無視してプロファイルだけが一致するものを見つけた
+                return pl
             }
         }
+
+        // 以上で、対応するプロファイルが見つからなければ、
+        // フォールバックプロファイルに一致するものを探す
+        if(fallbackProfiles!=null) {
+            var hasLevel = false
+            for (v in fallbackProfiles) {
+                hasLevel = hasLevel || v.level!=null
+                pl = findProfile(v.profile, v.level)
+                if(pl!=null) {
+                    return pl
+                }
+            }
+            if (hasLevel && !levelCritical) {
+               // levelCriticalでなければ、レベル指定なしで再チェック
+                for (v in fallbackProfiles) {
+                    pl = findProfile(v.profile, null)
+                    if(pl!=null) {
+                        return pl
+                    }
+                }
+            }
+        }
+        if(levelCritical) {
+            // levelCritical を false にして再試行
+            if(level!=null) {
+                pl = findProfile(profile, null)
+                if(pl!=null) {
+                    // レベルは無視してプロファイルだけが一致するものを見つけた
+                    return pl
+                }
+            }
+            if(fallbackProfiles!=null) {
+                for (v in fallbackProfiles) {
+                    pl = findProfile(v.profile, null)
+                    if (pl != null) {
+                        return pl
+                    }
+                }
+            }
+        }
+        // どうやっても無理
         return null
     }
 
@@ -162,38 +227,53 @@ open class VideoStrategy(
         return capabilities(encoder)?.encoderCapabilities?.isBitrateModeSupported(mode.value) ?: false
     }
 
-    protected fun supportedProfile(encoder: MediaCodec): MediaCodecInfo.CodecProfileLevel? {
-        val cap = capabilities(encoder) ?: return null
-        val supported = cap.profileLevels
-            .sortedWith { v1, v2 ->
-                val r = v1.profile - v2.profile
-                if(r!=0) r else v1.level - v2.level
-            }
-        IStrategy.logger.info("Supported Profiles by [${encoder.name}] ---")
-        supported.forEach { IStrategy.logger.info("  ${Profile.fromValue(codec, it.profile)?:"?"}@${Level.fromValue(codec, it.level)?:"?"}") }
-        IStrategy.logger.info("-------------------------------------------")
+//    protected fun supportedProfile(): MediaCodecInfo.CodecProfileLevel? {
+////        dumpCodecs()
+//        val supported = MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.filter { it.isEncoder }
+//            .flatMap { info->
+//                try { info.getCapabilitiesForType(codec.mime).profileLevels.toList() } catch(_:Throwable) { emptyList()}
+//            }
+//            .sortedWith { v1, v2 ->
+//                val r = v1.profile - v2.profile
+//                if(r!=0) r else v1.level - v2.level
+//            }
+//        return supportedProfile(supported)
+//    }
 
-        return supportedProfile(supported)
-    }
-
-    protected fun supportedProfile(): MediaCodecInfo.CodecProfileLevel? {
-//        dumpCodecs()
-        val supported = MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.filter { it.isEncoder }
-            .flatMap { info->
-                try { info.getCapabilitiesForType(codec.mime).profileLevels.toList() } catch(_:Throwable) { emptyList()}
-            }
-            .sortedWith { v1, v2 ->
-                val r = v1.profile - v2.profile
-                if(r!=0) r else v1.level - v2.level
-            }
-        return supportedProfile(supported)
-    }
-
+    /**
+     * 出力動画サイズの計算
+     *
+     * 元動画のサイズ(width/height) が、この VideoStrategy によるトランスコードで、
+     * どのようなサイズに変更されるかを確認するために使用する。
+     */
+    @Suppress("unused")
     fun calcSize(width:Int, height:Int) : Size {
         return calcVideoSize(width, height, sizeCriteria ?: throw IllegalStateException("sizeCriteria is null."))
     }
 
     data class SizeCriteria(val shortSize:Int, val longSide:Int)
+
+    protected fun getCapabilitiesOf(info: MediaCodecInfo): MediaCodecInfo.CodecCapabilities? {
+        return try {
+            info.getCapabilitiesForType(codec.mime)
+        } catch (e: Exception) {
+            null
+        }
+    }
+
+
+    override fun createEncoder(): MediaCodec {
+        val supported = MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos
+            .filter {
+                it.isEncoder
+            }
+        var codec = supported.firstOrNull { getCapabilitiesOf(it)?.profileLevels?.find { pl -> pl.profile == profile.value && (level == null || pl.level >= level.value) }!=null}
+        return if(codec!=null) {
+            MediaCodec.createByCodecName(codec.name)
+        } else {
+            super.createEncoder()
+        }
+    }
 
     companion object {
         val logger = UtLog("Video", IStrategy.logger)

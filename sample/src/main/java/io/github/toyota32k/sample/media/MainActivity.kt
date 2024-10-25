@@ -226,7 +226,7 @@ class MainActivity : UtMortalActivity() {
                         .input(srcFile)
                         .output(trimFile)
                         .audioStrategy(PresetAudioStrategies.AACDefault)
-                        .videoStrategy(PresetVideoStrategies.HEVC1080Profile)
+                        .videoStrategy(PresetVideoStrategies.AVC720LowProfile)
                         .rotate(rotation)
                         .addTrimmingRanges(*ranges.map { Converter.Factory.RangeMs(it.start, it.end) }.toTypedArray())
                         .setProgressHandler {

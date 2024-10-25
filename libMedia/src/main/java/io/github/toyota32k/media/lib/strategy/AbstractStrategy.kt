@@ -23,20 +23,25 @@ data class MinDefault(val min:Int, val default:Int=min) {
     }
 }
 
+data class ProfileLevel(val profile: Profile, val level: Level?=null)
+
+
 abstract class AbstractStrategy(
     val codec: Codec,
     val profile: Profile,
     val level:Level? = null,
-    val fallbackProfiles: Array<Profile>? = null,
+    val levelCritical:Boolean = false,
+    val fallbackProfiles: Array<ProfileLevel>? = null,
 ) : IStrategy {
     override fun createEncoder(): MediaCodec {
-        return MediaCodec.createEncoderByType(codec.mime).apply {
-            val hw = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                if(this.codecInfo.isHardwareAccelerated) "H/W" else "S/W"
-            } else {
-                ""
-            }
-            IStrategy.logger.info("using [$name] as encoder ($hw)")
-        }
+        return MediaCodec.createEncoderByType(codec.mime)
+//            .apply {
+//            val hw = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+//                if(this.codecInfo.isHardwareAccelerated) "H/W" else "S/W"
+//            } else {
+//                ""
+//            }
+//            IStrategy.logger.info("using [$name] as encoder ($hw)")
+//        }
     }
 }
