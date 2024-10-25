@@ -4,6 +4,8 @@ import android.content.Context
 import android.net.Uri
 import io.github.toyota32k.media.lib.format.ContainerFormat
 import io.github.toyota32k.media.lib.format.MetaData
+import io.github.toyota32k.media.lib.misc.CoroutineCancellation
+import io.github.toyota32k.media.lib.misc.ICancellation
 import io.github.toyota32k.media.lib.misc.RingBuffer
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.report.Summary
@@ -23,6 +25,7 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
@@ -34,7 +37,7 @@ import kotlin.math.min
 /**
  * 動画ファイルのトランスコード/トリミングを行うコンバータークラス
  */
-class Converter {
+class Converter : ICancellation {
     companion object {
         val logger = UtLog("AMP", null, "io.github.toyota32k.media.lib.")
         @Suppress("unused")
@@ -389,14 +392,14 @@ class Converter {
                 if(videoTrack.eos) {
                     throw IllegalStateException("unexpected eos in video track.")
                 }
-                videoTrack.next(muxer, coroutineScope)
+                videoTrack.consume()
             } else false
 
             val ra = if(audioTrack!=null && !muxer.isAudioReady) {
                 if(audioTrack.eos) {
                     throw IllegalStateException("unexpected eos in audio track.")
                 }
-                audioTrack.next(muxer, coroutineScope)
+                audioTrack.consume()
             } else false
             return rv || ra
         }
@@ -443,7 +446,7 @@ class Converter {
             }
             // フォーマットが確定したら、進捗度合いが同程度になるよう調停する。
             val track = nextTrack
-            val result = track.next(muxer, coroutineScope)
+            val result = track.consume()
 
             // 応答なしカウンタのメンテナンス
             if(track === videoTrack) {
@@ -480,6 +483,10 @@ class Converter {
 //        }
 //    }
 
+    private var runningCoroutineScope:CoroutineScope? = null
+    override val isCancelled: Boolean
+        get() = runningCoroutineScope?.isActive != true
+
     /**
      * コンバートを実行
      * 呼び出し元のCoroutineContext (JobやDeferred)をキャンセルすると処理は中止されるが、
@@ -501,11 +508,14 @@ class Converter {
      */
     suspend fun execute():ConvertResult {
         return withContext(Dispatchers.IO) {
+            val cancellation = CoroutineCancellation(this)
             try {
                 report = Report().apply { start() }
-                AudioTrack.create(inPath, audioStrategy,report).use { audioTrack->
-                VideoTrack.create(inPath, videoStrategy,report).use { videoTrack->
+                AudioTrack.create(inPath, audioStrategy, report, cancellation).use { audioTrack->
+                VideoTrack.create(inPath, videoStrategy, report, cancellation).use { videoTrack->
                 Muxer(videoTrack.metaData, outPath, audioTrack!=null, rotation, containerFormat).use { muxer->
+                    videoTrack.chain(muxer)
+                    audioTrack?.chain(muxer)
                     trimmingRangeList = videoTrack.extractor.adjustAndSetTrimmingRangeList(trimmingRangeList, muxer.durationUs)
                     audioTrack?.extractor?.setTrimmingRangeList(trimmingRangeList)
                     report.updateInputFileInfo(inPath.getLength(), muxer.durationUs/1000L)

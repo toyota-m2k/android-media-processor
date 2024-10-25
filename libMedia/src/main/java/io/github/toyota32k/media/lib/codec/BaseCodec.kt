@@ -3,12 +3,17 @@ package io.github.toyota32k.media.lib.codec
 import android.media.MediaCodec
 import android.media.MediaFormat
 import io.github.toyota32k.media.lib.converter.Converter
+import io.github.toyota32k.media.lib.misc.CoroutineCancellation
+import io.github.toyota32k.media.lib.misc.ICancellation
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.track.Muxer
 import io.github.toyota32k.utils.UtLog
 import java.io.Closeable
 
-abstract class BaseCodec(val mediaFormat:MediaFormat, val report: Report) : Closeable {
+abstract class BaseCodec(
+    val mediaFormat:MediaFormat,
+    val report: Report,
+    cancellation: ICancellation) : Closeable, ICancellation by cancellation {
     companion object {
         const val TIMEOUT_IMMEDIATE:Long = 0    // -1: infinite / 0:immediate / >0 milliseconds
         const val TIMEOUT_INFINITE:Long = -1L    // -1: infinite / 0:immediate / >0 milliseconds
@@ -44,4 +49,6 @@ abstract class BaseCodec(val mediaFormat:MediaFormat, val report: Report) : Clos
             logger.debug("disposed")
         }
     }
+
+    abstract fun consume():Boolean
 }

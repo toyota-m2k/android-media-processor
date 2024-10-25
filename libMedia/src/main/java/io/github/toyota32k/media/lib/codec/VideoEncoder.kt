@@ -3,11 +3,12 @@ package io.github.toyota32k.media.lib.codec
 import android.media.MediaCodec
 import android.media.MediaFormat
 import io.github.toyota32k.media.lib.format.dump
+import io.github.toyota32k.media.lib.misc.ICancellation
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.surface.InputSurface
 import io.github.toyota32k.media.lib.track.Muxer
 
-class VideoEncoder(format:MediaFormat, encoder:MediaCodec, report: Report):BaseEncoder(format, encoder, report) {
+class VideoEncoder(format:MediaFormat, encoder:MediaCodec, report: Report, cancellation: ICancellation):BaseEncoder(format, encoder, report,cancellation) {
     override val sampleType = Muxer.SampleType.Video
 
     lateinit var inputSurface:InputSurface

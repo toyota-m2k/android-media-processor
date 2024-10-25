@@ -3,23 +3,38 @@ package io.github.toyota32k.media.lib.codec
 import android.media.MediaCodec
 import android.media.MediaFormat
 import io.github.toyota32k.media.lib.format.dump
+import io.github.toyota32k.media.lib.misc.ICancellation
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.track.Muxer
 
-abstract class BaseEncoder(format: MediaFormat, val encoder:MediaCodec, report: Report):BaseCodec(format,report) {
+abstract class BaseEncoder(
+    format: MediaFormat,
+    val encoder:MediaCodec,
+    report: Report,
+    cancellation: ICancellation):BaseCodec(format,report,cancellation) {
 //    val encoder:MediaCodec = MediaCodec.createEncoderByType(format.getString(MediaFormat.KEY_MIME)!!)
     override val name: String get() = "Encoder($sampleType)"
     override val mediaCodec get() = encoder
     var writtenPresentationTimeUs:Long = 0L
         private set
 
+    protected lateinit var chainedMuxer: Muxer
+    fun chain(muxer:Muxer):Muxer {
+        chainedMuxer = muxer
+        return muxer
+    }
+
     override fun configure() {
         mediaCodec.configure(mediaFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
     }
 
-    fun chainTo(muxer:Muxer) : Boolean {
+    override fun consume() : Boolean {
         var effected = false
         while (true) {
+            if(isCancelled) {
+                return false
+            }
+
             val result: Int = encoder.dequeueOutputBuffer(bufferInfo, TIMEOUT_IMMEDIATE)
             when {
                 result == MediaCodec.INFO_TRY_AGAIN_LATER -> {
@@ -30,7 +45,7 @@ abstract class BaseEncoder(format: MediaFormat, val encoder:MediaCodec, report: 
                     logger.debug("input format changed.")
                     effected = true
                     val actualFormat = encoder.outputFormat
-                    muxer.setOutputFormat(sampleType, actualFormat)
+                    chainedMuxer.setOutputFormat(sampleType, actualFormat)
                     logger.info("Actual Format: $actualFormat")
                     actualFormat.dump(logger, "OutputFormat Changed")
                 }
@@ -47,7 +62,7 @@ abstract class BaseEncoder(format: MediaFormat, val encoder:MediaCodec, report: 
                         continue
                     }
                     logger.verbose {"output:$result size=${bufferInfo.size}"}
-                    muxer.writeSampleData(sampleType, encoder.getOutputBuffer(result)!!, bufferInfo)
+                    chainedMuxer.writeSampleData(sampleType, encoder.getOutputBuffer(result)!!, bufferInfo)
                     if(bufferInfo.presentationTimeUs>0) {
                         writtenPresentationTimeUs = bufferInfo.presentationTimeUs
                     }

@@ -1,11 +1,13 @@
 package io.github.toyota32k.media.lib.codec
 
 import android.media.MediaFormat
+import io.github.toyota32k.media.lib.misc.ICancellation
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.surface.OutputSurface
 import io.github.toyota32k.media.lib.track.Muxer
+import kotlin.compareTo
 
-class VideoDecoder(format: MediaFormat,report: Report):BaseDecoder(format,report)  {
+class VideoDecoder(format: MediaFormat,report: Report, cancellation: ICancellation):BaseDecoder(format,report,cancellation)  {
     private lateinit var outputSurface:OutputSurface
     override val sampleType = Muxer.SampleType.Video
     override fun configure() {
@@ -13,28 +15,30 @@ class VideoDecoder(format: MediaFormat,report: Report):BaseDecoder(format,report
         mediaCodec.configure(mediaFormat, outputSurface.surface, null, 0)
     }
 
-    override fun chainTo(encoder: BaseEncoder) :Boolean {
-        return chainTo(
-            formatChanged = null,
-            dataConsumed = { index, length, end ->
-                val render = length>0 /*&& trimmingRangeList.isValidPosition(timeUs)*/
-                decoder.releaseOutputBuffer(index, render)
-                if(render && encoder is VideoEncoder) {
-                    if(end) {
-                        logger.info("render end of data.")
-                    }
-                    outputSurface.awaitNewImage()
-                    outputSurface.drawImage()
-                    encoder.inputSurface.setPresentationTime(bufferInfo.presentationTimeUs*1000)
-                    encoder.inputSurface.swapBuffers()
+    override fun onFormatChanged(format: MediaFormat) {
+        // nothing to do.
+    }
+
+    override fun onDataConsumed(index: Int, length: Int, end: Boolean) {
+        val render = length>0 /*&& trimmingRangeList.isValidPosition(timeUs)*/
+        decoder.releaseOutputBuffer(index, render)
+        val videoEncoder = chainedEncoder as? VideoEncoder
+        if(videoEncoder!=null) {
+            if (render) {
+                if (end) {
+                    logger.info("render end of data.")
                 }
-                if(end) {
-                    logger.info("signal end of input stream to encoder.")
-                    eos = true
-                    encoder.encoder.signalEndOfInputStream()
-                }
+                outputSurface.awaitNewImage()
+                outputSurface.drawImage()
+                videoEncoder.inputSurface.setPresentationTime(bufferInfo.presentationTimeUs * 1000)
+                videoEncoder.inputSurface.swapBuffers()
             }
-        )
+            if (end) {
+                logger.info("signal end of input stream to encoder.")
+                eos = true
+                videoEncoder.encoder.signalEndOfInputStream()
+            }
+        }
     }
 
     override fun close() {
