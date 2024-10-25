@@ -52,7 +52,15 @@ abstract class BaseEncoder(format: MediaFormat, val encoder:MediaCodec, report: 
                         writtenPresentationTimeUs = bufferInfo.presentationTimeUs
                     }
                     encoder.releaseOutputBuffer(result, false)
-                    return true
+
+                    // TextureRender#drawImage (GLES20.glClear) でハングする不具合を回避する
+                    // デコーダーがInputSurfaceに描画したあと、エンコーダーが読み出す前（OutputSurfaceに転送される前）に、
+                    // 次のdrawImage()が呼ばれると、読み出し（or転送）処理と描画処理がコンフリクトして、デッドロックするのではないか、と推測。
+                    // そこで、Encoderでは、データが取り出せる限り取り出して muxerに書き込む、という処理に変更してみた。
+                    // 変更後何度も試してみたが、これでハングしなくなったように見えている。
+                    if(eos) {
+                        return true
+                    }
                 }
                 else -> {}
             }
