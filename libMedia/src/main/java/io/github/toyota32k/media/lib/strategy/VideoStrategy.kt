@@ -28,8 +28,7 @@ open class VideoStrategy(
     codec: Codec,
     profile: Profile,
     level: Level? = null,
-    levelCritical:Boolean = false,
-    fallbackProfiles: Array<ProfileLevel>? = null,
+    fallbackProfiles: Array<ProfileLv>? = null,
 
     val sizeCriteria: SizeCriteria?,
     val bitRate: MaxDefault, // = Int.MAX_VALUE,
@@ -37,7 +36,7 @@ open class VideoStrategy(
     val iFrameInterval:MinDefault, // = DEFAULT_IFRAME_INTERVAL,
     val colorFormat:ColorFormat?, // = DEFAULT_COLOR_FORMAT,
     val bitRateMode: BitRateMode?,
-) : AbstractStrategy(codec,profile,level,levelCritical, fallbackProfiles), IVideoStrategy {
+) : AbstractStrategy(codec,profile,level, fallbackProfiles), IVideoStrategy {
 
 //    override fun createOutputFormat(inputFormat: MediaFormat, encoder: MediaCodec): MediaFormat {
 //        return createOutputFormat(MediaFormatCompat(inputFormat), encoder)
@@ -49,12 +48,12 @@ open class VideoStrategy(
     /**
      * 既存のVideoStrategy（Preset*とか）から、必要なパラメータを書き換えて、新しいVideoStrategyを作成する。
      */
+    @Suppress("unused")
     fun derived(
         codec: Codec = this.codec,
         profile: Profile = this.profile,
-        level: Level? = this.level,
-        levelCritical:Boolean = this.levelCritical,
-        fallbackProfiles:Array<ProfileLevel>? = this.fallbackProfiles,
+        level: Level? = this.maxLevel,
+        fallbackProfiles:Array<ProfileLv>? = this.fallbackProfiles,
         sizeCriteria: SizeCriteria? = this.sizeCriteria,
         bitRate: MaxDefault = this.bitRate, // = Int.MAX_VALUE,
         frameRate: MaxDefault = this.frameRate, // = Int.MAX_VALUE,
@@ -66,7 +65,6 @@ open class VideoStrategy(
             codec,
             profile,
             level,
-            levelCritical,
             fallbackProfiles,
             sizeCriteria,
             bitRate,
@@ -76,6 +74,7 @@ open class VideoStrategy(
             bitRateMode)
     }
 
+    @Suppress("unused")
     fun preferSoftwareEncoder(): VideoStrategy {
         return VideoStrategyPreferSoftwareEncoder(this)
     }
@@ -120,7 +119,7 @@ open class VideoStrategy(
             setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, iFrameInterval)
             setInteger(MediaFormat.KEY_COLOR_FORMAT, (colorFormat?:ColorFormat.COLOR_FormatSurface).value)
             setInteger(MediaFormat.KEY_PROFILE, pl.profile)
-            setInteger(MediaFormat.KEY_LEVEL, min(pl.level, level?.value?:Int.MAX_VALUE))
+            setInteger(MediaFormat.KEY_LEVEL, min(pl.level, maxLevel?.value?:Int.MAX_VALUE))
             if(brm!=null) {
                 setInteger(MediaFormat.KEY_BITRATE_MODE, brm.value)
             }
@@ -145,6 +144,7 @@ open class VideoStrategy(
         return selectMostSuitableProfile(supported)
     }
 
+    @Suppress("unused")
     fun dumpCodecs() {
         dumpEncodingCodecs(codec)
     }
@@ -154,68 +154,38 @@ open class VideoStrategy(
      * これがEncoderのMediaFormatに設定するパラメータとなる。
      */
     protected fun selectMostSuitableProfile(supported: List<MediaCodecInfo.CodecProfileLevel>) : MediaCodecInfo.CodecProfileLevel? {
-        fun findProfile(profile:Profile, level:Level?): MediaCodecInfo.CodecProfileLevel? {
+        fun findProfileWithLevel(profile:Profile, level:Level?): MediaCodecInfo.CodecProfileLevel? {
             return supported.firstOrNull { it.profile == profile.value && (level==null || it.level>=level.value) }
         }
-
-        var pl = findProfile(profile, level)
-        if(pl!=null) {
-            // profile / level ともに適合するものが見つかった
-            return pl
+        fun findProfileWithoutLevel(profile:Profile, level:Level?): MediaCodecInfo.CodecProfileLevel? {
+            return if(level==null) null else findProfileWithLevel(profile, null)
         }
 
-        // levelCritical==false の場合は、profileだけでチェックする
-        if(level!=null||!levelCritical) {
-            pl = findProfile(profile, null)
-            if(pl!=null) {
-                // レベルは無視してプロファイルだけが一致するものを見つけた
+        // Strategyでレベルが明示されていれば、そのレベルをサポートしているコーデックを優先的に探す。
+        // 見つからなければ、レベルを無視してコーデックを探す。
+        // レベルが明示的に設定されていない場合、または、そのレベルをサポートしているコーデックがない場合は、
+        // 見つかったコーデックがサポートするレベルの最高値を使用する。
+        var findProfile = ::findProfileWithLevel
+        (0..1).forEach { i ->
+            var pl = findProfile(profile, maxLevel)
+            if (pl != null) {
+                // profile / level ともに適合するものが見つかった
                 return pl
             }
-        }
 
-        // 以上で、対応するプロファイルが見つからなければ、
-        // フォールバックプロファイルに一致するものを探す
-        if(fallbackProfiles!=null) {
-            var hasLevel = false
-            for (v in fallbackProfiles) {
-                hasLevel = hasLevel || v.level!=null
-                pl = findProfile(v.profile, v.level)
-                if(pl!=null) {
-                    // profile/level が合致するものが見つかった
-                    return pl
-                }
-            }
-            // levelCritical==false の場合は、profileだけでチェックする
-            if (hasLevel && !levelCritical) {
+            // 以上で、対応するプロファイルが見つからなければ、
+            // フォールバックプロファイルに一致するものを探す
+            if (fallbackProfiles != null) {
                 for (v in fallbackProfiles) {
-                    pl = findProfile(v.profile, null)
-                    if(pl!=null) {
-                        // レベルは無視してプロファイルだけが一致するものを見つけた
-                        return pl
-                    }
-                }
-            }
-        }
-        // ここまできて、条件に適合するものが見つからないなら、levelCritical を無視して再チェック。
-        if(levelCritical) {
-            if(level!=null) {
-                pl = findProfile(profile, null)
-                if(pl!=null) {
-                    // レベルは無視してプロファイルだけが一致するものを見つけた
-                    return pl
-                }
-            }
-            if(fallbackProfiles!=null) {
-                for (v in fallbackProfiles) {
-                    pl = findProfile(v.profile, null)
+                    pl = findProfile(v.profile, maxLevel)
                     if (pl != null) {
+                        // profile/level が合致するものが見つかった
                         return pl
                     }
                 }
             }
+            findProfile = ::findProfileWithoutLevel
         }
-
-        // どうやっても無理
         return null
     }
 
@@ -224,7 +194,7 @@ open class VideoStrategy(
     }
 
     protected fun isBitrateModeSupported(encoder: MediaCodec, mode: BitRateMode):Boolean {
-        return capabilities(encoder)?.encoderCapabilities?.isBitrateModeSupported(mode.value) ?: false
+        return capabilities(encoder)?.encoderCapabilities?.isBitrateModeSupported(mode.value) == true
     }
 
 //    protected fun supportedProfile(): MediaCodecInfo.CodecProfileLevel? {
@@ -253,10 +223,10 @@ open class VideoStrategy(
 
     data class SizeCriteria(val shortSize:Int, val longSide:Int)
 
-    protected fun getCapabilitiesOf(info: MediaCodecInfo): MediaCodecInfo.CodecCapabilities? {
+    protected fun getCapabilitiesOf(info: MediaCodecInfo): CodecCapabilities? {
         return try {
             info.getCapabilitiesForType(codec.mime)
-        } catch (e: Exception) {
+        } catch (_: Exception) {
             null
         }
     }
@@ -267,7 +237,7 @@ open class VideoStrategy(
             .filter {
                 it.isEncoder
             }
-        var codec = supported.firstOrNull { getCapabilitiesOf(it)?.profileLevels?.find { pl -> pl.profile == profile.value && (level == null || pl.level >= level.value) }!=null}
+        var codec = supported.firstOrNull { getCapabilitiesOf(it)?.profileLevels?.find { pl -> pl.profile == profile.value && (maxLevel == null || pl.level >= maxLevel.value) }!=null}
         return if(codec!=null) {
             MediaCodec.createByCodecName(codec.name)
         } else {
@@ -305,7 +275,8 @@ open class VideoStrategy(
             MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.filter { it.isEncoder }.forEach { ci->
                 val cap = try { ci.getCapabilitiesForType(codec.mime) } catch(_:Throwable) { return@forEach }
                 val hw = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    if(ci.isHardwareAccelerated()) "HW" else "SW"
+                    if(ci.
+                        isHardwareAccelerated()) "HW" else "SW"
                 } else {
                     ""
                 }

@@ -8,8 +8,7 @@ import android.os.Build
 class VideoStrategyPreferSoftwareEncoder(baseStrategy: VideoStrategy) : VideoStrategy(
     baseStrategy.codec,
     baseStrategy.profile,
-    baseStrategy.level,
-    baseStrategy.levelCritical,
+    baseStrategy.maxLevel,
     baseStrategy.fallbackProfiles,
     baseStrategy.sizeCriteria,
     baseStrategy.bitRate,
@@ -46,7 +45,7 @@ class VideoStrategyPreferSoftwareEncoder(baseStrategy: VideoStrategy) : VideoStr
                 it.isEncoder
                 && isSoftwareEncoder(it)
             }
-        var codec = supported.firstOrNull { getCapabilitiesOf(it)?.profileLevels?.find { pl -> pl.profile == profile.value && (level == null || pl.level >= level.value) }!=null}
+        var codec = supported.firstOrNull { getCapabilitiesOf(it)?.profileLevels?.find { pl -> pl.profile == profile.value && (maxLevel == null || pl.level >= maxLevel.value) }!=null}
         return if(codec!=null) {
             MediaCodec.createByCodecName(codec.name)
         } else {

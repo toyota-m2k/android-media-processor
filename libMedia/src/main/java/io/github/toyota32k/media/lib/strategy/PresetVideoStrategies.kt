@@ -1,6 +1,5 @@
 package io.github.toyota32k.media.lib.strategy
 
-import android.media.MediaCodecInfo
 import io.github.toyota32k.media.lib.format.BitRateMode
 import io.github.toyota32k.media.lib.format.Codec
 import io.github.toyota32k.media.lib.format.ColorFormat
@@ -14,8 +13,8 @@ object PresetVideoStrategies {
         VideoStrategy.SizeCriteria(VideoStrategy.FHD1080_S_SIZE, VideoStrategy.FHD1080_L_SIZE)
 
 
-    fun noLevelProfiles(vararg elements: Profile): Array<ProfileLevel> {
-        return elements.map { ProfileLevel(it) }.toTypedArray()
+    fun noLevelProfiles(vararg elements: Profile): Array<ProfileLv> {
+        return elements.map { ProfileLv(it) }.toTypedArray()
     }
 
     // AVC - H.264
@@ -24,9 +23,8 @@ object PresetVideoStrategies {
     object AVC720LowProfile : VideoStrategy(
         codec = Codec.AVC,
         profile = Profile.AVCProfileMain,
-        level = Level.AVCLevel4,
-        levelCritical = true,
-        fallbackProfiles = arrayOf(ProfileLevel(Profile.AVCProfileBaseline,Level.AVCLevel4)),
+        level = Level.AVCLevel41,
+        fallbackProfiles = arrayOf(ProfileLv(Profile.AVCProfileBaseline,Level.AVCLevel41)),
         sizeCriteria = HD720SizeCriteria,
         bitRate = MaxDefault(768*1000),
         frameRate = MaxDefault(30, 24),
@@ -38,9 +36,8 @@ object PresetVideoStrategies {
     object AVC720Profile : VideoStrategy(
         codec = Codec.AVC,
         profile = Profile.AVCProfileMain,
-        level = Level.AVCLevel4,
-        levelCritical = true,
-        fallbackProfiles = arrayOf(ProfileLevel(Profile.AVCProfileBaseline,Level.AVCLevel4)),
+        level = Level.AVCLevel41,
+        fallbackProfiles = arrayOf(ProfileLv(Profile.AVCProfileBaseline,Level.AVCLevel41)),
         sizeCriteria = HD720SizeCriteria,
         bitRate = MaxDefault(4*1000*1000, 3*1000*1000),
         frameRate = MaxDefault(30),
@@ -51,8 +48,8 @@ object PresetVideoStrategies {
     object AVC720HighProfile : VideoStrategy(
         codec = Codec.AVC,
         profile = Profile.AVCProfileHigh,
-        level = Level.AVCLevel4,
-        fallbackProfiles = arrayOf(ProfileLevel(Profile.AVCProfileMain,Level.AVCLevel4), ProfileLevel(Profile.AVCProfileBaseline,Level.AVCLevel4)),
+        level = null, // Level.AVCLevel4,
+        fallbackProfiles =  noLevelProfiles(Profile.AVCProfileHigh, Profile.AVCProfileMain, Profile.AVCProfileBaseline),
         sizeCriteria = HD720SizeCriteria,
         bitRate = MaxDefault(20*1000*1000, 10*1000*1000),
         frameRate = MaxDefault(60, 30),
@@ -67,8 +64,8 @@ object PresetVideoStrategies {
     object AVC1080Profile : VideoStrategy(
         codec = Codec.AVC,
         profile = Profile.AVCProfileHigh,
-        level = Level.AVCLevel4,
-        fallbackProfiles = noLevelProfiles(Profile.AVCProfileMain),
+        level = Level.AVCLevel41,
+        fallbackProfiles = arrayOf(ProfileLv(Profile.AVCProfileMain,Level.AVCLevel41), ProfileLv(Profile.AVCProfileBaseline,Level.AVCLevel41)),
         sizeCriteria = FHD1080SizeCriteria,
         bitRate = MaxDefault(4*1000*1000, 2*1000*1000),
         frameRate = MaxDefault(30),
@@ -80,7 +77,7 @@ object PresetVideoStrategies {
     object AVC1080HighProfile : VideoStrategy(
         codec = Codec.AVC,
         profile = Profile.AVCProfileHigh10,
-        level = Level.AVCLevel4,
+        level = null,
         fallbackProfiles =  noLevelProfiles(Profile.AVCProfileHigh, Profile.AVCProfileMain),
         sizeCriteria = FHD1080SizeCriteria,
         bitRate = MaxDefault(20*1000*1000, 10*1000*1000),

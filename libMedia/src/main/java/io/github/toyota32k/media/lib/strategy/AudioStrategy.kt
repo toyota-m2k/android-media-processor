@@ -13,19 +13,20 @@ import io.github.toyota32k.utils.UtLog
 open class AudioStrategy (
     codec:Codec,
     profile: Profile,                            // profile は AAC Profile として扱う。AAC以外のAudioコーデックは知らん。
-    fallbackProfiles: Array<ProfileLevel>?,
+    fallbackProfiles: Array<ProfileLv>?,
     val sampleRate:MaxDefault,
     val channelCount: MaxDefault,
     val bitRatePerChannel:MaxDefault,         //      // 1ch当たりのビットレート
-) : AbstractStrategy(codec, profile, null, false, fallbackProfiles), IAudioStrategy {
+) : AbstractStrategy(codec, profile, null, fallbackProfiles), IAudioStrategy {
 
     /**
      * 既存のAudioStrategyから、必要なパラメータを書き換えて新しいAudioStrategyを作成する。
      */
+    @Suppress("unused")
     fun derived(
         codec:Codec = this.codec,
         profile: Profile = this.profile,                            // profile は AAC Profile として扱う。AAC以外のAudioコーデックは知らん。
-        fallbackProfiles: Array<ProfileLevel>? = this.fallbackProfiles,
+        fallbackProfiles: Array<ProfileLv>? = this.fallbackProfiles,
         sampleRate:MaxDefault = this.sampleRate,
         channelCount: MaxDefault = this.channelCount,
         bitRatePerChannel:MaxDefault = this.bitRatePerChannel,         //      // 1ch当たりのビットレート
