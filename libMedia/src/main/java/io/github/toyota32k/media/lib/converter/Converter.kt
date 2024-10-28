@@ -3,7 +3,6 @@ package io.github.toyota32k.media.lib.converter
 import android.content.Context
 import android.net.Uri
 import io.github.toyota32k.media.lib.format.ContainerFormat
-import io.github.toyota32k.media.lib.format.MetaData
 import io.github.toyota32k.media.lib.misc.CoroutineCancellation
 import io.github.toyota32k.media.lib.misc.ICancellation
 import io.github.toyota32k.media.lib.misc.RingBuffer
@@ -25,14 +24,12 @@ import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
-import kotlinx.coroutines.cancel
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import kotlin.math.max
-import kotlin.math.min
 
 /**
  * 動画ファイルのトランスコード/トリミングを行うコンバータークラス
@@ -52,11 +49,12 @@ class Converter : ICancellation {
         fun analyze(file:IInputMediaFile) : Summary {
             return try {
                 Summary.getSummary(file)
-            } catch(e:Throwable) {
+            } catch(_:Throwable) {
                 Summary()
             }
         }
 
+        @Suppress("unused")
         fun setExternalLogger(externalLogger:IAmpLogger) {
             UtLoggerInstance.externalLogger = externalLogger.asUtExternalLogger()
         }
@@ -71,6 +69,7 @@ class Converter : ICancellation {
     var deleteOutputOnError:Boolean = true
     var rotation: Rotation? = null
     var containerFormat: ContainerFormat = ContainerFormat.MPEG_4
+    var preferSoftwareDecoder: Boolean = false  // 　HWデコーダーで読めない動画も、SWデコーダーなら読めるかもしれない。（Videoのみ）
     var onProgress : ((IProgress)->Unit)? = null
     lateinit var report :Report
 
@@ -187,6 +186,11 @@ class Converter : ICancellation {
             return this
         }
 
+        fun preferSoftwareDecoder(flag:Boolean):Factory {
+            converter.preferSoftwareDecoder = flag
+            return this
+        }
+
         fun build():Converter {
             if(!converter::inPath.isInitialized) throw IllegalStateException("input file is not specified.")
             if(!converter::outPath.isInitialized) throw IllegalStateException("output file is not specified.")
@@ -236,7 +240,7 @@ class Converter : ICancellation {
         override suspend fun await():ConvertResult {
             return try {
                 deferred.await()
-            } catch(e:CancellationException) {
+            } catch(_:CancellationException) {
                 return ConvertResult.cancelled
             }
         }
@@ -331,7 +335,6 @@ class Converter : ICancellation {
             }
 
         override var remainingTime: Long = 0
-            private set
 
         override val total: Long
             get() = trimmingRangeList.trimmedDurationUs
@@ -384,9 +387,9 @@ class Converter : ICancellation {
         private var audioNoEffectedCount = 0
         private var videoNoEffectContext = 0
 
-        val eos:Boolean get() = videoTrack.eos && audioTrack?.eos?:true
+        val eos:Boolean get() = videoTrack.eos && audioTrack?.eos != false
 
-        private fun runUp(coroutineScope: CoroutineScope):Boolean {
+        private fun runUp():Boolean {
             // フォーマットが確定するまでは、入力がすべてバッファリングされるだけで、outputへの書き込みが発生しないため、
             val rv = if(!muxer.isVideoReady) {
                 if(videoTrack.eos) {
@@ -439,10 +442,10 @@ class Converter : ICancellation {
                     }
                 }
 
-        fun next(coroutineScope: CoroutineScope):Boolean {
+        fun next():Boolean {
             // フォーマットが確定するまでは、両方を平行して進める
             if(!muxer.isReady) {
-                return runUp(coroutineScope)
+                return runUp()
             }
             // フォーマットが確定したら、進捗度合いが同程度になるよう調停する。
             val track = nextTrack
@@ -512,7 +515,7 @@ class Converter : ICancellation {
             try {
                 report = Report().apply { start() }
                 AudioTrack.create(inPath, audioStrategy, report, cancellation).use { audioTrack->
-                VideoTrack.create(inPath, videoStrategy, report, cancellation).use { videoTrack->
+                VideoTrack.create(inPath, videoStrategy, report, cancellation, preferSoftwareDecoder).use { videoTrack->
                 Muxer(videoTrack.metaData, outPath, audioTrack!=null, rotation, containerFormat).use { muxer->
                     videoTrack.chain(muxer)
                     audioTrack?.chain(muxer)
@@ -532,7 +535,7 @@ class Converter : ICancellation {
 //                        val ve = videoTrack.next(muxer, this)
 //                        val ae = audioTrack?.next(muxer, this) ?: false
 //                        if(!ve&&!ae) {
-                            if (!tracks.next(this)) {
+                            if (!tracks.next()) {
                                 if (videoTrack.decoder.eos && audioTrack?.decoder?.eos != false) {
                                     count++
                                     if (tick < 0) {

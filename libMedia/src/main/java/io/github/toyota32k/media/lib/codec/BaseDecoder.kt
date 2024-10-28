@@ -8,10 +8,10 @@ import io.github.toyota32k.media.lib.report.Report
 
 abstract class BaseDecoder(
     format: MediaFormat,
+    val decoder:MediaCodec,
     report: Report,
     cancellation: ICancellation):BaseCodec(format,report,cancellation) {
 //    val inputBuffer: ByteBuffer?
-    val decoder:MediaCodec = MediaCodec.createDecoderByType(format.getString(MediaFormat.KEY_MIME)!!)
 //    lateinit var trimmingRangeList : ITrimmingRangeList
     override val name: String get() = "Decoder($sampleType)"
     override val mediaCodec:MediaCodec get() = decoder

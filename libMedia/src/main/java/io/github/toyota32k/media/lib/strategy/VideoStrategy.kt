@@ -138,7 +138,7 @@ open class VideoStrategy(
                 val r = v1.profile - v2.profile
                 if(r!=0) r else v1.level - v2.level
             }
-        IStrategy.logger.info("Supported Profiles by [${encoder.name}] ---")
+        IStrategy.logger.info("using encoder: [${encoder.name}] ---")
         supported.forEach { IStrategy.logger.info("  ${Profile.fromValue(codec, it.profile)?:"?"}@${Level.fromValue(codec, it.level)?:"?"}") }
         IStrategy.logger.info("-------------------------------------------")
         return selectMostSuitableProfile(supported)
@@ -232,16 +232,39 @@ open class VideoStrategy(
     }
 
 
+
     override fun createEncoder(): MediaCodec {
-        val supported = MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos
-            .filter {
-                it.isEncoder
-            }
-        var codec = supported.firstOrNull { getCapabilitiesOf(it)?.profileLevels?.find { pl -> pl.profile == profile.value && (maxLevel == null || pl.level >= maxLevel.value) }!=null}
+        fun supportedCodec(optionalFilter:(MediaCodecInfo)->Boolean): List<MediaCodecInfo> {
+            return MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos
+                .filter {
+                    it.isEncoder
+                    && optionalFilter(it)
+                    && getCapabilitiesOf(it)?.profileLevels?.find { pl -> pl.profile == profile.value && (maxLevel == null || pl.level >= maxLevel.value) }!=null
+                }
+        }
+
+        var codec = supportedCodec { isHardwareAccelerated(it) }.firstOrNull()  // hardware accelerated なコーデックを最優先
+                    ?: supportedCodec { !isSoftwareOnly(it) }.firstOrNull()     // hardware accelerated でない、　非Softwareコーデックとはいったい？
         return if(codec!=null) {
+            logger.info("using hardware encoder: ${codec.name}")
             MediaCodec.createByCodecName(codec.name)
         } else {
             super.createEncoder()
+        }
+    }
+
+    protected fun isHardwareAccelerated(info: MediaCodecInfo): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            info.isHardwareAccelerated
+        } else {
+            true   // どうせわからんからなんでも true
+        }
+    }
+    protected fun isSoftwareOnly(info: MediaCodecInfo): Boolean {
+        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            info.isSoftwareOnly
+        } else {
+            false   // どうせわからんからなんでも false
         }
     }
 
@@ -275,10 +298,9 @@ open class VideoStrategy(
             MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.filter { it.isEncoder }.forEach { ci->
                 val cap = try { ci.getCapabilitiesForType(codec.mime) } catch(_:Throwable) { return@forEach }
                 val hw = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    if(ci.
-                        isHardwareAccelerated()) "HW" else "SW"
+                    if(ci.isHardwareAccelerated) "HW" else "SW"
                 } else {
-                    ""
+                    "?"
                 }
                 cap.profileLevels.forEach { pl->
                     logger.info("${ci.name} : ${Profile.fromValue(codec, pl.profile)?:"?"}@${Level.fromValue(codec, pl.level)?:"?"} ($hw)")
