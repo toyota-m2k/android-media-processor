@@ -28,7 +28,7 @@ class VideoTrack
     override val decoder: VideoDecoder = VideoDecoder(inputFormat,decoder, report,cancellation).apply { start() }
 
     companion object {
-        private fun createSoftwareDecoder(inputFormat: MediaFormat):MediaCodec? {
+        private fun createSoftwareDecoder(inputFormat: MediaFormat):MediaCodec {
             fun isSoftwareOnly(info: MediaCodecInfo): Boolean {
                 return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     info.isSoftwareOnly
@@ -44,10 +44,12 @@ class VideoTrack
                 }
             var codec = supported.firstOrNull()
             return if(codec!=null) {
-                logger.info("using hardware encoder: ${codec.name}")
+                logger.info("using software decoder: ${codec.name}")
                 MediaCodec.createByCodecName(codec.name)
             } else {
-                null
+                MediaCodec.createDecoderByType(inputFormat.getMime()!!).apply {
+                    logger.info("no software decoder --> default decoder: $name")
+                }
             }
         }
 
@@ -67,7 +69,11 @@ class VideoTrack
             }
             val decoder = if(preferSoftwareDecode) {
                 createSoftwareDecoder(inputFormat)
-            } else { null } ?: MediaCodec.createDecoderByType(inputFormat.getMime()!!)
+            } else {
+                MediaCodec.createDecoderByType(inputFormat.getMime()!!).apply {
+                    logger.info("using default decoder :$name")
+                }
+            }
 
             val encoder = strategy.createEncoder()
             val outputFormat = strategy.createOutputFormat(inputFormat, metaData, encoder)

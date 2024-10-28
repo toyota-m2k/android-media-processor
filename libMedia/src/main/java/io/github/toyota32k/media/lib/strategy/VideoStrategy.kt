@@ -138,7 +138,7 @@ open class VideoStrategy(
                 val r = v1.profile - v2.profile
                 if(r!=0) r else v1.level - v2.level
             }
-        IStrategy.logger.info("Supported Profiles by [${encoder.name}] ---")
+        IStrategy.logger.info("using encoder: [${encoder.name}] ---")
         supported.forEach { IStrategy.logger.info("  ${Profile.fromValue(codec, it.profile)?:"?"}@${Level.fromValue(codec, it.level)?:"?"}") }
         IStrategy.logger.info("-------------------------------------------")
         return selectMostSuitableProfile(supported)
@@ -249,21 +249,20 @@ open class VideoStrategy(
             logger.info("using hardware encoder: ${codec.name}")
             MediaCodec.createByCodecName(codec.name)
         } else {
-            logger.info("using default encoder")
             super.createEncoder()
         }
     }
 
     protected fun isHardwareAccelerated(info: MediaCodecInfo): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            !info.isHardwareAccelerated
+            info.isHardwareAccelerated
         } else {
             true   // どうせわからんからなんでも true
         }
     }
     protected fun isSoftwareOnly(info: MediaCodecInfo): Boolean {
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            !info.isSoftwareOnly
+            info.isSoftwareOnly
         } else {
             false   // どうせわからんからなんでも false
         }
