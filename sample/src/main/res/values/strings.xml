@@ -15,4 +15,13 @@
     <string name="undo">Undo</string>
     <string name="redo">Redo</string>
     <string name="convert">Convert</string>
+    <string name="input_label_short">IN:</string>
+    <string name="output_label_short">OUT:</string>
+    <string name="use_software_decoder">use software decoder</string>
+    <string name="use_software_encoder">use software encoder</string>
+    <string name="encode_qualities_prompt">Quality</string>
+    <string name="play_input">Input file</string>
+    <string name="play_output">Output File</string>
+    <string name="label_play_selection">Play</string>
+    <string name="execute_convert">Convert</string>
 </resources>
