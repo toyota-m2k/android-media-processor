@@ -1,5 +1,6 @@
 package io.github.toyota32k.media.lib.codec
 
+import android.media.MediaCodec
 import android.media.MediaFormat
 import io.github.toyota32k.media.lib.audio.AudioChannel
 import io.github.toyota32k.media.lib.misc.ICancellation
@@ -7,10 +8,13 @@ import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.track.Muxer
 import kotlin.compareTo
 
-class AudioDecoder(format: MediaFormat, report: Report, cancellation: ICancellation):BaseDecoder(format, report, cancellation) {
+class AudioDecoder(format: MediaFormat, decoder:MediaCodec, report: Report, cancellation: ICancellation)
+    :BaseDecoder(format, decoder, report, cancellation) {
     private val audioChannel = AudioChannel()
     override val sampleType = Muxer.SampleType.Audio
     private var decoderEos = false
+
+    // MediaCodec.createDecoderByType(format.getString(MediaFormat.KEY_MIME)!!)
 
     override fun onDecoderEos() {
         decoderEos = true

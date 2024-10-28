@@ -3,7 +3,6 @@ package io.github.toyota32k.media.lib.strategy
 import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaCodecList
-import android.os.Build
 
 class VideoStrategyPreferSoftwareEncoder(baseStrategy: VideoStrategy) : VideoStrategy(
     baseStrategy.codec,
@@ -17,14 +16,6 @@ class VideoStrategyPreferSoftwareEncoder(baseStrategy: VideoStrategy) : VideoStr
     baseStrategy.colorFormat,
     baseStrategy.bitRateMode,
 ) {
-    private fun isSoftwareEncoder(info: MediaCodecInfo): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            !info.isHardwareAccelerated
-        } else {
-            false   // どうせわからんからなんでも false
-        }
-    }
-
     override fun createEncoder(): MediaCodec {
 //        val list = MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos
 //        for (info in list) {
@@ -40,15 +31,22 @@ class VideoStrategyPreferSoftwareEncoder(baseStrategy: VideoStrategy) : VideoStr
 //                }
 //            }
 //        }
-        val supported = MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos
-            .filter {
-                it.isEncoder
-                && isSoftwareEncoder(it)
-            }
-        var codec = supported.firstOrNull { getCapabilitiesOf(it)?.profileLevels?.find { pl -> pl.profile == profile.value && (maxLevel == null || pl.level >= maxLevel.value) }!=null}
+        fun supportedCodec(optionalFilter:(MediaCodecInfo)->Boolean): List<MediaCodecInfo> {
+            return MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos
+                .filter {
+                    it.isEncoder
+                    && optionalFilter(it)
+                    && getCapabilitiesOf(it)?.profileLevels?.find { pl -> pl.profile == profile.value && (maxLevel == null || pl.level >= maxLevel.value) }!=null
+                }
+        }
+
+        var codec = supportedCodec { isSoftwareOnly(it) }.firstOrNull()     //
+            ?: supportedCodec { !isHardwareAccelerated(it) }.firstOrNull()  // software only ではないが、hardware accelerated ででもない？
         return if(codec!=null) {
+            logger.info("using software encoder: ${codec.name}")
             MediaCodec.createByCodecName(codec.name)
         } else {
+            logger.info("using default encoder")
             super.createEncoder()
         }
     }
