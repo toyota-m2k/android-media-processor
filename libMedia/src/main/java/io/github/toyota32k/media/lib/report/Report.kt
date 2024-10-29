@@ -7,6 +7,9 @@ import io.github.toyota32k.media.lib.format.Codec
 import io.github.toyota32k.media.lib.format.MetaData
 import io.github.toyota32k.media.lib.utils.TimeSpan
 import java.lang.StringBuilder
+import java.text.DecimalFormat
+import kotlin.math.roundToInt
+import kotlin.math.roundToLong
 
 class Report : IAttributes {
     var videoEncoderName: String? = null
@@ -75,10 +78,19 @@ class Report : IAttributes {
         get() = listOf(input, output)
 
     override fun toList(): List<IAttributes.KeyValue> {
+        val speed = if (endTick > startTick) {
+            (input.size.toDouble() / (endTick-startTick).toDouble()).roundToLong()
+        } else 0L
+        val speedText = if (speed > 0) {
+            "${DecimalFormat("#,###").format(speed)} bytes/sec"
+        } else {
+            "n/a"
+        }
         return listOf(
             IAttributes.KeyValue("Video Encoder", videoEncoderName ?: "n/a"),
             IAttributes.KeyValue("Audio Encoder", audioEncoderName?:"n/a"),
             IAttributes.KeyValue("Consumed Time", TimeSpan(endTick - startTick).formatH()),
+            IAttributes.KeyValue("Speed", speedText),
             IAttributes.KeyValue("Duration(Input)", TimeSpan(sourceDurationUs/1000).formatH()),
             IAttributes.KeyValue("Extracted(Video)", TimeSpan(videoExtractedDurationUs/1000).formatH()),
             IAttributes.KeyValue("Extracted(Audio)", TimeSpan(audioExtractedDurationUs/1000).formatH()),
