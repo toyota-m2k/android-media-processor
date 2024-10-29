@@ -99,7 +99,7 @@ class AndroidFile : IInputMediaFile, IOutputMediaFile {
 
     private fun <T> fileDescriptorToRead(fn:(FileDescriptor)->T):T = withFileDescriptor("r", fn)
 
-    private fun <T> fileDescriptorToWrite(fn:(FileDescriptor)->T):T = withFileDescriptor("rw", fn)
+    private fun <T> fileDescriptorToWrite(fn:(FileDescriptor)->T):T = withFileDescriptor("rwt", fn)
 
     fun <T> fileInputStream(fn:(FileInputStream)->T):T {
         return fileDescriptorToRead {
