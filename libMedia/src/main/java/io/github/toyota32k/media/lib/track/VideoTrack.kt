@@ -16,6 +16,7 @@ import io.github.toyota32k.media.lib.misc.ICancellation
 import io.github.toyota32k.media.lib.misc.MediaConstants
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
+import io.github.toyota32k.media.lib.strategy.VideoStrategy
 import io.github.toyota32k.media.lib.strategy.VideoStrategy.Companion.logger
 import io.github.toyota32k.utils.UtLog
 
@@ -30,17 +31,16 @@ class VideoTrack
     companion object {
         private fun createSoftwareDecoder(inputFormat: MediaFormat):MediaCodec {
             fun isSoftwareOnly(info: MediaCodecInfo): Boolean {
-                return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    info.isSoftwareOnly
-                } else {
-                    false
-                }
+                return VideoStrategy.isSoftwareOnly(info)
+            }
+            fun isSupportedType(info: MediaCodecInfo, mime: String): Boolean {
+                return VideoStrategy.capabilities(info,mime) != null
             }
             val supported = MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos
                 .filter {
                     !it.isEncoder
                     && isSoftwareOnly(it)
-                    && it.supportedTypes.contains(inputFormat.getMime())
+                    && isSupportedType(it,inputFormat.getMime()!!)
                 }
             var codec = supported.firstOrNull()
             return if(codec!=null) {

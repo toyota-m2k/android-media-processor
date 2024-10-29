@@ -42,6 +42,7 @@ import io.github.toyota32k.media.lib.converter.FastStart
 import io.github.toyota32k.media.lib.converter.Rotation
 import io.github.toyota32k.media.lib.converter.format
 import io.github.toyota32k.media.lib.converter.toAndroidFile
+import io.github.toyota32k.media.lib.format.Codec
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
 import io.github.toyota32k.media.lib.strategy.PresetAudioStrategies
 import io.github.toyota32k.media.lib.strategy.PresetVideoStrategies
@@ -400,5 +401,24 @@ class MainActivity : UtMortalActivity() {
 
         controls.videoViewer.bindViewModel(viewModel.playerControllerModel, binder)
 
+        /*
+        VideoStrategy.availableDecoders(Codec.AVC).apply {
+            logger.debug("Available Decoders for AVC:")
+            logger.debug(this.toString())
+        }
+        VideoStrategy.availableDecoders(Codec.HEVC).apply {
+            logger.debug("Available Decoders for HEVC:")
+            logger.debug(this.toString())
+        }
+        VideoStrategy.availableEncoders(Codec.AVC).apply {
+            logger.debug("Available Encoders for AVC:")
+            logger.debug(this.toString())
+        }
+        VideoStrategy.availableEncoders(Codec.HEVC).apply {
+            logger.debug("Available Encoders for HEVC:")
+            logger.debug(this.toString())
+        }
+        logger.debug("ok.")
+        */
     }
 }

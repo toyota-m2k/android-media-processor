@@ -224,47 +224,44 @@ open class VideoStrategy(
     data class SizeCriteria(val shortSize:Int, val longSide:Int)
 
     protected fun getCapabilitiesOf(info: MediaCodecInfo): CodecCapabilities? {
-        return try {
-            info.getCapabilitiesForType(codec.mime)
-        } catch (_: Exception) {
-            null
-        }
+        return capabilities(info, codec.mime)
     }
 
 
 
     override fun createEncoder(): MediaCodec {
+        fun checkProfileLevel(cap: CodecCapabilities?): Boolean {
+            if(cap==null) return false
+            return cap.profileLevels.find {
+                pl -> pl.profile == profile.value &&
+                (maxLevel == null || pl.level >= maxLevel.value) }!=null
+        }
+        val defaultCodec = super.createEncoder()
+        val cap = getCapabilitiesOf(defaultCodec.codecInfo)
+        if(checkProfileLevel(cap)) {
+            // デフォルトのコーデックが条件に適合した
+            logger.info("using default encoder: ${defaultCodec.name}")
+            return defaultCodec
+        }
+
+        // 他のコーデックを探す
         fun supportedCodec(optionalFilter:(MediaCodecInfo)->Boolean): List<MediaCodecInfo> {
             return MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos
                 .filter {
                     it.isEncoder
                     && optionalFilter(it)
-                    && getCapabilitiesOf(it)?.profileLevels?.find { pl -> pl.profile == profile.value && (maxLevel == null || pl.level >= maxLevel.value) }!=null
+                    && checkProfileLevel(getCapabilitiesOf(it))
                 }
         }
 
         var codec = supportedCodec { isHardwareAccelerated(it) }.firstOrNull()  // hardware accelerated なコーデックを最優先
-                    ?: supportedCodec { !isSoftwareOnly(it) }.firstOrNull()     // hardware accelerated でない、　非Softwareコーデックとはいったい？
-        return if(codec!=null) {
-            logger.info("using hardware encoder: ${codec.name}")
+                    ?: supportedCodec { true }.firstOrNull()     //  条件を緩和
+        return (if(codec!=null) {
             MediaCodec.createByCodecName(codec.name)
         } else {
             super.createEncoder()
-        }
-    }
-
-    protected fun isHardwareAccelerated(info: MediaCodecInfo): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            info.isHardwareAccelerated
-        } else {
-            true   // どうせわからんからなんでも true
-        }
-    }
-    protected fun isSoftwareOnly(info: MediaCodecInfo): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            info.isSoftwareOnly
-        } else {
-            false   // どうせわからんからなんでも false
+        }).apply {
+            logger.info("using encoder: $name")
         }
     }
 
@@ -293,10 +290,32 @@ open class VideoStrategy(
             return Size(w-w%4, h-h%2)
         }
 
+        fun capabilities(info: MediaCodecInfo, mime:String): CodecCapabilities? {
+            return try {
+                info.getCapabilitiesForType(mime)
+            } catch(_:Throwable) {
+                null
+            }
+        }
+        fun isHardwareAccelerated(info: MediaCodecInfo): Boolean {
+            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                info.isHardwareAccelerated
+            } else {
+                true   // どうせわからんからなんでも true
+            }
+        }
+        fun isSoftwareOnly(info: MediaCodecInfo): Boolean {
+            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+                info.isSoftwareOnly
+            } else {
+                false   // どうせわからんからなんでも false
+            }
+        }
+
         fun dumpEncodingCodecs(codec:Codec) {
             logger.info("#### dump codecs ####")
             MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.filter { it.isEncoder }.forEach { ci->
-                val cap = try { ci.getCapabilitiesForType(codec.mime) } catch(_:Throwable) { return@forEach }
+                val cap = capabilities(ci,codec.mime) ?: return@forEach
                 val hw = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                     if(ci.isHardwareAccelerated) "HW" else "SW"
                 } else {
@@ -306,6 +325,76 @@ open class VideoStrategy(
                     logger.info("${ci.name} : ${Profile.fromValue(codec, pl.profile)?:"?"}@${Level.fromValue(codec, pl.level)?:"?"} ($hw)")
                 }
             }
+        }
+
+        private class AvailableCodecList(override val encoder:Boolean) : IAvailableCodecList {
+            override var default: String = ""
+            override var hardwareAccelerated = mutableListOf<String>()
+            override var softwareOnly = mutableListOf<String>()
+            override var other = mutableListOf<String>()
+
+            override fun toString(): String {
+                return StringBuilder().apply {
+                    appendLine("Available ${if(encoder) "Encoders" else "Decoders"}:")
+                    appendLine("default: $default")
+                    appendLine("hardwareAccelerated:")
+                    hardwareAccelerated.forEach { appendLine("- $it") }
+                    appendLine("softwareOnly:")
+                    softwareOnly.forEach { appendLine("- $it") }
+                    if(other.isNotEmpty()) {
+                        appendLine("other:")
+                        other.forEach { appendLine("  $it") }
+                    }
+                }.toString()
+            }
+        }
+
+        /**
+         * デバイスにインストールされているエンコーダーを列挙する
+         * （実験＆ログ出力用）
+         */
+        fun availableEncoders(codec:Codec) : IAvailableCodecList {
+            return MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos
+                .filter { it.isEncoder && capabilities(it,codec.mime)!=null }
+                .fold(AvailableCodecList(true)) { codecs, ci ->
+                    codecs.apply {
+                        if (isHardwareAccelerated(ci)) {
+                            hardwareAccelerated.add(ci.name)
+                        } else if (isSoftwareOnly(ci)) {
+                            softwareOnly.add(ci.name)
+                        } else {
+                            other.add(ci.name)
+                        }
+                    }
+                }.apply {
+                    val codec = MediaCodec.createEncoderByType(codec.mime)
+                    default = codec.name
+                    codec.release()
+                }
+        }
+
+        /**
+         * デバイスにインストールされているデコーダーを列挙する
+         * （実験＆ログ出力用）
+         */
+        fun availableDecoders(codec:Codec) : IAvailableCodecList {
+            return MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos
+                .filter { !it.isEncoder && capabilities(it,codec.mime)!=null }
+                .fold(AvailableCodecList(false)) { codecs, ci ->
+                    codecs.apply {
+                        if (isHardwareAccelerated(ci)) {
+                            hardwareAccelerated.add(ci.name)
+                        } else if (isSoftwareOnly(ci)) {
+                            softwareOnly.add(ci.name)
+                        } else {
+                            other.add(ci.name)
+                        }
+                    }
+                }.apply {
+                    val codec = MediaCodec.createDecoderByType(codec.mime)
+                    default = codec.name
+                    codec.release()
+                }
         }
     }
 }

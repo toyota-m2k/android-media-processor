@@ -31,9 +31,7 @@ abstract class AbstractStrategy(
     val fallbackProfiles: Array<ProfileLv>? = null,
 ) : IStrategy {
     override fun createEncoder(): MediaCodec {
-        return MediaCodec.createEncoderByType(codec.mime).apply {
-            logger.info("using default encoder: $name")
-        }
+        return MediaCodec.createEncoderByType(codec.mime)
 //            .apply {
 //            val hw = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
 //                if(this.codecInfo.isHardwareAccelerated) "H/W" else "S/W"

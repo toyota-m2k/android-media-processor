@@ -3,7 +3,6 @@ package io.github.toyota32k.media.lib.converter
 import android.media.MediaExtractor
 import android.media.MediaMetadataRetriever
 import android.media.MediaMuxer
-import android.os.ParcelFileDescriptor
 import io.github.toyota32k.media.lib.format.ContainerFormat
 import java.io.Closeable
 
