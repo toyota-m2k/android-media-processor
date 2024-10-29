@@ -7,6 +7,7 @@ data class TrimmingRange(val startUs:Long = 0L, val endUs:Long = 0L) {
     val hasStart = startUs>0L
     val hasEnd = endUs>0L
     val hasAny = hasStart||hasEnd
+    @Suppress("unused")
     val isEmpty = !hasAny
     var naturalDurationUs:Long = -1L
 
@@ -36,6 +37,7 @@ data class TrimmingRange(val startUs:Long = 0L, val endUs:Long = 0L) {
         get() = actualEndUs - startUs
 
     companion object {
+        @Suppress("unused")
         val Empty = TrimmingRange()
     }
 }

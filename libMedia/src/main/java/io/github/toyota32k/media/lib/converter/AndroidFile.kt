@@ -184,8 +184,9 @@ class AndroidFile : IInputMediaFile, IOutputMediaFile {
         }
     }
 
+    @Suppress("unused")
     fun exists(): Boolean {
-        return if(hasPath) {
+        return (if(hasPath) {
             path?.exists()
         } else {
             when(uri?.scheme) {
@@ -195,10 +196,11 @@ class AndroidFile : IInputMediaFile, IOutputMediaFile {
                         it.count > 0
                     }
                 }
+
                 "file"-> uri.path?.let { File(it).exists() }
                 else -> false
             }
-        } ?: false
+        }) == true
 
     }
 
@@ -224,18 +226,20 @@ class AndroidFile : IInputMediaFile, IOutputMediaFile {
 //    }
 }
 
-fun MediaExtractor.setDataSource(source:AndroidFile) {
-    if(source.hasUri) {
-        this.setDataSource(source.context!!, source.uri!!, null)
-    } else {
-        this.setDataSource(source.path!!.toString())
-    }
-}
+// use openExtractor() instead.
+//fun MediaExtractor.setDataSource(source:AndroidFile) {
+//    if(source.hasUri) {
+//        this.setDataSource(source.context!!, source.uri!!, null)
+//    } else {
+//        this.setDataSource(source.path!!.toString())
+//    }
+//}
 
 fun Uri.toAndroidFile(context:Context):AndroidFile {
     return AndroidFile(this, context)
 }
 
+@Suppress("unused")
 fun File.toAndroidFile():AndroidFile {
     return AndroidFile(this)
 }

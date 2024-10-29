@@ -13,7 +13,7 @@ import java.util.*
 
 class AudioChannel {
     companion object {
-        val BUFFER_INDEX_END_OF_STREAM = -1
+        const val BUFFER_INDEX_END_OF_STREAM = -1
         val logger = UtLog("AC", Converter.logger)
         private const val BYTES_PER_SHORT = 2
         private const val MICROSECS_PER_SEC: Long = 1000000
@@ -114,7 +114,7 @@ class AudioChannel {
      *          false: 書き込まなかった（入力が空、または、出力バッファが busy）
      */
     private fun feedEncoderSub(decoder:MediaCodec, encoder: MediaCodec): Boolean {
-        val hasOverflow = mOverflowBuffer.data?.hasRemaining() ?: false
+        val hasOverflow = mOverflowBuffer.data?.hasRemaining() == true
 
         if (mFilledBuffers.isEmpty() && !hasOverflow) { // No audio data - Bail out
             logger.verbose("no audio data -- bail out")

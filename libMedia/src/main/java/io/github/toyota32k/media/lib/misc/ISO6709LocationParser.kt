@@ -19,13 +19,13 @@ object ISO6709LocationParser {
         val pattern = Pattern.compile("([+\\-][0-9.]+)([+\\-][0-9.]+)")
         val m = pattern.matcher(location)
         if (m.find() && m.groupCount() == 2) {
-            val latstr = m.group(1) ?: return null
-            val lonstr = m.group(2) ?: return null
+            val latStr = m.group(1) ?: return null
+            val lonStr = m.group(2) ?: return null
             try {
-                val lat = latstr.toFloat()
-                val lon = lonstr.toFloat()
+                val lat = latStr.toFloat()
+                val lon = lonStr.toFloat()
                 return floatArrayOf(lat, lon)
-            } catch (ignored: NumberFormatException) {
+            } catch (_: NumberFormatException) {
             }
         }
         return null

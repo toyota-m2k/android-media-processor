@@ -3,7 +3,6 @@ package io.github.toyota32k.media.lib.codec
 import android.media.MediaCodec
 import android.media.MediaFormat
 import io.github.toyota32k.media.lib.converter.Converter
-import io.github.toyota32k.media.lib.misc.CoroutineCancellation
 import io.github.toyota32k.media.lib.misc.ICancellation
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.track.Muxer
@@ -16,7 +15,7 @@ abstract class BaseCodec(
     cancellation: ICancellation) : Closeable, ICancellation by cancellation {
     companion object {
         const val TIMEOUT_IMMEDIATE:Long = 0    // -1: infinite / 0:immediate / >0 milliseconds
-        const val TIMEOUT_INFINITE:Long = -1L    // -1: infinite / 0:immediate / >0 milliseconds
+//        const val TIMEOUT_INFINITE:Long = -1L    // -1: infinite / 0:immediate / >0 milliseconds
 //        const val TIMEOUT_1SEC:Long = 1000L
     }
     abstract val sampleType: Muxer.SampleType

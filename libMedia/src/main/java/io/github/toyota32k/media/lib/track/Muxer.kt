@@ -4,13 +4,10 @@ import android.media.MediaCodec
 import android.media.MediaFormat
 import android.media.MediaMuxer
 import io.github.toyota32k.media.lib.converter.Converter
-import io.github.toyota32k.media.lib.converter.IInputMediaFile
 import io.github.toyota32k.media.lib.converter.IOutputMediaFile
 import io.github.toyota32k.media.lib.converter.Rotation
 import io.github.toyota32k.media.lib.format.ContainerFormat
 import io.github.toyota32k.media.lib.format.MetaData
-import io.github.toyota32k.media.lib.format.getLocation
-import io.github.toyota32k.media.lib.format.getRotation
 import io.github.toyota32k.media.lib.misc.ISO6709LocationParser
 import io.github.toyota32k.media.lib.utils.DurationEstimator
 import io.github.toyota32k.utils.UtLog
@@ -18,7 +15,7 @@ import java.io.Closeable
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
-class Muxer(inputMetaData: MetaData, outPath: IOutputMediaFile, private val hasAudio:Boolean, rotation: Rotation?, private val containerFormat: ContainerFormat): Closeable {
+class Muxer(inputMetaData: MetaData, outPath: IOutputMediaFile, private val hasAudio:Boolean, rotation: Rotation?, containerFormat: ContainerFormat): Closeable {
     companion object {
         val logger = UtLog("Muxer", Converter.logger)
         const val BUFFER_SIZE = 64 * 1024
@@ -167,21 +164,12 @@ class Muxer(inputMetaData: MetaData, outPath: IOutputMediaFile, private val hasA
         }
     }
 
-    private class SampleInfo(sampleType: SampleType, size: Int, bufferInfo: MediaCodec.BufferInfo) {
-        val sampleType: SampleType
-        val size: Int
-        private val mPresentationTimeUs: Long
-        private val mFlags: Int
+    private class SampleInfo(val sampleType: SampleType, val size: Int, bufferInfo: MediaCodec.BufferInfo) {
+        private val mPresentationTimeUs: Long = bufferInfo.presentationTimeUs
+        private val mFlags: Int = bufferInfo.flags
 
         fun writeToBufferInfo(bufferInfo: MediaCodec.BufferInfo, offset: Int) {
             bufferInfo[offset, size, mPresentationTimeUs] = mFlags
-        }
-
-        init {
-            this.sampleType = sampleType
-            this.size = size
-            mPresentationTimeUs = bufferInfo.presentationTimeUs
-            mFlags = bufferInfo.flags
         }
     }
 

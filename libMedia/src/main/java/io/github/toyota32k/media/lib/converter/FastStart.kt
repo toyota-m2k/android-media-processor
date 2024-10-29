@@ -10,6 +10,7 @@ import java.io.IOException
 import java.io.InputStream
 
 
+@Suppress("unused")
 object FastStart {
     /**
      * Fast Start が必要かどうかをチェックする

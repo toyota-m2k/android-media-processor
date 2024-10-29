@@ -1,6 +1,5 @@
 package io.github.toyota32k.media.lib.utils
 
-import android.media.MediaCodec
 import kotlin.math.max
 
 /**

@@ -5,16 +5,12 @@ import io.github.toyota32k.media.lib.codec.BaseEncoder
 import io.github.toyota32k.media.lib.converter.Converter
 import io.github.toyota32k.media.lib.extractor.Extractor
 import io.github.toyota32k.media.lib.misc.ICancellation
-import io.github.toyota32k.media.lib.misc.check
 import io.github.toyota32k.utils.UtLog
-import kotlinx.coroutines.CoroutineScope
 import java.io.Closeable
 
 abstract class Track(val extractor:Extractor, type:Muxer.SampleType, cancellation: ICancellation) : Closeable, ICancellation by cancellation {
     val logger: UtLog = UtLog("Track($type)", Converter.logger)
 
-    companion object {
-    }
     abstract val decoder: BaseDecoder
     abstract val encoder: BaseEncoder
 

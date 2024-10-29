@@ -2,13 +2,11 @@ package io.github.toyota32k.media.lib.report
 
 import android.media.MediaCodec
 import android.media.MediaFormat
-import android.media.MediaMetadataRetriever
 import io.github.toyota32k.media.lib.format.Codec
 import io.github.toyota32k.media.lib.format.MetaData
 import io.github.toyota32k.media.lib.utils.TimeSpan
 import java.lang.StringBuilder
 import java.text.DecimalFormat
-import kotlin.math.roundToInt
 import kotlin.math.roundToLong
 
 class Report : IAttributes {

@@ -87,6 +87,7 @@ class HttpInputFile(context: Context, private val streamSource: IHttpStreamSourc
     /**
      * 参照カウンタを１つ上げる
      */
+    @Suppress("unused")
     fun addRef() {
         prepare()
     }

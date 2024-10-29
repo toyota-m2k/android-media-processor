@@ -8,6 +8,7 @@ enum class Media {
     fun isVideo():Boolean {
         return this == Video
     }
+    @Suppress("unused")
     fun isAudio(): Boolean {
         return this == Audio
     }

@@ -4,7 +4,6 @@ import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaCodecList
 import android.media.MediaFormat
-import android.os.Build
 import io.github.toyota32k.media.lib.codec.VideoDecoder
 import io.github.toyota32k.media.lib.codec.VideoEncoder
 import io.github.toyota32k.media.lib.converter.Converter

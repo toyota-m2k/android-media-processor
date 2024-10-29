@@ -1,6 +1,7 @@
 package io.github.toyota32k.media.lib.audio
 
 import java.nio.ShortBuffer
+import kotlin.math.min
 
 interface AudioRemixer {
     fun remix(inSBuff: ShortBuffer, outSBuff: ShortBuffer)
@@ -15,8 +16,9 @@ interface AudioRemixer {
                 //      http://stackoverflow.com/a/25102339
                 val inRemaining = inSBuff.remaining() / 2
                 val outSpace = outSBuff.remaining()
-                val samplesToBeProcessed = Math.min(inRemaining, outSpace)
-                for (i in 0 until samplesToBeProcessed) { // Convert to unsigned
+                val samplesToBeProcessed = min(inRemaining, outSpace)
+                (0 until samplesToBeProcessed).forEach { // i ->
+                    // Convert to unsigned
                     val a = inSBuff.get() + SIGNED_SHORT_LIMIT
                     val b = inSBuff.get() + SIGNED_SHORT_LIMIT
                     var m: Int // Pick the equation
@@ -35,8 +37,8 @@ interface AudioRemixer {
             override fun remix(inSBuff: ShortBuffer, outSBuff: ShortBuffer) { // Up-mix mono to stereo
                 val inRemaining = inSBuff.remaining()
                 val outSpace = outSBuff.remaining() / 2
-                val samplesToBeProcessed = Math.min(inRemaining, outSpace)
-                for (i in 0 until samplesToBeProcessed) {
+                val samplesToBeProcessed = min(inRemaining, outSpace)
+                (0 until samplesToBeProcessed).forEach { // i ->
                     val inSample = inSBuff.get()
                     outSBuff.put(inSample)
                     outSBuff.put(inSample)

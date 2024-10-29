@@ -4,7 +4,6 @@ import android.media.MediaCodec
 import io.github.toyota32k.media.lib.format.Codec
 import io.github.toyota32k.media.lib.format.Level
 import io.github.toyota32k.media.lib.format.Profile
-import io.github.toyota32k.media.lib.strategy.IStrategy.Companion.logger
 import java.lang.Integer.max
 import java.lang.Integer.min
 

@@ -5,7 +5,6 @@ import io.github.toyota32k.media.lib.converter.IInputMediaFile
 import io.github.toyota32k.media.lib.extractor.Extractor
 import io.github.toyota32k.media.lib.format.MetaData
 import io.github.toyota32k.media.lib.format.getBitRate
-import io.github.toyota32k.media.lib.track.Track
 import io.github.toyota32k.media.lib.utils.TimeSpan
 import java.util.Locale
 

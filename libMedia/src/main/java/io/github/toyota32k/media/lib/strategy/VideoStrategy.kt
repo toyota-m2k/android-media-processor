@@ -353,6 +353,7 @@ open class VideoStrategy(
          * デバイスにインストールされているエンコーダーを列挙する
          * （実験＆ログ出力用）
          */
+        @Suppress("unused")
         fun availableEncoders(codec:Codec) : IAvailableCodecList {
             return MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos
                 .filter { it.isEncoder && capabilities(it,codec.mime)!=null }
@@ -377,6 +378,7 @@ open class VideoStrategy(
          * デバイスにインストールされているデコーダーを列挙する
          * （実験＆ログ出力用）
          */
+        @Suppress("unused")
         fun availableDecoders(codec:Codec) : IAvailableCodecList {
             return MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos
                 .filter { !it.isEncoder && capabilities(it,codec.mime)!=null }

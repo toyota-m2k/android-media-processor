@@ -2,6 +2,7 @@ package io.github.toyota32k.media.lib.format
 
 import android.media.MediaMuxer
 
+@Suppress("unused")
 enum class ContainerFormat(val mof: Int) {
     MPEG_4(MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4),
     WEBM(MediaMuxer.OutputFormat.MUXER_OUTPUT_WEBM),

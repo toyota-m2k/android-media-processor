@@ -48,6 +48,7 @@ class TimeSpan (private val ms : Long) {
         }
     }
 
+    @Suppress("unused")
     companion object {
         @JvmStatic
         fun formatH(ms:Long) : String {
