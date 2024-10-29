@@ -24,7 +24,7 @@ class DetailMessageDialog : UtDialogEx() {
         val label = MutableStateFlow("")
         val message = MutableStateFlow("")
         val detailMessage = MutableStateFlow("")
-        val showDetailMessage = MutableStateFlow(false)
+        val showDetailMessage = MutableStateFlow(true)
 
         companion object {
             fun create(taskName:String, label: String, message: String, detailMessage: String): DetailMessageViewModel {

@@ -42,7 +42,6 @@ import io.github.toyota32k.media.lib.converter.FastStart
 import io.github.toyota32k.media.lib.converter.Rotation
 import io.github.toyota32k.media.lib.converter.format
 import io.github.toyota32k.media.lib.converter.toAndroidFile
-import io.github.toyota32k.media.lib.format.Codec
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
 import io.github.toyota32k.media.lib.strategy.PresetAudioStrategies
 import io.github.toyota32k.media.lib.strategy.PresetVideoStrategies
@@ -294,15 +293,14 @@ class MainActivity : UtMortalActivity() {
                             }
                         }
                         .build()
-                    val awaiter = converter.executeAsync()
                     sink.cancelled.disposableObserve(currentCoroutineContext()) { cancelled->
                         if(cancelled) {
-                            awaiter.cancel()
+                            converter.cancel()
                         }
                     }
                     withContext(Dispatchers.IO) {
                         try {
-                            awaiter.await().also { convertResult ->
+                            converter.execute().also { convertResult ->
                                 if (convertResult.succeeded) {
                                     logger.debug(convertResult.toString())
                                     sink.message = "Optimizing Now..."

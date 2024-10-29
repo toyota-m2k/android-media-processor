@@ -3,7 +3,6 @@ package io.github.toyota32k.media.lib.converter
 import android.content.Context
 import android.net.Uri
 import io.github.toyota32k.media.lib.format.ContainerFormat
-import io.github.toyota32k.media.lib.misc.CoroutineCancellation
 import io.github.toyota32k.media.lib.misc.ICancellation
 import io.github.toyota32k.media.lib.misc.RingBuffer
 import io.github.toyota32k.media.lib.report.Report
@@ -25,16 +24,16 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import kotlin.math.max
+import kotlin.math.min
 
 /**
  * 動画ファイルのトランスコード/トリミングを行うコンバータークラス
  */
-class Converter : ICancellation {
+class Converter {
     companion object {
         val logger = UtLog("AMP", null, "io.github.toyota32k.media.lib.")
         @Suppress("unused")
@@ -218,22 +217,25 @@ class Converter : ICancellation {
             return converter
         }
 
-        suspend fun execute() : ConvertResult {
-            return build().execute()
-        }
-
-        fun executeAsync(coroutineScope: CoroutineScope?=null):IAwaiter<ConvertResult> {
-            return build().executeAsync(coroutineScope)
-        }
+//        suspend fun execute() : ConvertResult {
+//            return build().execute()
+//        }
+//
+//        fun executeAsync(coroutineScope: CoroutineScope?=null):IAwaiter<ConvertResult> {
+//            return build().executeAsync(coroutineScope)
+//        }
     }
 
     /**
      * Awaiter
      * IAwaiter(キャンセル可能な待ち合わせi/f)の実装クラス
      */
-    private data class Awaiter(private val deferred:Deferred<ConvertResult>): IAwaiter<ConvertResult> {
+    private class Awaiter: IAwaiter<ConvertResult>, ICancellation {
+        override var isCancelled: Boolean = false
+        lateinit var deferred:Deferred<ConvertResult>
 
         override fun cancel() {
+            isCancelled = true      // deferred.isCancelled の参照が遅いかも知れないので、自前でフラグを持っておく
             deferred.cancel()
         }
 
@@ -262,14 +264,14 @@ class Converter : ICancellation {
             set(v) {
                 if (field < v) {
                     field = v
-                    progressInUs = max(videoProgressInUs, v)
+                    progressInUs = min(videoProgressInUs, v)
                 }
             }
         var videoProgressInUs: Long = 0L
             set(v) {
                 if (field < v) {
                     field = v
-                    progressInUs = max(audioProgressInUs, v)
+                    progressInUs = min(audioProgressInUs, v)
                 }
             }
         fun finish() {
@@ -344,29 +346,6 @@ class Converter : ICancellation {
         init {
             startWatch()
         }
-    }
-
-    /**
-     * val converter = Converter(...)
-     * val awaiter = converter.executeAsync(viewModelScope)
-     * viewModelScope.launch {
-     *   val result = awaiter.await()
-     *   when {
-     *      result.succeeded -> // コンバート成功
-     *      result.cancelled -> // キャンセルされた
-     *      else -> showErrorMessage(result.errorMessage)
-     *   }
-     * }
-     * ...
-     * コンバートをキャンセルするときは、awaiter.cancel()を呼び出す。
-     * 尚、親のスコープ(↑の例では、viewModelScope)がキャンセルされると、execute()のスコープもキャンセルされるので、
-     * この場合は、awaitから結果を受け取る前にコルーチンから抜けてしまい、resultは受け取らない。
-     */
-    fun executeAsync(coroutineScope: CoroutineScope?=null):IAwaiter<ConvertResult> {
-        val cs = coroutineScope ?: CoroutineScope(Dispatchers.IO)
-        return Awaiter(cs.async {
-            execute()
-        })
     }
 
     /**
@@ -486,32 +465,65 @@ class Converter : ICancellation {
 //        }
 //    }
 
-    private var runningCoroutineScope:CoroutineScope? = null
-    override val isCancelled: Boolean
-        get() = runningCoroutineScope?.isActive != true
+    @Deprecated("use execute()")
+    fun executeAsync(coroutineScope: CoroutineScope?=null):IAwaiter<ConvertResult> {
+        val cs = coroutineScope ?: CoroutineScope(Dispatchers.IO)
+
+        return Awaiter().apply {
+            deferred = cs.async {
+                executeCore(this@apply)
+            }
+        }
+    }
+
+    private class Cancellation: ICancellation {
+        override var isCancelled: Boolean = false
+        lateinit var deferred:Deferred<ConvertResult>
+        fun cancel() {
+            isCancelled = true      // deferred.isCancelled の参照が遅いかも知れないので、自前でフラグを持っておく
+            deferred.cancel()
+        }
+    }
+
+    private var cancellation:Cancellation? = null
+
+    /**
+     * コンバート (execute) のキャンセル
+     */
+    fun cancel() {
+        cancellation?.cancel()
+    }
 
     /**
      * コンバートを実行
-     * 呼び出し元のCoroutineContext (JobやDeferred)をキャンセルすると処理は中止されるが、
-     * withContextもキャンセルされてしまうので、リターンしないで終了する（= Result.cancelを返せない。）
-     * キャンセルの結果をハンドリングしたい（Result.cancelを受け取りたい）時は、executeAsyncを使う。
      *
-     * val converter = Converter(...)
-     * val job = viewModelScope.launch {
-     *   val result = converter.execute()
-     *   when {
-     *      result.succeeded -> // コンバート成功
-     *      result.cancelled -> // ここには入らない
-     *      else -> showErrorMessage(result.errorMessage)
-     *   }
-     * }
-     * ...
-     * コンバートをキャンセルするときは、job.cancel()を呼び出すが、その場合、execute()がキャンセルされた時点で、
-     * このjob自体が終了してしまうため、resultは受け取れない。
+     * @return  ConvertResult
      */
-    suspend fun execute():ConvertResult {
+    suspend fun execute() : ConvertResult {
+        return try {
+            withContext(Dispatchers.IO) {
+                Cancellation().apply {
+                    cancellation = this
+                    deferred = async {
+                        executeCore(this@apply)
+                    }
+                }
+            }.deferred.await()
+        } catch(_:CancellationException) {
+            return ConvertResult.cancelled
+        } catch(e:Throwable) {
+            logger.error(e)
+            return ConvertResult.error(e)
+        } finally {
+            cancellation = null
+        }
+    }
+
+    /**
+     * コンバートを実行の中の人
+     */
+    private suspend fun executeCore(cancellation: ICancellation):ConvertResult {
         return withContext(Dispatchers.IO) {
-            val cancellation = CoroutineCancellation(this)
             try {
                 report = Report().apply { start() }
                 AudioTrack.create(inPath, audioStrategy, report, cancellation).use { audioTrack->
@@ -526,12 +538,7 @@ class Converter : ICancellation {
                         var tick = -1L
                         var count = 0
                         val tracks = TrackMediator(muxer, videoTrack, audioTrack)
-                        while (!tracks.eos) {
-                            if (!isActive) {
-                                throw CancellationException("cancelled")
-                            }
-
-
+                        while (!tracks.eos && !cancellation.isCancelled) {
 //                        val ve = videoTrack.next(muxer, this)
 //                        val ae = audioTrack?.next(muxer, this) ?: false
 //                        if(!ve&&!ae) {
@@ -559,12 +566,16 @@ class Converter : ICancellation {
                                 }
                             }
                         }
-                        report.updateOutputFileInfo(outPath.getLength(), videoTrack.extractor.naturalDurationUs / 1000L)
-                        report.end()
-                        report.setDurationInfo(trimmingRangeList.trimmedDurationUs, videoTrack.extractor.naturalDurationUs, audioTrack?.extractor?.naturalDurationUs?:0L, muxer.naturalDurationUs)
-                        logger.info(report.toString())
-                        progress?.finish()
-                        ConvertResult.succeeded(trimmingRangeList, report)
+                        if(cancellation.isCancelled) {
+                            ConvertResult.cancelled
+                        } else {
+                            report.updateOutputFileInfo(outPath.getLength(), videoTrack.extractor.naturalDurationUs / 1000L)
+                            report.end()
+                            report.setDurationInfo(trimmingRangeList.trimmedDurationUs, videoTrack.extractor.naturalDurationUs, audioTrack?.extractor?.naturalDurationUs ?: 0L, muxer.naturalDurationUs)
+                            logger.info(report.toString())
+                            progress?.finish()
+                            ConvertResult.succeeded(trimmingRangeList, report)
+                        }
                     }
                 }}}
             }

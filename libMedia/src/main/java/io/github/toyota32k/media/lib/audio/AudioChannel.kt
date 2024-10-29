@@ -147,7 +147,7 @@ class AudioChannel {
         if (inBuffer.bufferIndex == BUFFER_INDEX_END_OF_STREAM) {
             logger.debug("detect EOS (enqueue in encoder).")
             encoder.queueInputBuffer(encoderInBuffIndex, 0, 0, 0, MediaCodec.BUFFER_FLAG_END_OF_STREAM)
-            return false
+            return true
         }
         val outBuffer: ShortBuffer? = encoder.getInputBuffer(encoderInBuffIndex)?.asShortBuffer()
         if(outBuffer==null) {
