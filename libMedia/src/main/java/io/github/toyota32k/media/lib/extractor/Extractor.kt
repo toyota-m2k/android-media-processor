@@ -168,7 +168,7 @@ class Extractor private constructor(
             if (inputBufferIdx < 0) {
                 logger.verbose("no buffer in the decoder.")
             } else {
-
+                effected = true
                 val idx = extractor.sampleTrackIndex
                 if (idx < 0 || positionState == ITrimmingRangeList.PositionState.END) {
                     logger.debug("found eos")
