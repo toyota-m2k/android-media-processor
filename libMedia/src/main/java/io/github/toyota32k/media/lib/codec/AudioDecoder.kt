@@ -6,7 +6,6 @@ import io.github.toyota32k.media.lib.audio.AudioChannel
 import io.github.toyota32k.media.lib.misc.ICancellation
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.track.Muxer
-import kotlin.compareTo
 
 class AudioDecoder(format: MediaFormat, decoder:MediaCodec, report: Report, cancellation: ICancellation)
     :BaseDecoder(format, decoder, report, cancellation) {
@@ -17,6 +16,7 @@ class AudioDecoder(format: MediaFormat, decoder:MediaCodec, report: Report, canc
     // MediaCodec.createDecoderByType(format.getString(MediaFormat.KEY_MIME)!!)
 
     override fun onDecoderEos() {
+        // このタイミングでは、まだ eos はセットしない
         decoderEos = true
     }
 
@@ -25,51 +25,47 @@ class AudioDecoder(format: MediaFormat, decoder:MediaCodec, report: Report, canc
     }
 
     override fun onDataConsumed(index: Int, length: Int, end: Boolean) {
-        val encoder = chainedEncoder.encoder
         if (length > 0 /*&& trimmingRangeList.isValidPosition(timeUs)*/) {
             if(end) {
                 logger.info("render end of data.")
             }
             audioChannel.drainDecoderBufferAndQueue(decoder, index, bufferInfo.presentationTimeUs)
-            audioChannel.feedEncoder(decoder, encoder, 0)
         }
         if (end) {
             logger.debug("found eos")
             audioChannel.drainDecoderBufferAndQueue(decoder, AudioChannel.BUFFER_INDEX_END_OF_STREAM, 0)
-            audioChannel.feedEncoder(decoder, encoder, 0)
-            if(audioChannel.eos) {
-                // 入力ストリームを AudioChannel に書き込んだ時点で、
-                // AudioChannel もeosに達している（AudioChannelのバッファに未処理データがない）ので、
-                // デコーダーが eos に達したと判断する。
-                logger.debug("decoder complete (no more buffer in AudioChannel")
-                eos = true
-            }
         }
+        feedEncoder()
+    }
+
+    private fun feedEncoder() : Boolean {
+        val result = audioChannel.feedEncoder(decoder, chainedEncoder.encoder)
+        if(audioChannel.eos) {
+            // AudioChannel が eos に達した。
+            logger.debug("decode completion")
+            eos = true
+        }
+        return result
     }
 
     override fun consume() :Boolean {
-        if(isCancelled) {
+        if (isCancelled || eos) {
             return false
         }
 
-        if(!decoderEos) {
-            // デコーダーに未処理データが残っている間は、BaseDecoder の consume() に処理を任せる。
-            return super.consume()
+        if (!decoderEos) {
+            // デコーダーに未処理データが残っている間は、BaseDecoder の consume() を呼ぶ
+            if (super.consume()) {
+                // super.consume がture を返した場合は、chainedEncoder.consume()は不要
+                return true
+            }
         }
 
-        // デコーダーの入力（エクストラクターの出力）は eos に達しているが、AudioChannel のバッファにデータが残っている。
-        val effected = if (!eos) {
-            audioChannel.feedEncoder(decoder, chainedEncoder.encoder, 0).apply {
-                if(audioChannel.eos) {
-                    // AudioChannel も eos に達した。
-                    logger.debug("decoder complete (AudioChannel flushed)")
-                    eos = true
-                }
-            }
-            true
-        } else {
-            false
-        }
+        // デコーダーの入力（エクストラクターの出力）が eos（decoderEos==true)に達していても、AudioChannel のバッファにデータが残っていることがある。
+        // また、入力データが読めなくても (super.consume()==false)、バッファにデータが残っていることがある。
+        // そのため、ここで feedしておかないと終了しなくなる可能性がある（というか実際に問題の発生を確認した）ので、
+        // encoder.consume()を呼ぶ前に、一度、feedToEncoder()を実行しておく
+        val effected = feedEncoder()
         return chainedEncoder.consume() || effected
     }
 }

@@ -96,14 +96,31 @@ class AudioChannel {
         mFilledBuffers.add(buffer)
     }
 
-    fun feedEncoder(decoder:MediaCodec, encoder: MediaCodec, timeoutUs: Long): Boolean {
+    /**
+     * 可能な限りデータをエンコーダーに書き込む
+     */
+    fun feedEncoder(decoder:MediaCodec, encoder: MediaCodec): Boolean {
+        var result = false
+        while(feedEncoderSub(decoder, encoder)) {
+            result = true
+        }
+        return result
+    }
+
+    /**
+     * デコーダー (MediaCodec)の outputバッファ、または、内部バッファ（mFilledBuffers）の１回分のデータを
+     * エンコーダー (MediaCodec)の inputバッファに書き込む。
+     * @return  true: データを書き込んだ
+     *          false: 書き込まなかった（入力が空、または、出力バッファが busy）
+     */
+    private fun feedEncoderSub(decoder:MediaCodec, encoder: MediaCodec): Boolean {
         val hasOverflow = mOverflowBuffer.data?.hasRemaining() ?: false
 
         if (mFilledBuffers.isEmpty() && !hasOverflow) { // No audio data - Bail out
-            logger.debug("no audio data -- bail out")
+            logger.verbose("no audio data -- bail out")
             return false
         }
-        val encoderInBuffIndex = encoder.dequeueInputBuffer(timeoutUs)
+        val encoderInBuffIndex = encoder.dequeueInputBuffer(0 /*immediate*/)
         if (encoderInBuffIndex < 0) { // Encoder is full - Bail out
             logger.verbose { "encoder is full -- bail out" }
             return false
