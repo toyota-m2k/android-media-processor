@@ -31,6 +31,7 @@ private constructor(extractor: Extractor, inputFormat:MediaFormat, decoder: Medi
             val encoder = strategy.createEncoder()
             val outputFormat = strategy.createOutputFormat(inputFormat, encoder)
 
+            report.updateAudioDecoder(decoder)
             report.updateAudioEncoder(encoder)
             report.updateInputSummary(inputFormat, null)
             report.updateOutputSummary(outputFormat)

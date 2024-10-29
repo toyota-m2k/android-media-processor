@@ -10,7 +10,9 @@ import java.text.DecimalFormat
 import kotlin.math.roundToLong
 
 class Report : IAttributes {
+    var videoDecoderName: String? = null
     var videoEncoderName: String? = null
+    var audioDecoderName: String? = null
     var audioEncoderName: String? = null
     var startTick:Long = 0L
     var endTick:Long = 0L
@@ -39,6 +41,12 @@ class Report : IAttributes {
     }
     fun updateOutputSummary(format: MediaFormat) {
         updateSummary(output, format)
+    }
+    fun updateVideoDecoder(decoder:MediaCodec) {
+        videoDecoderName = decoder.name
+    }
+    fun updateAudioDecoder(decoder:MediaCodec) {
+        audioDecoderName = decoder.name
     }
     fun updateVideoEncoder(encoder:MediaCodec) {
         videoEncoderName = encoder.name
@@ -85,8 +93,10 @@ class Report : IAttributes {
             "n/a"
         }
         return listOf(
+            IAttributes.KeyValue("Video Decoder", videoDecoderName ?: "n/a"),
             IAttributes.KeyValue("Video Encoder", videoEncoderName ?: "n/a"),
-            IAttributes.KeyValue("Audio Encoder", audioEncoderName?:"n/a"),
+            IAttributes.KeyValue("Audio Decoder", audioDecoderName ?: "n/a"),
+            IAttributes.KeyValue("Audio Encoder", audioEncoderName ?: "n/a"),
             IAttributes.KeyValue("Consumed Time", TimeSpan(endTick - startTick).formatH()),
             IAttributes.KeyValue("Speed", speedText),
             IAttributes.KeyValue("Duration(Input)", TimeSpan(sourceDurationUs/1000).formatH()),
