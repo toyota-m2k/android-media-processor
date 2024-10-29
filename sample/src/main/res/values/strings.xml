@@ -24,4 +24,5 @@
     <string name="play_output">Output File</string>
     <string name="label_play_selection">Play</string>
     <string name="execute_convert">Convert</string>
+    <string name="show_detail">Detail</string>
 </resources>

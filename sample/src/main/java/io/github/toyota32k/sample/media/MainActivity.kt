@@ -48,6 +48,7 @@ import io.github.toyota32k.media.lib.strategy.PresetAudioStrategies
 import io.github.toyota32k.media.lib.strategy.PresetVideoStrategies
 import io.github.toyota32k.media.lib.strategy.VideoStrategy
 import io.github.toyota32k.sample.media.databinding.ActivityMainBinding
+import io.github.toyota32k.sample.media.dialog.DetailMessageDialog
 import io.github.toyota32k.sample.media.dialog.MultilineTextDialog
 import io.github.toyota32k.sample.media.dialog.ProgressDialog
 import io.github.toyota32k.utils.UtLog
@@ -326,7 +327,7 @@ class MainActivity : UtMortalActivity() {
                     // 変換成功
                     val srcLen = srcFile.getLength()
                     val dstLen = optFile.getLength()
-                    showConfirmMessageBox("Completed.", "${stringInKb(srcLen)} → ${stringInKb(dstLen)}")
+                    DetailMessageDialog.showMessage("Completed.", "${stringInKb(srcLen)} → ${stringInKb(dstLen)}", result.report?.toString() ?: "no information")
                 } else if (!result.cancelled) {
                     showConfirmMessageBox("Error.", result.errorMessage ?: result.exception?.message ?: "unknown")
                 }

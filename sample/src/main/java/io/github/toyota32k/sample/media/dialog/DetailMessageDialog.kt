@@ -1,20 +1,23 @@
-package io.github.toyota32k.secureCamera.dialog
+package io.github.toyota32k.sample.media.dialog
 
 import android.os.Bundle
 import android.view.View
-import androidx.constraintlayout.utils.widget.MotionLabel
 import androidx.lifecycle.ViewModelProvider
 import io.github.toyota32k.binder.checkBinding
 import io.github.toyota32k.binder.textBinding
 import io.github.toyota32k.binder.visibilityBinding
 import io.github.toyota32k.dialog.UtDialogEx
 import io.github.toyota32k.dialog.task.UtImmortalSimpleTask
+import io.github.toyota32k.dialog.task.UtImmortalTaskBase
 import io.github.toyota32k.dialog.task.UtImmortalTaskManager
 import io.github.toyota32k.dialog.task.UtImmortalViewModel
 import io.github.toyota32k.dialog.task.createViewModel
 import io.github.toyota32k.dialog.task.immortalTaskContext
-import io.github.toyota32k.secureCamera.databinding.DialogDetailMessageBinding
+import io.github.toyota32k.sample.media.databinding.DialogDetailMessageBinding
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlin.also
+import kotlin.apply
+import kotlin.jvm.java
 
 class DetailMessageDialog : UtDialogEx() {
     class DetailMessageViewModel : UtImmortalViewModel() {
