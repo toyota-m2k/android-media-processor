@@ -280,7 +280,6 @@ class MainActivity : UtMortalActivity() {
                             sink.progress = it.percentage
                             sink.progressText = it.format()
                         }
-                        .preferSoftwareDecoder(true)
                         .apply {
                             if(softwareDecode.value) {
                                 preferSoftwareDecoder(true)
