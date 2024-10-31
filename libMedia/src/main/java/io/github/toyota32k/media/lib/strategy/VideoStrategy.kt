@@ -36,7 +36,13 @@ open class VideoStrategy(
     val iFrameInterval:MinDefault, // = DEFAULT_IFRAME_INTERVAL,
     val colorFormat:ColorFormat?, // = DEFAULT_COLOR_FORMAT,
     val bitRateMode: BitRateMode?,
+    val encoderType: EncoderType = EncoderType.HARDWARE,
 ) : AbstractStrategy(codec,profile,level, fallbackProfiles), IVideoStrategy {
+    enum class EncoderType {
+        DEFAULT,
+        HARDWARE,
+        SOFTWARE,
+    }
 
 //    override fun createOutputFormat(inputFormat: MediaFormat, encoder: MediaCodec): MediaFormat {
 //        return createOutputFormat(MediaFormatCompat(inputFormat), encoder)
@@ -60,6 +66,7 @@ open class VideoStrategy(
         iFrameInterval:MinDefault = this.iFrameInterval, // = DEFAULT_IFRAME_INTERVAL,
         colorFormat:ColorFormat? = this.colorFormat, // = DEFAULT_COLOR_FORMAT,
         bitRateMode: BitRateMode? = this.bitRateMode,
+        encoderType: EncoderType = this.encoderType,
     ):VideoStrategy {
         return VideoStrategy(
             codec,
@@ -74,9 +81,21 @@ open class VideoStrategy(
             bitRateMode)
     }
 
-    @Suppress("unused")
+    private fun preferEncoderType(encoderType:EncoderType):VideoStrategy {
+        return if(this.encoderType==encoderType) {
+            this
+        } else {
+            derived(encoderType=encoderType)
+        }
+    }
     fun preferSoftwareEncoder(): VideoStrategy {
-        return VideoStrategyPreferSoftwareEncoder(this)
+        return preferEncoderType(EncoderType.SOFTWARE)
+    }
+    fun preferHardwareEncoder(): VideoStrategy {
+        return preferEncoderType(EncoderType.HARDWARE)
+    }
+    fun preferDefaultEncoder(): VideoStrategy {
+        return preferEncoderType(EncoderType.DEFAULT)
     }
 
     override fun createOutputFormat(inputFormat: MediaFormat, metaData: MetaData, encoder: MediaCodec): MediaFormat {
@@ -230,21 +249,25 @@ open class VideoStrategy(
 
 
     override fun createEncoder(): MediaCodec {
+        if(encoderType==EncoderType.DEFAULT) {
+            return super.createEncoder()
+        }
+
         fun checkProfileLevel(cap: CodecCapabilities?): Boolean {
             if(cap==null) return false
             return cap.profileLevels.find {
                 pl -> pl.profile == profile.value &&
                 (maxLevel == null || pl.level >= maxLevel.value) }!=null
         }
-        val defaultCodec = super.createEncoder()
-        val cap = getCapabilitiesOf(defaultCodec.codecInfo)
-        if(checkProfileLevel(cap)) {
-            // デフォルトのコーデックが条件に適合した
-            logger.info("using default encoder: ${defaultCodec.name}")
-            return defaultCodec
-        }
+//        val defaultCodec = super.createEncoder()
+//        val cap = getCapabilitiesOf(defaultCodec.codecInfo)
+//        if(checkProfileLevel(cap)) {
+//            // デフォルトのコーデックが条件に適合した
+//            logger.info("using default encoder: ${defaultCodec.name}")
+//            return defaultCodec
+//        }
 
-        // 他のコーデックを探す
+        // 条件に適合するコーデックを探す
         fun supportedCodec(optionalFilter:(MediaCodecInfo)->Boolean): List<MediaCodecInfo> {
             return MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos
                 .filter {
@@ -254,14 +277,22 @@ open class VideoStrategy(
                 }
         }
 
-        var codec = supportedCodec { isHardwareAccelerated(it) }.firstOrNull()  // hardware accelerated なコーデックを最優先
-                    ?: supportedCodec { true }.firstOrNull()     //  条件を緩和
-        return (if(codec!=null) {
+
+        var codec = (if(encoderType==EncoderType.HARDWARE) {
+            // hardware accelerated なコーデックを優先して探す
+            supportedCodec { isHardwareAccelerated(it) }
+        } else {
+            // hardware accelerated ではないコーデックを探す
+            supportedCodec { !isHardwareAccelerated(it)||!isSoftwareOnly(it) }
+        }).firstOrNull()
+
+        return if(codec!=null) {
+            logger.info("using [$encoderType] encoder: ${codec.name}")
             MediaCodec.createByCodecName(codec.name)
         } else {
+            // hardware accelerated なコーデックがなければ、デフォルトのコーデックを使用。
+            logger.info("no hardware accelerated codec found.")
             super.createEncoder()
-        }).apply {
-            logger.info("using encoder: $name")
         }
     }
 
