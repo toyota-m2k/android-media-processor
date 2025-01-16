@@ -4,6 +4,14 @@ import io.github.toyota32k.media.lib.format.Codec
 import io.github.toyota32k.media.lib.format.Profile
 
 object PresetAudioStrategies {
+    object NoAudio : AudioStrategy(
+        codec = Codec.InvalidAudio,
+        profile = Profile.AACObjectLC,
+        fallbackProfiles = null,
+        sampleRate = MaxDefault(96*1000, 48*1000),
+        channelCount = MaxDefault(2,1),
+        bitRatePerChannel = MaxDefault(192*1000, 64*1000)
+    )
     object AACDefault : AudioStrategy(
         codec = Codec.AAC,
         profile = Profile.AACObjectLC,

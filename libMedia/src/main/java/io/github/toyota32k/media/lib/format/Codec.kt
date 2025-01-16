@@ -6,6 +6,7 @@ import android.media.MediaFormat
 @SuppressLint("InlinedApi")
 enum class Codec(val media: Media, val mime:String, val alias:String?=null) {
     Invalid(Media.Video, "n/a"),
+    InvalidAudio(Media.Audio, "n/a"),
 
     AVC(Media.Video, MediaFormat.MIMETYPE_VIDEO_AVC),       // H.264
     H263(Media.Video, MediaFormat.MIMETYPE_VIDEO_H263),

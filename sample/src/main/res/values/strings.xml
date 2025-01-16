@@ -25,4 +25,5 @@
     <string name="label_play_selection">Play</string>
     <string name="execute_convert">Convert</string>
     <string name="show_detail">Detail</string>
+    <string name="no_audio">No Audio</string>
 </resources>

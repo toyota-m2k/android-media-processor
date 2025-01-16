@@ -3,6 +3,7 @@ package io.github.toyota32k.sample.media
 import android.app.Application
 import android.net.Uri
 import android.os.Bundle
+import android.util.Log
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.core.view.ViewCompat
@@ -122,7 +123,6 @@ class MainActivity : UtMortalActivity() {
 //        val videoSource: VideoSource?
 //            get() = playerModel.currentSource.value as VideoSource?
 
-
         val analyzeInputFileCommand = LiteUnitCommand {
             val input = inputFile.value ?: return@LiteUnitCommand
             val summary = Converter.analyze(input.toAndroidFile(application))
@@ -143,6 +143,7 @@ class MainActivity : UtMortalActivity() {
         val outputFileName = outputFile.map {it?.toAndroidFile(application)?.getFileName() ?: "select output file"}
         val readyToConvert = combine(inputFileAvailable, outputFileAvailable) {i,o-> i && o }
         val converted = MutableStateFlow(false)
+        val noAudio = MutableStateFlow(false)
 
         val softwareEncode: MutableStateFlow<Boolean> = MutableStateFlow(false)
         val softwareDecode: MutableStateFlow<Boolean> = MutableStateFlow(false)
@@ -273,7 +274,7 @@ class MainActivity : UtMortalActivity() {
                     val converter = Converter.Factory()
                         .input(srcFile)
                         .output(trimFile)
-                        .audioStrategy(PresetAudioStrategies.AACDefault)
+                        .audioStrategy(if(noAudio.value) PresetAudioStrategies.NoAudio else PresetAudioStrategies.AACDefault)
                         .rotate(rotation)
                         .addTrimmingRanges(*ranges.map { Converter.Factory.RangeMs(it.start, it.end) }.toTypedArray())
                         .setProgressHandler {
@@ -352,6 +353,7 @@ class MainActivity : UtMortalActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        UtLog.logLevel = Log.VERBOSE
         enableEdgeToEdge()
         UtDialogConfig.useLegacyTheme()
         controls = ActivityMainBinding.inflate(layoutInflater)
@@ -395,6 +397,7 @@ class MainActivity : UtMortalActivity() {
             }
             .checkBinding(controls.useSoftwareDecoder, viewModel.softwareDecode)
             .checkBinding(controls.useSoftwareEncoder, viewModel.softwareEncode)
+            .checkBinding(controls.noAudio, viewModel.noAudio)
             .spinnerBinding(controls.encodeQuality, viewModel.namedVideoStrategy, strategyList)
 
         controls.videoViewer.bindViewModel(viewModel.playerControllerModel, binder)

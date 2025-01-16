@@ -40,7 +40,7 @@ fun MediaFormat.getColorFormat():Int? = safeGetIntegerOrNull(MediaFormat.KEY_COL
 fun MediaFormat.getMaxBitRate():Int? = safeGetIntegerOrNull("max-bitrate")
 fun MediaFormat.getBitRateMode():Int? = safeGetIntegerOrNull(MediaFormat.KEY_BITRATE_MODE)
 
-fun MediaFormat.getAacProfile():Int? = safeGetIntegerOrNull(MediaFormat.KEY_AAC_PROFILE)
+fun MediaFormat.getAacProfile():Int? = safeGetIntegerOrNull(MediaFormat.KEY_AAC_PROFILE) ?: safeGetIntegerOrNull(MediaFormat.KEY_PROFILE)   // profile として保持されるケースがある模様
 fun MediaFormat.getSampleRate():Int? = safeGetIntegerOrNull(MediaFormat.KEY_SAMPLE_RATE)
 fun MediaFormat.getChannelCount():Int? = safeGetIntegerOrNull(MediaFormat.KEY_CHANNEL_COUNT)
 

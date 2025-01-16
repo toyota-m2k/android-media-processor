@@ -7,9 +7,11 @@ import io.github.toyota32k.media.lib.codec.AudioEncoder
 import io.github.toyota32k.media.lib.converter.Converter
 import io.github.toyota32k.media.lib.converter.IInputMediaFile
 import io.github.toyota32k.media.lib.extractor.Extractor
+import io.github.toyota32k.media.lib.format.Codec
 import io.github.toyota32k.media.lib.format.getMime
 import io.github.toyota32k.media.lib.misc.ICancellation
 import io.github.toyota32k.media.lib.report.Report
+import io.github.toyota32k.media.lib.strategy.AudioStrategy
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
 import io.github.toyota32k.utils.UtLog
 
@@ -21,6 +23,7 @@ private constructor(extractor: Extractor, inputFormat:MediaFormat, decoder: Medi
 
     companion object {
         fun create(inPath: IInputMediaFile, strategy: IAudioStrategy, report: Report, cancellation: ICancellation): AudioTrack? {
+            if(strategy is AudioStrategy && strategy.codec== Codec.InvalidAudio) return null
             val extractor = Extractor.create(inPath, Muxer.SampleType.Audio, cancellation)
             if(extractor == null) {
                 UtLog("Track(Audio)", Converter.logger).info("no audio truck")
