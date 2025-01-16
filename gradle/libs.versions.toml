@@ -16,7 +16,6 @@ constraintLayout = "2.2.0"
 androidUtilities = "2.7.2"
 androidBinding = "1.3.9"    # for sample only
 androidDialog = "4.0.7"     # for sample only
-androidCamera = "2.0.0"     # for sample only
 androidPlayer = "2.6.1"     # for sample only
 
 [libraries]
@@ -32,7 +31,6 @@ constraintLayout = { module = "androidx.constraintlayout:constraintlayout", vers
 android-utilities = { module = "com.github.toyota-m2k:android-utilities", version.ref = "androidUtilities" }
 android-binding = { module = "com.github.toyota-m2k:android-binding", version.ref = "androidBinding" }
 android-dialog = { module = "com.github.toyota-m2k:android-dialog", version.ref = "androidDialog" }
-android-camera = { module = "com.github.toyota-m2k:android-camera", version.ref = "androidCamera" }
 android-player = { module = "com.github.toyota-m2k:android-media-player", version.ref = "androidPlayer" }
 
 [plugins]
