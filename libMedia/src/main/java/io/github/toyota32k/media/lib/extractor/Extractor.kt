@@ -124,6 +124,10 @@ class Extractor private constructor(
     }
     fun setTrimmingRangeList(list:ITrimmingRangeList) {
         this.trimmingRangeList = list
+        // オーディオトラックを先頭にシークしておく
+        // 通常は、オープンしたら呼び出し位置は先頭を指しているのだが、特定の動画ファイルでは、sampleTimeが負値を持っていることがあった。
+        // これが負値だと、TrimmingRangeList#positionStateがEOSと判断してしまい、コンバートに失敗していた。#17124
+        extractor.seekTo(0L, SEEK_TO_CLOSEST_SYNC)
     }
 
     private var totalTime = 0L
