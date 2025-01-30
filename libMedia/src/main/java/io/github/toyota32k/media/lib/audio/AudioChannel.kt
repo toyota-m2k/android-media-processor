@@ -42,14 +42,17 @@ class AudioChannel {
 
     private lateinit var mActualDecodedFormat: MediaFormat
 
-    fun setActualDecodedFormat(decodedFormat: MediaFormat, encodeFormat: MediaFormat) {
-        mActualDecodedFormat = decodedFormat
+    fun setActualDecodedFormat(actualFormat: MediaFormat, presetFormat: MediaFormat) {
+        mActualDecodedFormat = actualFormat
         mInputSampleRate = mActualDecodedFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE)
-        if (mInputSampleRate != encodeFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE)) {
-            throw UnsupportedOperationException("Audio sample rate conversion not supported yet.")
+        val encodingSampleRate = presetFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE)
+        if (mInputSampleRate != encodingSampleRate) {
+            // throw UnsupportedOperationException("Audio sample rate conversion not supported yet.")
+            logger.info("Sample Rate: input=$mInputSampleRate, output=$encodingSampleRate")
+            logger.info("Audio sample rate conversion not supported yet.")
         }
         mInputChannelCount = mActualDecodedFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
-        mOutputChannelCount = encodeFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
+        mOutputChannelCount = presetFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
         if (mInputChannelCount != 1 && mInputChannelCount != 2) {
             throw UnsupportedOperationException("Input channel count ($mInputChannelCount) not supported.")
         }
@@ -190,7 +193,7 @@ class AudioChannel {
         // Reset position to 0, and set limit to capacity (Since MediaCodec doesn't do that for us)
         inBuff.clear()
         if (inBuff.remaining() > outBuff.remaining()) { // Overflow
-            logger.debug("remix with overflow data")
+            logger.debug("remix with overflow data: in=${inBuff.remaining()}, out=${outBuff.remaining()} out-cap=${outBuff.capacity()}")
             // Limit inBuff to outBuff's capacity
             inBuff.limit(outBuff.capacity())
             mRemixer.remix(inBuff, outBuff)
@@ -202,6 +205,7 @@ class AudioChannel {
             // NOTE: We should only reach this point when overflow buffer is empty
             val consumedDurationUs = sampleCountToDurationUs(inBuff.position(), mInputSampleRate, mInputChannelCount)
             if(overflowBuff!=null) {
+                overflowBuff.clear()
                 mRemixer.remix(inBuff, overflowBuff)
 
                 // Seal off overflowBuff & mark limit

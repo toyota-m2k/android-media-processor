@@ -3,6 +3,8 @@ package io.github.toyota32k.media.lib.codec
 import android.media.MediaCodec
 import android.media.MediaFormat
 import io.github.toyota32k.media.lib.audio.AudioChannel
+import io.github.toyota32k.media.lib.format.dump
+import io.github.toyota32k.media.lib.format.getSampleRate
 import io.github.toyota32k.media.lib.misc.ICancellation
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.track.Muxer
@@ -12,6 +14,7 @@ class AudioDecoder(format: MediaFormat, decoder:MediaCodec, report: Report, canc
     private val audioChannel = AudioChannel()
     override val sampleType = Muxer.SampleType.Audio
     private var decoderEos = false
+    private var formatDetected = false  // INFO_OUTPUT_FORMAT_CHANGED を受け取るまで、encoderへの書き込みを抑制するためのフラグ
 
     // MediaCodec.createDecoderByType(format.getString(MediaFormat.KEY_MIME)!!)
 
@@ -20,10 +23,22 @@ class AudioDecoder(format: MediaFormat, decoder:MediaCodec, report: Report, canc
         decoderEos = true
     }
 
+    /**
+     * デコーダーからINFO_OUTPUT_FORMAT_CHANGEDを受け取った時の処理
+     * 受け取ったフォーマットに基づいて、エンコーダーを構成・開始する。
+     */
     override fun onFormatChanged(format: MediaFormat) {
         audioChannel.setActualDecodedFormat(format, mediaFormat)
+        if(!formatDetected) {   // 二度漬け禁止
+            (chainedEncoder as AudioEncoder).configureWithActualSampleRate(format.getSampleRate())
+            formatDetected = true
+        }
     }
 
+    /**
+     * デコーダーからデータを読み込んだ時の処理
+     * decoder.dequeueOutputBuffer が有効なインデックス(>=0)を返したときに、そのデータを処理する。
+     */
     override fun onDataConsumed(index: Int, length: Int, end: Boolean) {
         if (length > 0 /*&& trimmingRangeList.isValidPosition(timeUs)*/) {
             if(end) {
@@ -39,6 +54,12 @@ class AudioDecoder(format: MediaFormat, decoder:MediaCodec, report: Report, canc
     }
 
     private fun feedEncoder() : Boolean {
+        if(!formatDetected) {
+            // INFO_OUTPUT_FORMAT_CHANGEDを検出する前にデータが読み込まれた
+            // このようなことは起きないと思うが念のため防衛しておく
+            logger.warn("read data before INFO_OUTPUT_FORMAT_CHANGED")
+            onFormatChanged(mediaFormat)
+        }
         val result = audioChannel.feedEncoder(decoder, chainedEncoder.encoder)
         if(audioChannel.eos) {
             // AudioChannel が eos に達した。
@@ -48,6 +69,20 @@ class AudioDecoder(format: MediaFormat, decoder:MediaCodec, report: Report, canc
         return result
     }
 
+    /**
+     * decoderで処理したので、次は、encoderで処理する。
+     * ただし、formatDetected == true になるまで（INFO_OUTPUT_FORMAT_CHANGEDを検出するまで）は、encoderの処理は呼ばない。
+     */
+    override fun afterComsumed(): Boolean {
+        return if (formatDetected) {
+            super.afterComsumed()   // chainedEncoder.consume()
+        } else false
+    }
+
+    /**
+     * Extractorからデータを読み出してデコードする。
+     * @return  true: データを処理した / false: 何もしなかった (no-effect)
+     */
     override fun consume() :Boolean {
         if (isCancelled || eos) {
             return false
@@ -58,6 +93,10 @@ class AudioDecoder(format: MediaFormat, decoder:MediaCodec, report: Report, canc
             if (super.consume()) {
                 // super.consume がture を返した場合は、chainedEncoder.consume()は不要
                 return true
+            }
+            if(!formatDetected) {
+                // まだフォーマットが確定していなければ encoder にフィードしない
+                return false
             }
         }
 

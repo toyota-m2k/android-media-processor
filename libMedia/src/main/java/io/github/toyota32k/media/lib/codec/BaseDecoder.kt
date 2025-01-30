@@ -28,14 +28,37 @@ abstract class BaseDecoder(
     // BaseDecoder クラスは、入力のEOSで、decoderEos をセットするだけにしして、
     // BaseCodec#eos はサブクラス側でセットすることとする。
 //    protected var decoderEos:Boolean = false
-
-    protected abstract fun onFormatChanged(format:MediaFormat)
-    protected abstract fun onDataConsumed(index:Int, length:Int, end:Boolean)
     protected open fun onDecoderEos() {
         logger.debug("onDecoderEos")
         eos = true
     }
 
+    /**
+     * デコーダーからINFO_OUTPUT_FORMAT_CHANGEDを受け取った時の処理
+     * デフォルト： 何もしない
+     */
+    protected open fun onFormatChanged(format:MediaFormat) {
+        // nothing to do
+    }
+
+    /**
+     * デコーダーからデータを読み込んだ時の処理
+     * decoder.dequeueOutputBuffer が有効なインデックス(>=0)を返したときに、そのデータを処理する。
+     */
+    protected abstract fun onDataConsumed(index:Int, length:Int, end:Boolean)
+
+    /**
+     * consume()の一連の処理が終了したときの処理
+     * デフォルト： 読み込んだデータをエンコーダーにデータを流す。
+     */
+    protected open fun afterComsumed():Boolean {
+        return chainedEncoder.consume()
+    }
+
+    /**
+     * Extractorからデータを読み出してデコードする。
+     * @return  true: データを処理した / false: 何もしなかった (no-effect)
+     */
     override fun consume():Boolean {
         var effected = false
         if (!eos) {
@@ -80,7 +103,6 @@ abstract class BaseDecoder(
                 }
             }
         }
-        return chainedEncoder.consume() || effected
+        return afterComsumed() || effected
     }
-
 }

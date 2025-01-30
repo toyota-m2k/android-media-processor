@@ -32,6 +32,7 @@ fun MediaMetadataRetriever.getFrameRate(): Int? = getInt(MediaMetadataRetriever.
 fun MediaMetadataRetriever.getBitRate(): Int? = getInt(MediaMetadataRetriever.METADATA_KEY_BITRATE)
 fun MediaMetadataRetriever.getRotation(): Int? = getInt(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)
 fun MediaMetadataRetriever.getLocation():String? = getString(MediaMetadataRetriever.METADATA_KEY_LOCATION)
+fun MediaMetadataRetriever.getSampleRate(): Int? = getInt(MediaMetadataRetriever.METADATA_KEY_SAMPLERATE)
 
 // 今後は、IInputMediaFile.openMetadataRetriever():CloseableMediaMetadataRetrieverを使う
 /**

@@ -143,27 +143,29 @@ class Extractor private constructor(
         if(!eos) {
             logger.assert(trackIdx >= 0, "selectTrack() must be called before.")
 
-            var currentPositionUs = extractor.sampleTime
-            val positionState = trimmingRangeList.positionState(currentPositionUs)
+            val startPositionUs = extractor.sampleTime.coerceAtLeast(0L)    // プリロールを持つ音声の場合、先頭が負値になることがある
+            var currentPositionUs = startPositionUs
+            val positionState = trimmingRangeList.positionState(startPositionUs)
 
             // シークする（＝デコーダーにデータを書き込まない）場合は、decoder.dequeueInputBuffer() を呼んではならない。
             // dequeueInputBuffer すると、dequeue済みバッファーとして予約され queueInputBuffer されるまで使えなくなる。
             // これを何度も繰り返す（=トリミング区間が増える）と、使えるバッファがなくなって、"no buffer in the decoder" が発生する。
             if (positionState == ITrimmingRangeList.PositionState.OUT_OF_RANGE) {
-                logger.debug("FOUND End Of Chapter: ${TimeSpan.formatAutoM(extractor.sampleTime / 1000)}")
-                val position = trimmingRangeList.getNextValidPosition(extractor.sampleTime)
+                logger.debug("FOUND End Of Chapter: ${TimeSpan.formatAutoM(startPositionUs / 1000)}")
+                val position = trimmingRangeList.getNextValidPosition(startPositionUs)
                 if (position != null) {
                     logger.chronos(msg = "extractor.seekTo", level = Log.INFO) {
                         try {
+                            // 次の位置までシークする
                             extractor.seekTo(position.startUs, SEEK_TO_CLOSEST_SYNC)
                         } catch (e: Throwable) {
                             logger.error(e)
                         }
                     }
-                    logger.info("SKIPPED from ${currentPositionUs.toUsTimeString()} to ${extractor.sampleTime.toUsTimeString()} (req:${position.startUs.toUsTimeString()} Δ=${abs(position.startUs - extractor.sampleTime).toUsTimeString()})")
-                    val skippedTime = extractor.sampleTime - currentPositionUs
-                    currentPositionUs = extractor.sampleTime
-                    totalSkippedTime += skippedTime
+                    currentPositionUs = extractor.sampleTime    // カレント位置をシーク後の位置に更新
+                    logger.info("SKIPPED from ${startPositionUs.toUsTimeString()} to ${currentPositionUs.toUsTimeString()} (req:${position.startUs.toUsTimeString()} Δ=${abs(position.startUs - currentPositionUs).toUsTimeString()})")
+                    val skippedTime = currentPositionUs - startPositionUs
+                    totalSkippedTime += skippedTime     // スキップした時間を積算
                 }
             }
 
@@ -192,7 +194,10 @@ class Extractor private constructor(
                         durationEstimator.update(totalTime, sampleSize.toLong())
                         decoder.queueInputBuffer(inputBufferIdx, 0, sampleSize, totalTime, extractor.sampleFlags)
                     } else {
-                        logger.error("zero byte read.")
+                        logger.error("zero byte read. it may be eos.")
+                        // 本来は、↑の idx < 0 でチェックしているので、ここには入らないはず。
+                        // もし入ってきたら、dequeue した inputBufferだけは解放しておく。
+                        decoder.queueInputBuffer(inputBufferIdx, 0, 0, 0, 0)
                     }
                     extractor.advance()
                 }

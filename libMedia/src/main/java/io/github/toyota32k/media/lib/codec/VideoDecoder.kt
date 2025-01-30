@@ -2,6 +2,7 @@ package io.github.toyota32k.media.lib.codec
 
 import android.media.MediaCodec
 import android.media.MediaFormat
+import io.github.toyota32k.media.lib.format.dump
 import io.github.toyota32k.media.lib.misc.ICancellation
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.surface.OutputSurface
@@ -13,10 +14,6 @@ class VideoDecoder(format: MediaFormat, decoder: MediaCodec, report: Report, can
     override fun configure() {
         outputSurface = OutputSurface()
         mediaCodec.configure(mediaFormat, outputSurface.surface, null, 0)
-    }
-
-    override fun onFormatChanged(format: MediaFormat) {
-        // nothing to do.
     }
 
     override fun onDataConsumed(index: Int, length: Int, end: Boolean) {
@@ -47,4 +44,56 @@ class VideoDecoder(format: MediaFormat, decoder: MediaCodec, report: Report, can
         }
         super.close()
     }
+
+    // Debug Note
+    // BaseDecoder#consume() は、Video/Audio 共用のため、ブレークポイントを仕掛けると、VideoとAudioの両方で止まってしまうので不便。
+    // そんな時は、BaseDecoder から、fun consume() の実装をここにコピーして実行すれば、
+    // Videoは、こちらの consume()、Audioは、BaseDecoderのconsume()が呼ばれるので、分離してデバッグできる。
+
+//    override fun consume():Boolean {
+//        var effected = false
+//        if (!eos) {
+//            while (true) {
+//                if(isCancelled) {
+//                    return false
+//                }
+//                val index = decoder.dequeueOutputBuffer(bufferInfo, TIMEOUT_IMMEDIATE)
+//                when {
+//                    index >= 0 -> {
+//                        logger.verbose { "output:$index size=${bufferInfo.size}" }
+//                        effected = true
+//                        val eos = bufferInfo.flags.and(MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0
+//                        if (eos) {
+//                            logger.debug("found eos")
+//                            onDecoderEos()
+//                        }
+//                        // サブクラス側で releaseOutputBuffer()する
+//                        onDataConsumed(index, bufferInfo.size, eos)
+//                        break
+//                    }
+//
+//                    index == MediaCodec.INFO_TRY_AGAIN_LATER -> {
+//                        logger.verbose { "no sufficient data yet" }
+//                        break
+//                    }
+//
+//                    index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
+//                        logger.debug("format changed")
+//                        effected = true
+//                        onFormatChanged(decoder.outputFormat)
+//                        decoder.outputFormat.dump(logger, "OutputFormat Changed")
+//                    }
+//
+//                    else -> {
+//                        if (index == -3) {
+//                            logger.debug("BUFFERS_CHANGED ... ignorable.")
+//                        } else {
+//                            logger.error("unknown index ($index)")
+//                        }
+//                    }
+//                }
+//            }
+//        }
+//        return afterComsumed() || effected
+//    }
 }
