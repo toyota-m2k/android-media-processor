@@ -94,7 +94,7 @@ class AudioDecoder(format: MediaFormat, decoder:MediaCodec, report: Report, canc
                 // super.consume がture を返した場合は、chainedEncoder.consume()は不要
                 return true
             }
-            if(!formatDetected) {
+            if (!formatDetected) {
                 // まだフォーマットが確定していなければ encoder にフィードしない
                 return false
             }

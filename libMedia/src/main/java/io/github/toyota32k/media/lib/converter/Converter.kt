@@ -569,6 +569,10 @@ class Converter {
                         if(cancellation.isCancelled) {
                             ConvertResult.cancelled
                         } else {
+                            if(audioTrack!=null) {
+                                // AudioTrack の SamplingRate が、コンバート中に書き変ることがあるので、最後に更新しておく。
+                                report.updateOutputSummary(audioTrack.encoder.mediaFormat)
+                            }
                             report.updateOutputFileInfo(outPath.getLength(), videoTrack.extractor.naturalDurationUs / 1000L)
                             report.end()
                             report.setDurationInfo(trimmingRangeList.trimmedDurationUs, videoTrack.extractor.naturalDurationUs, audioTrack?.extractor?.naturalDurationUs ?: 0L, muxer.naturalDurationUs)
