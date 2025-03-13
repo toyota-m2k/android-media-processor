@@ -10,6 +10,7 @@ import io.github.toyota32k.media.lib.format.ContainerFormat
 import io.github.toyota32k.media.lib.format.MetaData
 import io.github.toyota32k.media.lib.misc.ISO6709LocationParser
 import io.github.toyota32k.media.lib.utils.DurationEstimator
+import io.github.toyota32k.media.lib.utils.ExpandableByteBuffer
 import io.github.toyota32k.utils.UtLog
 import java.io.Closeable
 import java.nio.ByteBuffer
@@ -70,7 +71,8 @@ class Muxer(inputMetaData: MetaData, outPath: IOutputMediaFile, private val hasA
     val isVideoReady get() = videoFormat != null
     val isAudioReady get() = !hasAudio || audioFormat != null
     val isReady get() = videoFormat != null && (!hasAudio || audioFormat != null)
-    private var mByteBuffer: ByteBuffer? = null
+    // private var mByteBuffer: ByteBuffer? = null
+    private val mExByteBuffer = ExpandableByteBuffer()
     private val mSampleInfoList = mutableListOf<SampleInfo>()
 
     private fun trackIndexOf(sampleType: SampleType): Int {
@@ -101,7 +103,7 @@ class Muxer(inputMetaData: MetaData, outPath: IOutputMediaFile, private val hasA
             muxer.start()
 
             // フォーマット確定前に書き込まれた保留中のデータがあればmuxerに書き込む
-            val byteBuffer = mByteBuffer ?: return
+            val byteBuffer = mExByteBuffer.bufferOrNull ?: return
             byteBuffer.flip()
             logger.debug("Output format determined, writing ${mSampleInfoList.size} samples / ${byteBuffer.limit()} bytes to muxer.")
             val bufferInfo = MediaCodec.BufferInfo()
@@ -112,7 +114,7 @@ class Muxer(inputMetaData: MetaData, outPath: IOutputMediaFile, private val hasA
                 offset += sampleInfo.size
             }
             mSampleInfoList.clear()
-            mByteBuffer = null
+            mExByteBuffer.free()
         }
     }
 
@@ -133,7 +135,7 @@ class Muxer(inputMetaData: MetaData, outPath: IOutputMediaFile, private val hasA
         byteBuf.limit(bufferInfo.offset + bufferInfo.size)
         byteBuf.position(bufferInfo.offset)
 
-        val byteBuffer = mByteBuffer ?: ByteBuffer.allocateDirect(BUFFER_SIZE).order(ByteOrder.nativeOrder()).also { mByteBuffer = it }
+        val byteBuffer = mExByteBuffer.alloc(bufferInfo.size).order(ByteOrder.nativeOrder())
         byteBuffer.put(byteBuf)
         mSampleInfoList.add(SampleInfo(sampleType, bufferInfo.size, bufferInfo))
     }
