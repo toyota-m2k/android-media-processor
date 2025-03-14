@@ -22,3 +22,4 @@ local.properties
 app/build
 .idea/runConfigurations.xml
 .idea/kotlinc.xml
+.idea/AndroidProjectSystem.xml

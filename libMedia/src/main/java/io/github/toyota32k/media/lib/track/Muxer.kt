@@ -72,7 +72,7 @@ class Muxer(inputMetaData: MetaData, outPath: IOutputMediaFile, private val hasA
     val isAudioReady get() = !hasAudio || audioFormat != null
     val isReady get() = videoFormat != null && (!hasAudio || audioFormat != null)
     // private var mByteBuffer: ByteBuffer? = null
-    private val mExByteBuffer = ExpandableByteBuffer()
+    private val mExByteBuffer = ExpandableByteBuffer(BUFFER_SIZE,BUFFER_SIZE)
     private val mSampleInfoList = mutableListOf<SampleInfo>()
 
     private fun trackIndexOf(sampleType: SampleType): Int {
