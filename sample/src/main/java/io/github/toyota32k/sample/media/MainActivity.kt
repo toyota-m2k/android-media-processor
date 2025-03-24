@@ -8,6 +8,7 @@ import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
+import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import io.github.toyota32k.binder.Binder
 import io.github.toyota32k.binder.IIDValueResolver
@@ -22,11 +23,11 @@ import io.github.toyota32k.binder.observe
 import io.github.toyota32k.binder.spinnerBinding
 import io.github.toyota32k.binder.textBinding
 import io.github.toyota32k.dialog.UtDialogConfig
-import io.github.toyota32k.dialog.broker.pickers.UtFilePickerStore
-import io.github.toyota32k.dialog.task.UtImmortalAndroidViewModel
-import io.github.toyota32k.dialog.task.UtImmortalSimpleTask
-import io.github.toyota32k.dialog.task.UtMortalActivity
-import io.github.toyota32k.dialog.task.application
+import io.github.toyota32k.dialog.broker.UtActivityBrokerStore
+import io.github.toyota32k.dialog.broker.pickers.UtCreateFilePicker
+import io.github.toyota32k.dialog.broker.pickers.UtOpenFilePicker
+import io.github.toyota32k.dialog.mortal.UtMortalActivity
+import io.github.toyota32k.dialog.task.UtImmortalTask
 import io.github.toyota32k.dialog.task.showConfirmMessageBox
 import io.github.toyota32k.lib.player.model.IChapterList
 import io.github.toyota32k.lib.player.model.IMediaSourceWithChapter
@@ -85,7 +86,7 @@ class MainActivity : UtMortalActivity() {
             NamedVideoStrategy("HEVC Full HD-High", PresetVideoStrategies.HEVC1080HighProfile),
         )
     }
-    private val pickers = UtFilePickerStore(this)
+    private val activityBrokers = UtActivityBrokerStore(this, UtOpenFilePicker(), UtCreateFilePicker())
     private val binder = Binder()
     private lateinit var controls: ActivityMainBinding
 
@@ -105,7 +106,7 @@ class MainActivity : UtMortalActivity() {
         override val type: String = "mp4"
     }
 
-    class MainViewModel(application: Application) : UtImmortalAndroidViewModel(application) {
+    class MainViewModel(application: Application) : AndroidViewModel(application) {
         companion object {
             val logger = UtLog("VM", MainActivity.logger)
         }
@@ -154,9 +155,9 @@ class MainActivity : UtMortalActivity() {
         fun updatePlayerSource() {
             val src = if(!playOutput.value) {
                 // Inputを再生
-                inputFile.value?.toAndroidFile(application)
+                inputFile.value?.toAndroidFile(getApplication())
             } else if(converted.value){
-                outputFile.value?.toAndroidFile(application)
+                outputFile.value?.toAndroidFile(getApplication())
             } else {
                 null
             }
@@ -168,10 +169,10 @@ class MainActivity : UtMortalActivity() {
         }
 
         val selectInputFileCommand = LiteUnitCommand {
-            UtImmortalSimpleTask.run {
+            UtImmortalTask.launchTask {
                 withOwner {
                     val activity = it.asActivity() as MainActivity
-                    val file = activity.pickers.openFilePicker.selectFile(arrayOf("video/*"))
+                    val file = activity.activityBrokers.openFilePicker.selectFile(arrayOf("video/*"))
                     if (file!=null) {
                         inputFile.value = file
                         playOutput.value = false
@@ -183,12 +184,12 @@ class MainActivity : UtMortalActivity() {
         }
 
         val selectOutputFileCommand = LiteUnitCommand {
-            UtImmortalSimpleTask.run {
+            UtImmortalTask.launchTask {
                 withOwner {
                     val activity = it.asActivity() as MainActivity
                     val inFile = inputFile.value?.let { AndroidFile(it, application).getFileName() }
                     val outFile = if(inFile.isNullOrBlank()) "output.mp4" else "output-$inFile"
-                    val file = activity.pickers.createFilePicker.selectFile(outFile, "video/mp4")
+                    val file = activity.activityBrokers.createFilePicker.selectFile(outFile, "video/mp4")
                     if(file!=null) {
                         outputFile.value = file
                         converted.value = false
@@ -267,7 +268,7 @@ class MainActivity : UtMortalActivity() {
 
             val ranges = chapterEditor.enabledRanges(Range.empty)
 
-            UtImmortalSimpleTask.run("trimming") {
+            UtImmortalTask.launchTask("trimming") {
                 val result = ProgressDialog.withProgressDialog<ConvertResult> { sink ->
                     sink.message = "Trimming Now"
                     val rotation = if(playerModel.rotation.value!=0) Rotation(playerModel.rotation.value, relative = true) else Rotation.nop

@@ -9,13 +9,13 @@ import io.github.toyota32k.binder.command.bindCommand
 import io.github.toyota32k.binder.progressBarBinding
 import io.github.toyota32k.binder.textBinding
 import io.github.toyota32k.dialog.UtDialogEx
-import io.github.toyota32k.dialog.task.UtImmortalSimpleTask
+import io.github.toyota32k.dialog.task.UtDialogViewModel
+import io.github.toyota32k.dialog.task.UtImmortalTask
 import io.github.toyota32k.dialog.task.UtImmortalTaskManager
-import io.github.toyota32k.dialog.task.UtImmortalViewModel
 import io.github.toyota32k.dialog.task.createViewModel
+import io.github.toyota32k.dialog.task.getViewModel
 import io.github.toyota32k.dialog.task.immortalTaskContext
 import io.github.toyota32k.sample.media.databinding.DialogProgressBinding
-import io.github.toyota32k.utils.FlowableEvent
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filterNotNull
@@ -29,7 +29,7 @@ interface IProgressSetter {
 }
 
 class ProgressDialog : UtDialogEx() {
-    class ProgressViewModel : UtImmortalViewModel() {
+    class ProgressViewModel : UtDialogViewModel() {
         val progress = MutableStateFlow(0)
         val progressText = MutableStateFlow("")
         val message = MutableStateFlow("")
@@ -56,25 +56,15 @@ class ProgressDialog : UtDialogEx() {
             override val cancelled: Flow<Boolean> = this@ProgressViewModel.cancelled
         }
         val progressSetter:IProgressSetter = ProgressSetter()
-
-        companion object {
-            fun create(taskName:String):ProgressViewModel {
-                return UtImmortalTaskManager.taskOf(taskName)?.task?.createViewModel() ?: throw IllegalStateException("no task")
-            }
-
-            fun instanceFor(dlg:ProgressDialog):ProgressViewModel {
-                return ViewModelProvider(dlg.immortalTaskContext, ViewModelProvider.NewInstanceFactory())[ProgressViewModel::class.java]
-            }
-        }
     }
 
-    private val viewModel by lazy { ProgressViewModel.instanceFor(this) }
+    private val viewModel by lazy { getViewModel<ProgressViewModel>() }
     lateinit var controls: DialogProgressBinding
 
     override fun preCreateBodyView() {
         gravityOption = GravityOption.CENTER
         noHeader = true
-        setLimitWidth(400)
+        widthOption = WidthOption.LIMIT(400)
         heightOption = HeightOption.COMPACT
         cancellable = false
     }
@@ -94,8 +84,8 @@ class ProgressDialog : UtDialogEx() {
     companion object {
         suspend fun <T> withProgressDialog(taskName:String="withProgressDialog", block: suspend (IProgressSetter)->T):T {
             var vmf = MutableStateFlow<ProgressViewModel?>(null)
-            UtImmortalSimpleTask.run(taskName) {
-                vmf.value = ProgressViewModel.create(taskName)
+            UtImmortalTask.launchTask(taskName) {
+                vmf.value = createViewModel<ProgressViewModel>()
                 showDialog(taskName) { ProgressDialog() }.status.ok
             }
             return vmf.filterNotNull().first().let { vm ->
