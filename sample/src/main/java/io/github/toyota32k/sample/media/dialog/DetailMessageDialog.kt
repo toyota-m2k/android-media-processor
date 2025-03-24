@@ -18,7 +18,7 @@ class DetailMessageDialog : UtDialogEx() {
         val label = MutableStateFlow("")
         val message = MutableStateFlow("")
         val detailMessage = MutableStateFlow("")
-        val showDetailMessage = MutableStateFlow(true)
+        val showDetailMessage = MutableStateFlow(false)
 
         fun initialize(label: String, message: String, detailMessage: String) {
             this.label.value = label
@@ -47,6 +47,7 @@ class DetailMessageDialog : UtDialogEx() {
         widthOption = WidthOption.FULL
         heightOption = HeightOption.AUTO_SCROLL
         rightButtonType = ButtonType.CLOSE
+        noHeader = true
     }
 
     override fun createBodyView(

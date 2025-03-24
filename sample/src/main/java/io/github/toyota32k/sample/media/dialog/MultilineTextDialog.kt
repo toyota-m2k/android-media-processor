@@ -30,6 +30,7 @@ class MultilineTextDialog : UtDialogEx() {
         widthOption = WidthOption.FULL
         heightOption = HeightOption.FULL
         rightButtonType = ButtonType.CLOSE
+        noHeader = true
     }
     override fun createBodyView(savedInstanceState: Bundle?, inflater: IViewInflater): View {
         controls = DialogMultilineTextBinding.inflate(inflater.layoutInflater)

@@ -356,7 +356,8 @@ class MainActivity : UtMortalActivity() {
         super.onCreate(savedInstanceState)
         UtLog.logLevel = Log.VERBOSE
         enableEdgeToEdge()
-        UtDialogConfig.useLegacyTheme()
+//        UtDialogConfig.useLegacyTheme()
+
         controls = ActivityMainBinding.inflate(layoutInflater)
         setContentView(controls.root)
         ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
