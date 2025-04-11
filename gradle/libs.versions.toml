@@ -15,7 +15,7 @@ activityKtx = "1.10.1"
 constraintLayout = "2.2.1"
 androidUtilities = "2.7.6"
 androidBinding = "1.5.1"    # for sample only
-androidDialog = "5.1.0"     # for sample only
+androidDialog = "5.3.1"     # for sample only
 androidPlayer = "2.6.4"     # for sample only
 
 [libraries]
