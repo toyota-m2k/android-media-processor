@@ -20,7 +20,7 @@ abstract class BaseCodec(
     }
     abstract val sampleType: Muxer.SampleType
     abstract val name:String
-    lateinit var logger: UtLog
+    var logger = UtLog("BaseCodec",Converter.logger)
     var eos:Boolean = false
         protected set
 
