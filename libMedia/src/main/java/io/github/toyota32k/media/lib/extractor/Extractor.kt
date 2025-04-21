@@ -53,6 +53,7 @@ class Extractor private constructor(
     private val closeableExtractor: CloseableExtractor = inPath.openExtractor()
     private val extractor:MediaExtractor get() = closeableExtractor.obj
     private var trackIdx:Int = -1
+    private var firstRead = true
 
     private lateinit var chainedDecoder: BaseDecoder
     fun chain(decoder: BaseDecoder) : BaseDecoder {
@@ -143,7 +144,15 @@ class Extractor private constructor(
         if(!eos) {
             logger.assert(trackIdx >= 0, "selectTrack() must be called before.")
 
-            val startPositionUs = extractor.sampleTime.coerceAtLeast(0L)    // プリロールを持つ音声の場合、先頭が負値になることがある
+            var startPositionUs = extractor.sampleTime
+            // setTrimmingRangeList で seekTo(0) しているが、プリロールを持った（音声）トラックは、初回の sampleTime が負値になっていることがある。
+            // coerceAtLeast(0L)とすると、EOS (-1) が検知できなくなるので、初回に限り、負値をゼロとして扱う。
+            if (firstRead) {
+                firstRead = false
+                if(startPositionUs<0L) {
+                    startPositionUs = 0L
+                }
+            }
             var currentPositionUs = startPositionUs
             val positionState = trimmingRangeList.positionState(startPositionUs)
 
