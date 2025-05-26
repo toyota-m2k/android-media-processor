@@ -180,7 +180,7 @@
                 android:layout_height="@dimen/media_button_height"
                 app:srcCompat="@drawable/ic_marker"
                 android:rotationX="180"
-                app:tint="?attr/iconColor"
+                app:tint="?attr/colorSecondary"
                 android:background="?attr/selectableItemBackground"
                 android:contentDescription="@string/make_chapter" />
             <ImageButton
@@ -188,7 +188,7 @@
                 android:layout_width="@dimen/media_button_width"
                 android:layout_height="@dimen/media_button_height"
                 app:srcCompat="@drawable/ic_skip_marker"
-                app:tint="?attr/iconColor"
+                app:tint="?attr/colorSecondary"
                 android:background="?attr/selectableItemBackground"
                 android:contentDescription="@string/make_skip_chapter" />
             <ImageButton
@@ -196,7 +196,7 @@
                 android:layout_width="@dimen/media_button_width"
                 android:layout_height="@dimen/media_button_height"
                 app:srcCompat="@drawable/ic_forbidden"
-                app:tint="?attr/iconColor"
+                app:tint="?attr/colorSecondary"
                 android:background="?attr/selectableItemBackground"
                 android:contentDescription="@string/make_region_skip" />
             <ImageButton
@@ -205,7 +205,7 @@
                 android:layout_height="@dimen/media_button_height"
                 app:srcCompat="@drawable/ic_expand_right"
                 android:rotationY="180"
-                app:tint="?attr/iconColor"
+                app:tint="?attr/colorSecondary"
                 android:background="?attr/selectableItemBackground"
                 android:contentDescription="@string/remove_prev_chapter" />
             <ImageButton
@@ -213,7 +213,7 @@
                 android:layout_width="@dimen/media_button_width"
                 android:layout_height="@dimen/media_button_height"
                 app:srcCompat="@drawable/ic_expand_right"
-                app:tint="?attr/iconColor"
+                app:tint="?attr/colorSecondary"
                 android:background="?attr/selectableItemBackground"
                 android:contentDescription="@string/remove_next_chapter" />
             <ImageButton
@@ -221,7 +221,7 @@
                 android:layout_width="@dimen/media_button_width"
                 android:layout_height="@dimen/media_button_height"
                 app:srcCompat="@drawable/ic_undo"
-                app:tint="?attr/iconColor"
+                app:tint="?attr/colorSecondary"
                 android:background="?attr/selectableItemBackground"
                 android:contentDescription="@string/undo" />
             <ImageButton
@@ -229,7 +229,7 @@
                 android:layout_width="@dimen/media_button_width"
                 android:layout_height="@dimen/media_button_height"
                 app:srcCompat="@drawable/ic_redo"
-                app:tint="?attr/iconColor"
+                app:tint="?attr/colorSecondary"
                 android:background="?attr/selectableItemBackground"
                 android:contentDescription="@string/redo" />
         </LinearLayout>
