@@ -29,17 +29,11 @@ abstract class AbstractStrategy(
     val maxLevel:Level? = null,
     val fallbackProfiles: Array<ProfileLv>? = null,
 ) : IStrategy {
+    override val name: String get() = this.javaClass.simpleName
     override fun createEncoder(): MediaCodec {
         return MediaCodec.createEncoderByType(codec.mime).apply {
             IStrategy.logger.info("using default encoder: $name")
         }
-//            .apply {
-//            val hw = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-//                if(this.codecInfo.isHardwareAccelerated) "H/W" else "S/W"
-//            } else {
-//                ""
-//            }
-//            IStrategy.logger.info("using [$name] as encoder ($hw)")
-//        }
     }
+
 }

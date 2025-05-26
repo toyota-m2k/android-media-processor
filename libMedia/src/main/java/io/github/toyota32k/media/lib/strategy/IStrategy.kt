@@ -7,6 +7,7 @@ import io.github.toyota32k.media.lib.format.MetaData
 import io.github.toyota32k.utils.UtLog
 
 interface IStrategy {
+    val name:String
     fun createEncoder(): MediaCodec
     companion object {
         val logger = UtLog("Strategy", Converter.logger)
@@ -15,6 +16,7 @@ interface IStrategy {
 
 interface IAudioStrategy : IStrategy {
     fun createOutputFormat(inputFormat: MediaFormat, encoder:MediaCodec): MediaFormat
+    fun resolveOutputChannelCount(inputFormat: MediaFormat):Int
 }
 interface IVideoStrategy : IStrategy {
     fun createOutputFormat(inputFormat: MediaFormat, metaData: MetaData, encoder:MediaCodec): MediaFormat

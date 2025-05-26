@@ -13,13 +13,16 @@ import io.github.toyota32k.media.lib.format.ColorFormat
 import io.github.toyota32k.media.lib.format.Level
 import io.github.toyota32k.media.lib.format.MetaData
 import io.github.toyota32k.media.lib.format.Profile
-import io.github.toyota32k.media.lib.format.getBitRate
-import io.github.toyota32k.media.lib.format.getBitRateMode
-import io.github.toyota32k.media.lib.format.getFrameRate
-import io.github.toyota32k.media.lib.format.getHeight
-import io.github.toyota32k.media.lib.format.getIFrameInterval
-import io.github.toyota32k.media.lib.format.getMime
-import io.github.toyota32k.media.lib.format.getWidth
+import io.github.toyota32k.media.lib.format.bitRate
+import io.github.toyota32k.media.lib.format.bitRateMode
+import io.github.toyota32k.media.lib.format.frameRate
+import io.github.toyota32k.media.lib.format.height
+import io.github.toyota32k.media.lib.format.iFrameInterval
+import io.github.toyota32k.media.lib.format.mime
+import io.github.toyota32k.media.lib.format.width
+import io.github.toyota32k.media.lib.strategy.DeviceCapabilities.capabilities
+import io.github.toyota32k.media.lib.strategy.DeviceCapabilities.isHardwareAccelerated
+import io.github.toyota32k.media.lib.strategy.DeviceCapabilities.isSoftwareOnly
 import io.github.toyota32k.utils.UtLog
 import kotlin.math.min
 import kotlin.math.roundToInt
@@ -101,11 +104,11 @@ open class VideoStrategy(
     override fun createOutputFormat(inputFormat: MediaFormat, metaData: MetaData, encoder: MediaCodec): MediaFormat {
         // bitRate は、MediaFormat に含まれず、MetaDataにのみ含まれるケースがあるようなので、
         // 両方をチェックするようにしてみた。
-        val bitRate = this.bitRate.value(inputFormat.getBitRate(), metaData.bitRate)
-        val frameRate = this.frameRate.value(inputFormat.getFrameRate(), metaData.frameRate)
-        val iFrameInterval = this.iFrameInterval.value(inputFormat.getIFrameInterval())
-        var width = inputFormat.getWidth() ?: metaData.width ?: throw IllegalArgumentException("inputFormat have no size params.")
-        var height = inputFormat.getHeight() ?: metaData.height ?: throw IllegalArgumentException("inputFormat have no size params.")
+        val bitRate = this.bitRate.value(inputFormat.bitRate, metaData.bitRate)
+        val frameRate = this.frameRate.value(inputFormat.frameRate, metaData.frameRate)
+        val iFrameInterval = this.iFrameInterval.value(inputFormat.iFrameInterval)
+        var width = inputFormat.width ?: metaData.width ?: throw IllegalArgumentException("inputFormat have no size params.")
+        var height = inputFormat.height ?: metaData.height ?: throw IllegalArgumentException("inputFormat have no size params.")
         if(sizeCriteria!=null) {
             val size = calcVideoSize(width, height, sizeCriteria)
             width = size.width
@@ -115,21 +118,21 @@ open class VideoStrategy(
         val brm = if(bitRateMode!=null && isBitrateModeSupported(encoder, bitRateMode)) bitRateMode else null
 
         logger.info("Video Format ------------------------------------------------------")
-        logger.info("- Type           ${inputFormat.getMime()?:"n/a"} --> ${codec.mime}")
-        logger.info("- Profile        ${Profile.fromFormat(inputFormat)?:"n/a"} --> ${Profile.fromValue(codec, pl.profile)?:"n/a"}")
-        logger.info("- Level          ${Level.fromFormat(inputFormat)} --> ${Level.fromValue(codec,pl.level)?:"n/a"}")
-        logger.info("- Width          ${inputFormat.getWidth()?:"n/a"}")
-        logger.info("- Width(MT)      ${metaData.width?:"n/a"} --> $width")
-        logger.info("- Height         ${inputFormat.getHeight()?:"n/a"}")
-        logger.info("- Height(MT)     ${metaData.height?:"n/a"} --> $height")
-        logger.info("- BitRate        ${inputFormat.getBitRate()?:"n/a"}")
-        logger.info("- BitRate(MT)    ${metaData.bitRate?:"n/a"} --> $bitRate")
-        logger.info("- BitRateMode    ${inputFormat.getBitRateMode()?:"n/a"} --> ${brm?:"n/a"}")
-        logger.info("- FrameRate      ${inputFormat.getFrameRate()?:"n/a"}")
-        logger.info("- FrameRate(MT)  ${metaData.frameRate?:"n/a"} --> $frameRate")
-        logger.info("- iFrameInterval ${inputFormat.getIFrameInterval()?:"n/a"} --> $iFrameInterval")
-        logger.info("- colorFormat    ${ColorFormat.fromFormat(inputFormat)?:"n/a"} --> ${colorFormat?:"n/a"}")
-        logger.info("- Duration       ${metaData.duration?:"n/a"}")
+        logger.info("- Type            ${inputFormat.mime?:"n/a"} --> ${codec.mime}")
+        logger.info("- Profile         ${Profile.fromFormat(inputFormat)?:"n/a"} --> ${Profile.fromValue(codec, pl.profile)?:"n/a"}")
+        logger.info("- Level           ${Level.fromFormat(inputFormat)} --> ${Level.fromValue(codec,pl.level)?:"n/a"}")
+        logger.info("- Width           ${inputFormat.width?:"n/a"}")
+        logger.info("- Width(Meta)     ${metaData.width?:"n/a"} --> $width")
+        logger.info("- Height          ${inputFormat.height?:"n/a"}")
+        logger.info("- Height(Meta)    ${metaData.height?:"n/a"} --> $height")
+        logger.info("- BitRate         ${inputFormat.bitRate?:"n/a"}")
+        logger.info("- BitRate(Meta)   ${metaData.bitRate?:"n/a"} --> $bitRate")
+        logger.info("- BitRateMode     ${inputFormat.bitRateMode?:"n/a"} --> ${brm?:"n/a"}")
+        logger.info("- FrameRate       ${inputFormat.frameRate?:"n/a"}")
+        logger.info("- FrameRate(Meta) ${metaData.frameRate?:"n/a"} --> $frameRate")
+        logger.info("- iFrameInterval  ${inputFormat.iFrameInterval?:"n/a"} --> $iFrameInterval")
+        logger.info("- colorFormat     ${ColorFormat.fromFormat(inputFormat)?:"n/a"} --> ${colorFormat?:"n/a"}")
+        logger.info("- Duration(Meta)  ${metaData.duration?:"n/a"}")
         logger.info("-------------------------------------------------------------------")
 
         return MediaFormat.createVideoFormat(codec.mime, width, height).apply {
@@ -165,7 +168,9 @@ open class VideoStrategy(
 
     @Suppress("unused")
     fun dumpCodecs() {
-        dumpEncodingCodecs(codec)
+        logger.info("#### Dump Video Codecs ####")
+        logger.info(DeviceCapabilities.availableCodecs(codec, encoder = true).toString())
+        logger.info(DeviceCapabilities.availableCodecs(codec, encoder = false).toString())
     }
 
     /**
@@ -321,114 +326,20 @@ open class VideoStrategy(
             return Size(w-w%4, h-h%2)
         }
 
-        fun capabilities(info: MediaCodecInfo, mime:String): CodecCapabilities? {
-            return try {
-                info.getCapabilitiesForType(mime)
-            } catch(_:Throwable) {
-                null
-            }
-        }
-        fun isHardwareAccelerated(info: MediaCodecInfo): Boolean {
-            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                info.isHardwareAccelerated
-            } else {
-                true   // どうせわからんからなんでも true
-            }
-        }
-        fun isSoftwareOnly(info: MediaCodecInfo): Boolean {
-            return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                info.isSoftwareOnly
-            } else {
-                false   // どうせわからんからなんでも false
-            }
-        }
-
-        fun dumpEncodingCodecs(codec:Codec) {
-            logger.info("#### dump codecs ####")
-            MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.filter { it.isEncoder }.forEach { ci->
-                val cap = capabilities(ci,codec.mime) ?: return@forEach
-                val hw = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    if(ci.isHardwareAccelerated) "HW" else "SW"
-                } else {
-                    "?"
-                }
-                cap.profileLevels.forEach { pl->
-                    logger.info("${ci.name} : ${Profile.fromValue(codec, pl.profile)?:"?"}@${Level.fromValue(codec, pl.level)?:"?"} ($hw)")
-                }
-            }
-        }
-
-        private class AvailableCodecList(override val encoder:Boolean) : IAvailableCodecList {
-            override var default: String = ""
-            override var hardwareAccelerated = mutableListOf<String>()
-            override var softwareOnly = mutableListOf<String>()
-            override var other = mutableListOf<String>()
-
-            override fun toString(): String {
-                return StringBuilder().apply {
-                    appendLine("Available ${if(encoder) "Encoders" else "Decoders"}:")
-                    appendLine("default: $default")
-                    appendLine("hardwareAccelerated:")
-                    hardwareAccelerated.forEach { appendLine("- $it") }
-                    appendLine("softwareOnly:")
-                    softwareOnly.forEach { appendLine("- $it") }
-                    if(other.isNotEmpty()) {
-                        appendLine("other:")
-                        other.forEach { appendLine("  $it") }
-                    }
-                }.toString()
-            }
-        }
-
-        /**
-         * デバイスにインストールされているエンコーダーを列挙する
-         * （実験＆ログ出力用）
-         */
-        @Suppress("unused")
-        fun availableEncoders(codec:Codec) : IAvailableCodecList {
-            return MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos
-                .filter { it.isEncoder && capabilities(it,codec.mime)!=null }
-                .fold(AvailableCodecList(true)) { codecs, ci ->
-                    codecs.apply {
-                        if (isHardwareAccelerated(ci)) {
-                            hardwareAccelerated.add(ci.name)
-                        } else if (isSoftwareOnly(ci)) {
-                            softwareOnly.add(ci.name)
-                        } else {
-                            other.add(ci.name)
-                        }
-                    }
-                }.apply {
-                    val codec = MediaCodec.createEncoderByType(codec.mime)
-                    default = codec.name
-                    codec.release()
-                }
-        }
-
-        /**
-         * デバイスにインストールされているデコーダーを列挙する
-         * （実験＆ログ出力用）
-         */
-        @Suppress("unused")
-        fun availableDecoders(codec:Codec) : IAvailableCodecList {
-            return MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos
-                .filter { !it.isEncoder && capabilities(it,codec.mime)!=null }
-                .fold(AvailableCodecList(false)) { codecs, ci ->
-                    codecs.apply {
-                        if (isHardwareAccelerated(ci)) {
-                            hardwareAccelerated.add(ci.name)
-                        } else if (isSoftwareOnly(ci)) {
-                            softwareOnly.add(ci.name)
-                        } else {
-                            other.add(ci.name)
-                        }
-                    }
-                }.apply {
-                    val codec = MediaCodec.createDecoderByType(codec.mime)
-                    default = codec.name
-                    codec.release()
-                }
-        }
+//        fun dumpEncodingCodecs(codec:Codec) {
+//            logger.info("#### dump codecs ####")
+//            MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos.filter { it.isEncoder }.forEach { ci->
+//                val cap = capabilities(ci,codec.mime) ?: return@forEach
+//                val hw = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+//                    if(ci.isHardwareAccelerated) "HW" else "SW"
+//                } else {
+//                    "?"
+//                }
+//                cap.profileLevels.forEach { pl->
+//                    logger.info("${ci.name} : ${Profile.fromValue(codec, pl.profile)?:"?"}@${Level.fromValue(codec, pl.level)?:"?"} ($hw)")
+//                }
+//            }
+//        }
     }
 }
 

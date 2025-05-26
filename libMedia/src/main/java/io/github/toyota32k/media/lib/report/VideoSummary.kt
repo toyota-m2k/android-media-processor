@@ -7,12 +7,12 @@ import io.github.toyota32k.media.lib.format.ColorFormat
 import io.github.toyota32k.media.lib.format.Level
 import io.github.toyota32k.media.lib.format.MetaData
 import io.github.toyota32k.media.lib.format.Profile
-import io.github.toyota32k.media.lib.format.getBitRate
-import io.github.toyota32k.media.lib.format.getFrameRate
-import io.github.toyota32k.media.lib.format.getHeight
-import io.github.toyota32k.media.lib.format.getIFrameInterval
-import io.github.toyota32k.media.lib.format.getMaxBitRate
-import io.github.toyota32k.media.lib.format.getWidth
+import io.github.toyota32k.media.lib.format.bitRate
+import io.github.toyota32k.media.lib.format.frameRate
+import io.github.toyota32k.media.lib.format.height
+import io.github.toyota32k.media.lib.format.iFrameInterval
+import io.github.toyota32k.media.lib.format.maxBitRate
+import io.github.toyota32k.media.lib.format.width
 import java.util.Locale
 
 data class VideoSummary(
@@ -27,19 +27,19 @@ data class VideoSummary(
     val frameRate: Int,
     val iFrameInterval: Int,
     val colorFormat: ColorFormat?) : IAttributes {
-    constructor(format: MediaFormat, metaData: MetaData?) : this(
-        Codec.fromFormat(format),
-        Profile.fromFormat(format),
-        Level.fromFormat(format),
+    constructor(org:VideoSummary?, format: MediaFormat, metaData: MetaData?) : this(
+        org?.codec ?: Codec.fromFormat(format),
+        org?.profile ?: Profile.fromFormat(format),
+        org?.level ?: Level.fromFormat(format),
 
-        width = format.getWidth()?:-1,
-        height = format.getHeight()?:-1,
-        bitRate = format.getBitRate()?: metaData?.bitRate ?: -1,
-        maxBitRate = format.getMaxBitRate()?:-1,
-        bitRateMode = BitRateMode.fromFormat(format),
-        frameRate = format.getFrameRate()?: metaData?.frameRate ?: -1,
-        iFrameInterval = format.getIFrameInterval()?:-1,
-        colorFormat = ColorFormat.fromFormat(format))
+        width = format.width?: org?.width ?:-1,
+        height = format.height?: org?.height ?:-1,
+        bitRate = format.bitRate?: metaData?.bitRate ?: org?.bitRate ?: -1,
+        maxBitRate = format.maxBitRate?: org?.maxBitRate ?:-1,
+        bitRateMode = BitRateMode.fromFormat(format) ?: org?.bitRateMode,
+        frameRate = format.frameRate?: metaData?.frameRate ?: org?.frameRate ?: -1,
+        iFrameInterval = format.iFrameInterval?: org?.iFrameInterval ?: -1,
+        colorFormat = ColorFormat.fromFormat(format) ?: org?.colorFormat)
 
     private fun Int.format():String {
         return if(this<0) "n/a" else String.format(Locale.US, "%,d", this)

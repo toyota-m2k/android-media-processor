@@ -2,15 +2,20 @@ package io.github.toyota32k.media.lib.codec
 
 import android.media.MediaCodec
 import android.media.MediaFormat
+import io.github.toyota32k.media.lib.converter.Converter
 import io.github.toyota32k.media.lib.format.dump
 import io.github.toyota32k.media.lib.misc.ICancellation
 import io.github.toyota32k.media.lib.report.Report
+import io.github.toyota32k.media.lib.strategy.IVideoStrategy
 import io.github.toyota32k.media.lib.surface.OutputSurface
 import io.github.toyota32k.media.lib.track.Muxer
+import io.github.toyota32k.utils.UtLog
 
-class VideoDecoder(format: MediaFormat, decoder: MediaCodec, report: Report, cancellation: ICancellation):BaseDecoder(format,decoder,report,cancellation)  {
+class VideoDecoder(strategy: IVideoStrategy, format: MediaFormat, decoder: MediaCodec, report: Report, cancellation: ICancellation)
+    :BaseDecoder(strategy, format,decoder,report,cancellation)  {
     private lateinit var outputSurface:OutputSurface
     override val sampleType = Muxer.SampleType.Video
+    override val logger = UtLog("Decoder(Video)", Converter.logger)
     override fun configure() {
         outputSurface = OutputSurface()
         mediaCodec.configure(mediaFormat, outputSurface.surface, null, 0)

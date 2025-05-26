@@ -5,15 +5,17 @@ import android.media.MediaFormat
 import io.github.toyota32k.media.lib.format.dump
 import io.github.toyota32k.media.lib.misc.ICancellation
 import io.github.toyota32k.media.lib.report.Report
+import io.github.toyota32k.media.lib.strategy.IStrategy
 
 abstract class BaseDecoder(
+    strategy: IStrategy,
     format: MediaFormat,
     val decoder:MediaCodec,
     report: Report,
-    cancellation: ICancellation):BaseCodec(format,report,cancellation) {
+    cancellation: ICancellation):BaseCodec(strategy, format, report, cancellation) {
 //    val inputBuffer: ByteBuffer?
 //    lateinit var trimmingRangeList : ITrimmingRangeList
-    override val name: String get() = "Decoder($sampleType)"
+//    override val name: String get() = "Decoder($sampleType)"
     override val mediaCodec:MediaCodec get() = decoder
 
     protected lateinit var chainedEncoder:BaseEncoder
@@ -38,7 +40,8 @@ abstract class BaseDecoder(
      * デフォルト： 何もしない
      */
     protected open fun onFormatChanged(format:MediaFormat) {
-        // nothing to do
+        format.dump(logger, "found actual format ($sampleType)")
+        report.updateInputSummary(format, null)
     }
 
     /**

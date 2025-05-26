@@ -3,6 +3,7 @@ package io.github.toyota32k.media.lib.audio
 import android.media.MediaCodec
 import android.media.MediaFormat
 import io.github.toyota32k.media.lib.converter.Converter
+import io.github.toyota32k.media.lib.strategy.IAudioStrategy
 import io.github.toyota32k.utils.UtLog
 import java.lang.RuntimeException
 import java.lang.UnsupportedOperationException
@@ -35,6 +36,7 @@ class AudioChannel {
     private var mInputSampleRate = 0
     private var mInputChannelCount = 0
     private var mOutputChannelCount = 0
+    val outputChannelCount: Int get() = mOutputChannelCount
 
     private lateinit var mRemixer: AudioRemixer
 
@@ -42,17 +44,19 @@ class AudioChannel {
 
     private lateinit var mActualDecodedFormat: MediaFormat
 
-    fun setActualDecodedFormat(actualFormat: MediaFormat, presetFormat: MediaFormat) {
+    fun setActualDecodedFormat(actualFormat: MediaFormat, presetFormat: MediaFormat, audioStrategy: IAudioStrategy) {
         mActualDecodedFormat = actualFormat
-        mInputSampleRate = mActualDecodedFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE)
+        mInputSampleRate = actualFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE)
         val encodingSampleRate = presetFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE)
         if (mInputSampleRate != encodingSampleRate) {
             // throw UnsupportedOperationException("Audio sample rate conversion not supported yet.")
             logger.info("Sample Rate: input=$mInputSampleRate, output=$encodingSampleRate")
             logger.info("Audio sample rate conversion not supported yet.")
         }
-        mInputChannelCount = mActualDecodedFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
-        mOutputChannelCount = presetFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
+        // 実際の入力チャネル数
+        mInputChannelCount = actualFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
+        // 出力チャネル数： 実際の入力チャネル数＋AudioStrategy によって出力チャネル数を決定する
+        mOutputChannelCount = audioStrategy.resolveOutputChannelCount(actualFormat)
         if (mInputChannelCount != 1 && mInputChannelCount != 2) {
             throw UnsupportedOperationException("Input channel count ($mInputChannelCount) not supported.")
         }

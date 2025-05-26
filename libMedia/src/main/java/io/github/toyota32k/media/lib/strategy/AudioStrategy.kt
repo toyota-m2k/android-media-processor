@@ -4,10 +4,10 @@ import android.media.MediaCodec
 import android.media.MediaFormat
 import io.github.toyota32k.media.lib.format.Codec
 import io.github.toyota32k.media.lib.format.Profile
-import io.github.toyota32k.media.lib.format.getBitRate
-import io.github.toyota32k.media.lib.format.getChannelCount
-import io.github.toyota32k.media.lib.format.getMime
-import io.github.toyota32k.media.lib.format.getSampleRate
+import io.github.toyota32k.media.lib.format.bitRate
+import io.github.toyota32k.media.lib.format.channelCount
+import io.github.toyota32k.media.lib.format.mime
+import io.github.toyota32k.media.lib.format.sampleRate
 import io.github.toyota32k.utils.UtLog
 
 open class AudioStrategy (
@@ -15,7 +15,7 @@ open class AudioStrategy (
     profile: Profile,                            // profile は AAC Profile として扱う。AAC以外のAudioコーデックは知らん。
     fallbackProfiles: Array<ProfileLv>?,
     val sampleRate:MaxDefault,
-    val channelCount: MaxDefault,
+    val channelCount: Int,      // 1 or 2,  ... 0なら入力と同じチャネル数で出力
     val bitRatePerChannel:MaxDefault,         //      // 1ch当たりのビットレート
 ) : AbstractStrategy(codec, profile, null, fallbackProfiles), IAudioStrategy {
 
@@ -28,27 +28,35 @@ open class AudioStrategy (
         profile: Profile = this.profile,                            // profile は AAC Profile として扱う。AAC以外のAudioコーデックは知らん。
         fallbackProfiles: Array<ProfileLv>? = this.fallbackProfiles,
         sampleRate:MaxDefault = this.sampleRate,
-        channelCount: MaxDefault = this.channelCount,
+        channelCount: Int = this.channelCount,
         bitRatePerChannel:MaxDefault = this.bitRatePerChannel,         //      // 1ch当たりのビットレート
     ):AudioStrategy {
         return AudioStrategy(codec, profile, fallbackProfiles, sampleRate, channelCount, bitRatePerChannel)
     }
 
+    override fun resolveOutputChannelCount(inputFormat: MediaFormat): Int {
+        return if(this.channelCount==0) {
+            inputFormat.channelCount?:1
+        } else {
+            this.channelCount
+        }
+    }
+
     override fun createOutputFormat(inputFormat: MediaFormat, encoder:MediaCodec): MediaFormat {
-        val sampleRate = this.sampleRate.value(inputFormat.getSampleRate())
-        val channelCount = this.channelCount.value(inputFormat.getChannelCount())
-        val inputBitRatePerChannel = (inputFormat.getBitRate()?:0)/channelCount
+        val sampleRate = this.sampleRate.value(inputFormat.sampleRate)
+        val channelCount = resolveOutputChannelCount(inputFormat)
+        val inputBitRatePerChannel = (inputFormat.bitRate?:0)/channelCount
         val bitRate = this.bitRatePerChannel.value(inputBitRatePerChannel) * channelCount
 
         VideoStrategy.logger.info("Audio Format ------------------------------------------------------")
-        VideoStrategy.logger.info("- Type           ${inputFormat.getMime()?:"n/a"} --> ${codec.mime}")
+        VideoStrategy.logger.info("- Type           ${inputFormat.mime?:"n/a"} --> ${codec.mime}")
         VideoStrategy.logger.info("- Profile        ${Profile.fromFormat(inputFormat)?:"n/a"} --> $profile")
-        VideoStrategy.logger.info("- SampleRate     ${inputFormat.getSampleRate()} --> $sampleRate")
-        VideoStrategy.logger.info("- Channels       ${inputFormat.getChannelCount()?:"n/a"} --> $channelCount")
-        VideoStrategy.logger.info("- BitRate        ${inputFormat.getBitRate()?:"n/a"} --> $bitRate")
+        VideoStrategy.logger.info("- SampleRate     ${inputFormat.sampleRate?:"n/a"} --> $sampleRate")
+        VideoStrategy.logger.info("- Channels       ${inputFormat.channelCount?:"n/a"} --> $channelCount")
+        VideoStrategy.logger.info("- BitRate        ${inputFormat.bitRate?:"n/a"} --> $bitRate")
         VideoStrategy.logger.info("-------------------------------------------------------------------")
 
-        return MediaFormat.createAudioFormat(codec.mime, sampleRate, channelCount).apply {
+        return MediaFormat.createAudioFormat(codec.mime, sampleRate, this.channelCount).apply {
             setInteger(MediaFormat.KEY_AAC_PROFILE, profile.value)
             setInteger(MediaFormat.KEY_BIT_RATE, bitRate)
         }
@@ -69,7 +77,14 @@ open class AudioStrategy (
     // AACObjectELD        = 39;     AAC-LDにSBRやPSなどの技術を追加したプロファイルで、さらに遅延時間を短くしながら高品質な音声を提供します。主に高度な音声通信に使用されます。
     // AACObjectXHE        = 42;     HE-AAC v2にMPEG-D USACという技術を追加したプロファイルで、最も高い圧縮効率と音質を提供します。主にストリーミングや放送などの用途に使用されます。
 
+    fun dumpCodecs() {
+        logger.info("#### Dump Audio Codecs ####")
+        logger.info(DeviceCapabilities.availableCodecs(codec, encoder = true).toString())
+        logger.info(DeviceCapabilities.availableCodecs(codec, encoder = false).toString())
+    }
+
     companion object {
         val logger = UtLog("Audio", IStrategy.logger)
+
     }
 }

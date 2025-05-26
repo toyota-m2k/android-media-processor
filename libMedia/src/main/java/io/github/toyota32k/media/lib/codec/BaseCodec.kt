@@ -2,14 +2,15 @@ package io.github.toyota32k.media.lib.codec
 
 import android.media.MediaCodec
 import android.media.MediaFormat
-import io.github.toyota32k.media.lib.converter.Converter
 import io.github.toyota32k.media.lib.misc.ICancellation
 import io.github.toyota32k.media.lib.report.Report
+import io.github.toyota32k.media.lib.strategy.IStrategy
 import io.github.toyota32k.media.lib.track.Muxer
 import io.github.toyota32k.utils.UtLog
 import java.io.Closeable
 
 abstract class BaseCodec(
+    val strategy: IStrategy,
     val mediaFormat:MediaFormat,
     val report: Report,
     cancellation: ICancellation) : Closeable, ICancellation by cancellation {
@@ -19,8 +20,8 @@ abstract class BaseCodec(
 //        const val TIMEOUT_1SEC:Long = 1000L
     }
     abstract val sampleType: Muxer.SampleType
-    abstract val name:String
-    var logger = UtLog("BaseCodec",Converter.logger)
+//    abstract val name:String
+    abstract val logger:UtLog // = UtLog("BaseCodec",Converter.logger)
     var eos:Boolean = false
         protected set
 
@@ -33,7 +34,7 @@ abstract class BaseCodec(
     }
 
     fun start() {
-        logger = UtLog(name, Converter.logger)
+//        logger = UtLog(name, Converter.logger)
         configure()
         mediaCodec.start()
     }

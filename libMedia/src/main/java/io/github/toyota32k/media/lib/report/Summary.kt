@@ -4,7 +4,7 @@ import io.github.toyota32k.media.lib.converter.Converter
 import io.github.toyota32k.media.lib.converter.IInputMediaFile
 import io.github.toyota32k.media.lib.extractor.Extractor
 import io.github.toyota32k.media.lib.format.MetaData
-import io.github.toyota32k.media.lib.format.getBitRate
+import io.github.toyota32k.media.lib.format.bitRate
 import io.github.toyota32k.media.lib.utils.TimeSpan
 import java.util.Locale
 
@@ -51,12 +51,12 @@ data class Summary (
                 val videoTrack = Extractor.findTrackIdx(extractor, "video")
                 val videoSummary = if (videoTrack >= 0) {
                     val videoFormat = Extractor.getMediaFormat(extractor, videoTrack)
-                    Converter.logger.info("BitRate = ${videoFormat.getBitRate() ?: -1L} / ${metaData.bitRate ?: -1L}")
-                    VideoSummary(videoFormat, metaData)
+                    Converter.logger.info("BitRate = ${videoFormat.bitRate ?: -1L} / ${metaData.bitRate ?: -1L}")
+                    VideoSummary(null, videoFormat, metaData)
                 } else null
                 val audioTrack = Extractor.findTrackIdx(extractor, "audio")
                 val audioSummary = if (audioTrack >= 0) {
-                    AudioSummary(Extractor.getMediaFormat(extractor, audioTrack))
+                    AudioSummary(null, Extractor.getMediaFormat(extractor, audioTrack))
                 } else null
                 val duration = metaData.duration ?: -1L
                 Summary(inFile.getLength(), duration, videoSummary, audioSummary)

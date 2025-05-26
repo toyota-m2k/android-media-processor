@@ -3,19 +3,24 @@ package io.github.toyota32k.media.lib.codec
 import android.media.MediaCodec
 import android.media.MediaFormat
 import io.github.toyota32k.media.lib.audio.AudioChannel
-import io.github.toyota32k.media.lib.format.dump
-import io.github.toyota32k.media.lib.format.getSampleRate
+import io.github.toyota32k.media.lib.converter.Converter
+import io.github.toyota32k.media.lib.format.channelCount
+import io.github.toyota32k.media.lib.format.sampleRate
 import io.github.toyota32k.media.lib.misc.ICancellation
 import io.github.toyota32k.media.lib.report.Report
+import io.github.toyota32k.media.lib.strategy.IAudioStrategy
 import io.github.toyota32k.media.lib.track.Muxer
+import io.github.toyota32k.utils.UtLog
 
-class AudioDecoder(format: MediaFormat, decoder:MediaCodec, report: Report, cancellation: ICancellation)
-    :BaseDecoder(format, decoder, report, cancellation) {
+class AudioDecoder(strategy:IAudioStrategy, format: MediaFormat, decoder:MediaCodec, report: Report, cancellation: ICancellation)
+    :BaseDecoder(strategy, format, decoder, report, cancellation) {
     private val audioChannel = AudioChannel()
     override val sampleType = Muxer.SampleType.Audio
+    override val logger = UtLog("Decoder(Audio)", Converter.logger)
     private var decoderEos = false
     private var formatDetected = false  // INFO_OUTPUT_FORMAT_CHANGED を受け取るまで、encoderへの書き込みを抑制するためのフラグ
 
+    private val audioStrategy: IAudioStrategy get() = strategy as IAudioStrategy
     // MediaCodec.createDecoderByType(format.getString(MediaFormat.KEY_MIME)!!)
 
     override fun onDecoderEos() {
@@ -28,9 +33,10 @@ class AudioDecoder(format: MediaFormat, decoder:MediaCodec, report: Report, canc
      * 受け取ったフォーマットに基づいて、エンコーダーを構成・開始する。
      */
     override fun onFormatChanged(format: MediaFormat) {
-        audioChannel.setActualDecodedFormat(format, mediaFormat)
+        super.onFormatChanged(format)   // for log
+        audioChannel.setActualDecodedFormat(format, mediaFormat, audioStrategy)
         if(!formatDetected) {   // 二度漬け禁止
-            (chainedEncoder as AudioEncoder).configureWithActualSampleRate(format.getSampleRate())
+            (chainedEncoder as AudioEncoder).configureWithActualSampleRate(format.sampleRate, audioChannel.outputChannelCount)
             formatDetected = true
         }
     }

@@ -3,10 +3,9 @@ package io.github.toyota32k.media.lib.report
 import android.media.MediaFormat
 import io.github.toyota32k.media.lib.format.Codec
 import io.github.toyota32k.media.lib.format.Profile
-import io.github.toyota32k.media.lib.format.getBitRate
-import io.github.toyota32k.media.lib.format.getChannelCount
-import io.github.toyota32k.media.lib.format.getSampleRate
-import java.lang.StringBuilder
+import io.github.toyota32k.media.lib.format.bitRate
+import io.github.toyota32k.media.lib.format.channelCount
+import io.github.toyota32k.media.lib.format.sampleRate
 import java.util.Locale
 
 data class AudioSummary(
@@ -16,7 +15,12 @@ data class AudioSummary(
     val channelCount: Int,
     val bitRate: Int,
     ) : IAttributes {
-    constructor(format:MediaFormat) : this(Codec.fromFormat(format), Profile.fromFormat(format), format.getSampleRate()?:-1, format.getChannelCount()?:-1, format.getBitRate()?:-1)
+    constructor(org:AudioSummary?, format:MediaFormat) : this(
+        org?.codec ?: Codec.fromFormat(format),
+        org?.profile ?: Profile.fromFormat(format),
+        format.sampleRate?: org?.sampleRate ?: -1,
+        format.channelCount?: org?.channelCount ?:-1,
+        format.bitRate?: org?.bitRate ?: -1)
 
     override val title: String
         get() = "Audio Summary"

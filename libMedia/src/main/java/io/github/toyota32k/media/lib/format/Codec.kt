@@ -38,7 +38,7 @@ enum class Codec(val media: Media, val mime:String, val alias:String?=null) {
             }
         }
         fun fromFormat(format: MediaFormat): Codec? {
-            val mime = format.getMime()?:return null
+            val mime = format.mime?:return null
             return fromMime(mime)
         }
     }

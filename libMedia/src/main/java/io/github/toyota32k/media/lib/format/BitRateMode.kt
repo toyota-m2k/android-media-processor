@@ -20,7 +20,7 @@ enum class BitRateMode(val value:Int) {
         }
 
         fun fromFormat(format:MediaFormat):BitRateMode? {
-            val mode = format.getBitRateMode()?:return null
+            val mode = format.bitRateMode?:return null
             return fromValue(mode)
         }
     }

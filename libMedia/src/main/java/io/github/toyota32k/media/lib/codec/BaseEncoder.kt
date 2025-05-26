@@ -5,15 +5,17 @@ import android.media.MediaFormat
 import io.github.toyota32k.media.lib.format.dump
 import io.github.toyota32k.media.lib.misc.ICancellation
 import io.github.toyota32k.media.lib.report.Report
+import io.github.toyota32k.media.lib.strategy.IStrategy
 import io.github.toyota32k.media.lib.track.Muxer
 
 abstract class BaseEncoder(
+    strategy: IStrategy,
     format: MediaFormat,
     val encoder:MediaCodec,
     report: Report,
-    cancellation: ICancellation):BaseCodec(format,report,cancellation) {
+    cancellation: ICancellation):BaseCodec(strategy, format,report,cancellation) {
 //    val encoder:MediaCodec = MediaCodec.createEncoderByType(format.getString(MediaFormat.KEY_MIME)!!)
-    override val name: String get() = "Encoder($sampleType)"
+//    override val name: String get() = "Encoder($sampleType)"
     override val mediaCodec get() = encoder
     var writtenPresentationTimeUs:Long = 0L
         private set

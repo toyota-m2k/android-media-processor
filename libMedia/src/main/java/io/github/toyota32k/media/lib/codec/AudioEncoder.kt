@@ -2,13 +2,19 @@ package io.github.toyota32k.media.lib.codec
 
 import android.media.MediaCodec
 import android.media.MediaFormat
-import io.github.toyota32k.media.lib.format.getSampleRate
+import io.github.toyota32k.media.lib.converter.Converter
+import io.github.toyota32k.media.lib.format.channelCount
+import io.github.toyota32k.media.lib.format.sampleRate
 import io.github.toyota32k.media.lib.misc.ICancellation
 import io.github.toyota32k.media.lib.report.Report
+import io.github.toyota32k.media.lib.strategy.IAudioStrategy
 import io.github.toyota32k.media.lib.track.Muxer
+import io.github.toyota32k.utils.UtLog
 
-class AudioEncoder(format: MediaFormat, encoder: MediaCodec,report: Report, cancellation: ICancellation):BaseEncoder(format,encoder,report,cancellation)  {
+class AudioEncoder(strategy: IAudioStrategy, format: MediaFormat, encoder: MediaCodec, report: Report, cancellation: ICancellation)
+    :BaseEncoder(strategy, format, encoder, report, cancellation)  {
     override val sampleType = Muxer.SampleType.Audio
+    override val logger = UtLog("Encoder(Audio)", Converter.logger)
 
     // #17124
     //  前提として、このコンバーターでは、現在、音声トラックのトランスコーダーは、サンプリングレートの変更はサポートしていない。
@@ -20,14 +26,23 @@ class AudioEncoder(format: MediaFormat, encoder: MediaCodec,report: Report, canc
     //  具体的には、初期化時にはまだ、start/configure しないで、音声トラックから（真の）サンプリングレートが読み込めた時点で start/configureするように修正した。
 
     /**
-     * 真のサンプリングレートが判明したとき（デコーダーがMediaCodec.INFO_OUTPUT_FORMAT_CHANGEDを受け取った時）に、
+     * 真のサンプリングレート&チャネル数が判明したとき（デコーダーがMediaCodec.INFO_OUTPUT_FORMAT_CHANGEDを受け取った時）に、
      * エンコーダーを configure / start する。
      */
-    fun configureWithActualSampleRate(sampleRate:Int?) {
-        val presetSampleRate = mediaFormat.getSampleRate()
-        if(sampleRate!=null && sampleRate != presetSampleRate) {
-            mediaFormat.setInteger(MediaFormat.KEY_SAMPLE_RATE, sampleRate)
+    fun configureWithActualSampleRate(sampleRate:Int?, channelCount:Int?) {
+        var modified = false
+        if(sampleRate!=null && sampleRate != mediaFormat.sampleRate) {
+            mediaFormat.sampleRate = sampleRate
+            modified = true
         }
+        if(channelCount!=null && channelCount != mediaFormat.channelCount) {
+            if(channelCount!=1 && channelCount!=2) {
+                throw UnsupportedOperationException("Input channel count ($channelCount) not supported.")
+            }
+            mediaFormat.channelCount = channelCount
+            modified = true
+        }
+        report.updateOutputSummary(mediaFormat)
         start()
         logger.debug("AudioEncoder configured.")
     }

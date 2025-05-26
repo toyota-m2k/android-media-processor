@@ -10,43 +10,43 @@ import io.github.toyota32k.media.lib.converter.Converter
 import io.github.toyota32k.media.lib.converter.IInputMediaFile
 import io.github.toyota32k.media.lib.extractor.Extractor
 import io.github.toyota32k.media.lib.format.MetaData
-import io.github.toyota32k.media.lib.format.getMime
+import io.github.toyota32k.media.lib.format.mime
 import io.github.toyota32k.media.lib.misc.ICancellation
 import io.github.toyota32k.media.lib.misc.MediaConstants
 import io.github.toyota32k.media.lib.report.Report
+import io.github.toyota32k.media.lib.strategy.DeviceCapabilities
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
-import io.github.toyota32k.media.lib.strategy.VideoStrategy
 import io.github.toyota32k.media.lib.strategy.VideoStrategy.Companion.logger
 import io.github.toyota32k.utils.UtLog
 
 class VideoTrack
-    private constructor(extractor:Extractor, inputFormat:MediaFormat, decoder: MediaCodec, outputFormat:MediaFormat, encoder: MediaCodec, report: Report, val metaData: MetaData, cancellation: ICancellation)
+    private constructor(strategy:IVideoStrategy, extractor:Extractor, inputFormat:MediaFormat, decoder: MediaCodec, outputFormat:MediaFormat, encoder: MediaCodec, report: Report, val metaData: MetaData, cancellation: ICancellation)
         : Track(extractor, Muxer.SampleType.Video,cancellation) {
 
     // 必ず、Encoder-->Decoder の順に初期化＆開始する。そうしないと、Decoder側の inputSurfaceの初期化に失敗する。
-    override val encoder: VideoEncoder = VideoEncoder(outputFormat, encoder,report,cancellation).apply { start() }
-    override val decoder: VideoDecoder = VideoDecoder(inputFormat,decoder, report,cancellation).apply { start() }
+    override val encoder: VideoEncoder = VideoEncoder(strategy, outputFormat, encoder,report,cancellation).apply { start() }
+    override val decoder: VideoDecoder = VideoDecoder(strategy, inputFormat,decoder, report,cancellation).apply { start() }
 
     companion object {
         private fun createSoftwareDecoder(inputFormat: MediaFormat):MediaCodec {
             fun isSoftwareOnly(info: MediaCodecInfo): Boolean {
-                return VideoStrategy.isSoftwareOnly(info)
+                return DeviceCapabilities.isSoftwareOnly(info)
             }
             fun isSupportedType(info: MediaCodecInfo, mime: String): Boolean {
-                return VideoStrategy.capabilities(info,mime) != null
+                return DeviceCapabilities.capabilities(info,mime) != null
             }
             val supported = MediaCodecList(MediaCodecList.REGULAR_CODECS).codecInfos
                 .filter {
                     !it.isEncoder
                     && isSoftwareOnly(it)
-                    && isSupportedType(it,inputFormat.getMime()!!)
+                    && isSupportedType(it,inputFormat.mime!!)
                 }
             var codec = supported.firstOrNull()
             return if(codec!=null) {
                 logger.info("using software decoder: ${codec.name}")
                 MediaCodec.createByCodecName(codec.name)
             } else {
-                MediaCodec.createDecoderByType(inputFormat.getMime()!!).apply {
+                MediaCodec.createDecoderByType(inputFormat.mime!!).apply {
                     logger.info("no software decoder --> default decoder: $name")
                 }
             }
@@ -69,7 +69,7 @@ class VideoTrack
             val decoder = if(preferSoftwareDecode) {
                 createSoftwareDecoder(inputFormat)
             } else {
-                MediaCodec.createDecoderByType(inputFormat.getMime()!!).apply {
+                MediaCodec.createDecoderByType(inputFormat.mime!!).apply {
                     logger.info("using default decoder :$name")
                 }
             }
@@ -77,12 +77,13 @@ class VideoTrack
             val encoder = strategy.createEncoder()
             val outputFormat = strategy.createOutputFormat(inputFormat, metaData, encoder)
 
+            report.updateVideoStrategyName(strategy.name)
             report.updateVideoDecoder(decoder)
             report.updateVideoEncoder(encoder)
             report.updateInputSummary(inputFormat, metaData)
             report.updateOutputSummary(outputFormat)
 
-            return VideoTrack(extractor, inputFormat, decoder, outputFormat, encoder, report, metaData, cancellation)
+            return VideoTrack(strategy, extractor, inputFormat, decoder, outputFormat, encoder, report, metaData, cancellation)
         }
     }
 }

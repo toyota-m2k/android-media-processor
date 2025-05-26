@@ -12,8 +12,10 @@ import kotlin.math.roundToLong
 class Report : IAttributes {
     var videoDecoderName: String? = null
     var videoEncoderName: String? = null
+    var videoStrategyName: String? = null
     var audioDecoderName: String? = null
     var audioEncoderName: String? = null
+    var audioStrategyName: String? = null
     var startTick:Long = 0L
     var endTick:Long = 0L
 
@@ -30,10 +32,17 @@ class Report : IAttributes {
     private fun updateSummary(summary:Summary, format: MediaFormat, metaData: MetaData?=null) {
         val codec = Codec.fromFormat(format) ?: return
         if(codec.media.isVideo()) {
-            summary.videoSummary = VideoSummary(format, metaData)
+            summary.videoSummary = VideoSummary(summary.videoSummary, format, metaData)
         } else {
-            summary.audioSummary = AudioSummary(format)
+            summary.audioSummary = AudioSummary(summary.audioSummary, format)
         }
+    }
+
+    fun updateVideoStrategyName(name:String) {
+        videoStrategyName = name
+    }
+    fun updateAudioStrategyName(name:String) {
+        audioStrategyName = name
     }
 
     fun updateInputSummary(format: MediaFormat, metaData: MetaData?) {
@@ -93,10 +102,12 @@ class Report : IAttributes {
             "n/a"
         }
         return listOf(
+            IAttributes.KeyValue("Video Strategy", videoStrategyName ?: "n/a"),
             IAttributes.KeyValue("Video Decoder", videoDecoderName ?: "n/a"),
             IAttributes.KeyValue("Video Encoder", videoEncoderName ?: "n/a"),
             IAttributes.KeyValue("Audio Decoder", audioDecoderName ?: "n/a"),
             IAttributes.KeyValue("Audio Encoder", audioEncoderName ?: "n/a"),
+            IAttributes.KeyValue("Audio Strategy", audioStrategyName ?: "n/a"),
             IAttributes.KeyValue("Consumed Time", TimeSpan(endTick - startTick).formatH()),
             IAttributes.KeyValue("Speed", speedText),
             IAttributes.KeyValue("Duration(Input)", TimeSpan(sourceDurationUs/1000).formatH()),
