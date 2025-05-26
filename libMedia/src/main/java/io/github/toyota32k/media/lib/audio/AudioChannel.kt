@@ -134,11 +134,11 @@ class AudioChannel {
         }
 
         if (hasOverflow) {
-            logger.debug("found over flow data")
+            logger.verbose {"found over flow data"}
             // Drain overflow first
             val outBuffer: ShortBuffer? = encoder.getInputBuffer(encoderInBuffIndex)?.asShortBuffer()
             if(outBuffer==null) {
-                logger.info("no output (encoder) buffer.")
+                logger.info("no output (encoder) buffer for overflow data.")
                 return false
             }
 
@@ -197,7 +197,7 @@ class AudioChannel {
         // Reset position to 0, and set limit to capacity (Since MediaCodec doesn't do that for us)
         inBuff.clear()
         if (inBuff.remaining() > outBuff.remaining()) { // Overflow
-            logger.debug("remix with overflow data: in=${inBuff.remaining()}, out=${outBuff.remaining()} out-cap=${outBuff.capacity()}")
+            logger.verbose { "remix with overflow data: in=${inBuff.remaining()}, out=${outBuff.remaining()} out-cap=${outBuff.capacity()}" }
             // Limit inBuff to outBuff's capacity
             inBuff.limit(outBuff.capacity())
             mRemixer.remix(inBuff, outBuff)
