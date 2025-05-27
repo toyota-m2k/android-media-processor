@@ -24,8 +24,8 @@ data class ProfileLv(val profile: Profile, val maxLevel: Level?=null)
 
 
 abstract class AbstractStrategy(
-    val codec: Codec,
-    val profile: Profile,
+    override val codec: Codec,
+    override val profile: Profile,
     val maxLevel:Level? = null,
     val fallbackProfiles: Array<ProfileLv>? = null,
 ) : IStrategy {

@@ -78,38 +78,67 @@
         android:contentDescription="@string/analyze_text" />
 
     <Spinner
-        android:id="@+id/encode_quality"
-        android:layout_width="wrap_content"
+        android:id="@+id/video_strategy"
+        android:layout_width="0dp"
         android:layout_height="wrap_content"
         app:layout_constraintTop_toBottomOf="@+id/output_file_button"
         app:layout_constraintStart_toStartOf="@+id/output_file_button"
+        app:layout_constraintEnd_toStartOf="@id/video_capability_button"
         android:prompt="@string/encode_qualities_prompt"
+        />
+    <ImageButton
+        android:id="@+id/video_capability_button"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@+id/video_strategy"
+        app:layout_constraintBottom_toBottomOf="@+id/video_strategy"
+        android:src="@drawable/ic_info"
+        android:contentDescription="@string/video_capability_info"
         />
     <CheckBox
         android:id="@+id/use_software_encoder"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        app:layout_constraintTop_toBottomOf="@+id/encode_quality"
+        app:layout_constraintTop_toBottomOf="@+id/video_strategy"
         app:layout_constraintStart_toStartOf="@+id/output_file_button"
         android:text="@string/use_software_encoder"
         android:checked="false"
         />
-    <CheckBox
-        android:id="@+id/no_audio"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        app:layout_constraintTop_toBottomOf="@+id/use_software_encoder"
-        app:layout_constraintStart_toStartOf="@+id/output_file_button"
-        android:text="@string/no_audio"
-        android:checked="false"
-        />
+<!--    <CheckBox-->
+<!--        android:id="@+id/no_audio"-->
+<!--        android:layout_width="wrap_content"-->
+<!--        android:layout_height="wrap_content"-->
+<!--        app:layout_constraintTop_toBottomOf="@+id/use_video_software_encoder"-->
+<!--        app:layout_constraintStart_toStartOf="@+id/output_file_button"-->
+<!--        android:text="@string/no_audio"-->
+<!--        android:checked="false"-->
+<!--        />-->
 
+    <Spinner
+        android:id="@+id/audio_strategy"
+        android:layout_width="0dp"
+        android:layout_height="wrap_content"
+        app:layout_constraintTop_toBottomOf="@+id/use_software_encoder" app:layout_constraintStart_toStartOf="@+id/output_file_button"
+        app:layout_constraintEnd_toStartOf="@id/audio_capability_button"
+        android:prompt="@string/encode_qualities_prompt"
+        />
+    <ImageButton
+        android:id="@+id/audio_capability_button"
+        android:layout_width="48dp"
+        android:layout_height="48dp"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toTopOf="@+id/audio_strategy"
+        app:layout_constraintBottom_toBottomOf="@+id/audio_strategy"
+        android:src="@drawable/ic_info"
+        android:contentDescription="@string/audio_capability_info"
+        />
     <Button
         android:id="@+id/save_video"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="@string/execute_convert"
-        app:layout_constraintTop_toBottomOf="@+id/no_audio"
+        app:layout_constraintTop_toBottomOf="@+id/audio_capability_button"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         />

@@ -3,6 +3,7 @@ package io.github.toyota32k.media.lib.codec
 import android.media.MediaCodec
 import android.media.MediaFormat
 import io.github.toyota32k.media.lib.converter.Converter
+import io.github.toyota32k.media.lib.format.bitRate
 import io.github.toyota32k.media.lib.format.channelCount
 import io.github.toyota32k.media.lib.format.sampleRate
 import io.github.toyota32k.media.lib.misc.ICancellation
@@ -29,20 +30,26 @@ class AudioEncoder(strategy: IAudioStrategy, format: MediaFormat, encoder: Media
      * 真のサンプリングレート&チャネル数が判明したとき（デコーダーがMediaCodec.INFO_OUTPUT_FORMAT_CHANGEDを受け取った時）に、
      * エンコーダーを configure / start する。
      */
-    fun configureWithActualSampleRate(sampleRate:Int?, channelCount:Int?) {
+    fun configureWithActualSampleRate(sampleRate:Int, channelCount:Int, bitrate:Int) {
         var modified = false
-        if(sampleRate!=null && sampleRate != mediaFormat.sampleRate) {
+        if(sampleRate != mediaFormat.sampleRate) {
             mediaFormat.sampleRate = sampleRate
             modified = true
         }
-        if(channelCount!=null && channelCount != mediaFormat.channelCount) {
+        if(channelCount != mediaFormat.channelCount) {
             if(channelCount!=1 && channelCount!=2) {
                 throw UnsupportedOperationException("Input channel count ($channelCount) not supported.")
             }
             mediaFormat.channelCount = channelCount
             modified = true
         }
-        report.updateOutputSummary(mediaFormat)
+        if(bitrate != mediaFormat.bitRate) {
+            mediaFormat.bitRate = bitrate
+            modified = true
+        }
+        if(modified) {
+            report.updateOutputSummary(mediaFormat)
+        }
         start()
         logger.debug("AudioEncoder configured.")
     }

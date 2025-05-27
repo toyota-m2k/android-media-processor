@@ -26,4 +26,6 @@
     <string name="execute_convert">Convert</string>
     <string name="show_detail">Detail</string>
     <string name="no_audio">No Audio</string>
+    <string name="video_capability_info">Video Capabilities</string>
+    <string name="audio_capability_info">Audio Capabilities</string>
 </resources>

@@ -3,14 +3,14 @@ package io.github.toyota32k.media.lib.audio
 import android.media.MediaCodec
 import android.media.MediaFormat
 import io.github.toyota32k.media.lib.converter.Converter
+import io.github.toyota32k.media.lib.format.bitRate
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
 import io.github.toyota32k.utils.UtLog
-import java.lang.RuntimeException
-import java.lang.UnsupportedOperationException
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.ShortBuffer
-import java.util.*
+import java.util.ArrayDeque
+import java.util.Queue
 
 class AudioChannel {
     companion object {
@@ -35,14 +35,20 @@ class AudioChannel {
 
     private var mInputSampleRate = 0
     private var mInputChannelCount = 0
-    private var mOutputChannelCount = 0
-    val outputChannelCount: Int get() = mOutputChannelCount
 
     private lateinit var mRemixer: AudioRemixer
 
     private val mOverflowBuffer = AudioBuffer()
 
     private lateinit var mActualDecodedFormat: MediaFormat
+
+    // for encoder
+    var outputChannelCount: Int = 0
+        private set
+    var outputSampleRate: Int = 0
+        private set
+    var outputBitRate: Int = 0
+        private set
 
     fun setActualDecodedFormat(actualFormat: MediaFormat, presetFormat: MediaFormat, audioStrategy: IAudioStrategy) {
         mActualDecodedFormat = actualFormat
@@ -53,20 +59,23 @@ class AudioChannel {
             logger.info("Sample Rate: input=$mInputSampleRate, output=$encodingSampleRate")
             logger.info("Audio sample rate conversion not supported yet.")
         }
+        outputSampleRate = mInputSampleRate
         // 実際の入力チャネル数
         mInputChannelCount = actualFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
         // 出力チャネル数： 実際の入力チャネル数＋AudioStrategy によって出力チャネル数を決定する
-        mOutputChannelCount = audioStrategy.resolveOutputChannelCount(actualFormat)
+        outputChannelCount = audioStrategy.resolveOutputChannelCount(actualFormat)
         if (mInputChannelCount != 1 && mInputChannelCount != 2) {
             throw UnsupportedOperationException("Input channel count ($mInputChannelCount) not supported.")
         }
-        if (mOutputChannelCount != 1 && mOutputChannelCount != 2) {
-            throw UnsupportedOperationException("Output channel count ($mOutputChannelCount) not supported.")
+        if (outputChannelCount != 1 && outputChannelCount != 2) {
+            throw UnsupportedOperationException("Output channel count ($outputChannelCount) not supported.")
         }
-        mRemixer = if (mInputChannelCount > mOutputChannelCount) {
+        outputBitRate = audioStrategy.resolveOutputSampleRate(actualFormat, mInputChannelCount, outputChannelCount)
+        logger.debug("bitrate: ${actualFormat.bitRate?:0} --> $outputBitRate")
+        mRemixer = if (mInputChannelCount > outputChannelCount) {
             logger.debug("down mix")
             AudioRemixer.DOWNMIX
-        } else if (mInputChannelCount < mOutputChannelCount) {
+        } else if (mInputChannelCount < outputChannelCount) {
             logger.debug("up mix")
             AudioRemixer.UPMIX
         } else {
@@ -177,7 +186,7 @@ class AudioChannel {
         val overflowBuff = mOverflowBuffer.data ?: return 0L
         val overflowLimit = overflowBuff.limit()
         val overflowSize = overflowBuff.remaining()
-        val beginPresentationTimeUs = mOverflowBuffer.presentationTimeUs + sampleCountToDurationUs(overflowBuff.position(), mInputSampleRate, mOutputChannelCount)
+        val beginPresentationTimeUs = mOverflowBuffer.presentationTimeUs + sampleCountToDurationUs(overflowBuff.position(), mInputSampleRate, outputChannelCount)
         outBuff.clear() // Limit overflowBuff to outBuff's capacity
         overflowBuff.limit(outBuff.capacity()) // Load overflowBuff onto outBuff
         outBuff.put(overflowBuff)
@@ -196,7 +205,7 @@ class AudioChannel {
 
         // Reset position to 0, and set limit to capacity (Since MediaCodec doesn't do that for us)
         inBuff.clear()
-        if (inBuff.remaining() > outBuff.remaining()) { // Overflow
+        if (mRemixer.checkOverflow(inBuff, outBuff)) { // Overflow
             logger.verbose { "remix with overflow data: in=${inBuff.remaining()}, out=${outBuff.remaining()} out-cap=${outBuff.capacity()}" }
             // Limit inBuff to outBuff's capacity
             inBuff.limit(outBuff.capacity())

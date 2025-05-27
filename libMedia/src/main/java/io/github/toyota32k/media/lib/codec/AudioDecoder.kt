@@ -4,8 +4,6 @@ import android.media.MediaCodec
 import android.media.MediaFormat
 import io.github.toyota32k.media.lib.audio.AudioChannel
 import io.github.toyota32k.media.lib.converter.Converter
-import io.github.toyota32k.media.lib.format.channelCount
-import io.github.toyota32k.media.lib.format.sampleRate
 import io.github.toyota32k.media.lib.misc.ICancellation
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
@@ -36,7 +34,7 @@ class AudioDecoder(strategy:IAudioStrategy, format: MediaFormat, decoder:MediaCo
         super.onFormatChanged(format)   // for log
         audioChannel.setActualDecodedFormat(format, mediaFormat, audioStrategy)
         if(!formatDetected) {   // 二度漬け禁止
-            (chainedEncoder as AudioEncoder).configureWithActualSampleRate(format.sampleRate, audioChannel.outputChannelCount)
+            (chainedEncoder as AudioEncoder).configureWithActualSampleRate(audioChannel.outputSampleRate, audioChannel.outputChannelCount, audioChannel.outputBitRate)
             formatDetected = true
         }
     }

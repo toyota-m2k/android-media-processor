@@ -42,11 +42,16 @@ open class AudioStrategy (
         }
     }
 
+    override fun resolveOutputSampleRate(inputFormat: MediaFormat, inputChannelCount:Int, outputChannelCount:Int): Int {
+        val inputBitRatePerChannel = (inputFormat.bitRate?:0)/inputChannelCount
+        return this.bitRatePerChannel.value(inputBitRatePerChannel) * outputChannelCount
+    }
+
     override fun createOutputFormat(inputFormat: MediaFormat, encoder:MediaCodec): MediaFormat {
         val sampleRate = this.sampleRate.value(inputFormat.sampleRate)
         val channelCount = resolveOutputChannelCount(inputFormat)
-        val inputBitRatePerChannel = (inputFormat.bitRate?:0)/channelCount
-        val bitRate = this.bitRatePerChannel.value(inputBitRatePerChannel) * channelCount
+//        val inputBitRatePerChannel = (inputFormat.bitRate?:0)/channelCount
+        val bitRate = resolveOutputSampleRate(inputFormat, inputFormat.channelCount?:1, channelCount)
 
         VideoStrategy.logger.info("Audio Format ------------------------------------------------------")
         VideoStrategy.logger.info("- Type           ${inputFormat.mime?:"n/a"} --> ${codec.mime}")

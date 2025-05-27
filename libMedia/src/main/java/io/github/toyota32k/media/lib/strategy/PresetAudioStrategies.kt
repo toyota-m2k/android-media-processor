@@ -20,7 +20,7 @@ object PresetAudioStrategies {
         channelCount = 0,
         bitRatePerChannel = MaxDefault(192*1000, 64*1000)
     )
-    object AACMono : AudioStrategy(
+    object AACMono : AudioStrategy(     // not work properly ...
         codec = Codec.AAC,
         profile = Profile.AACObjectLC,
         fallbackProfiles = null,

@@ -22,7 +22,6 @@ import io.github.toyota32k.binder.multiVisibilityBinding
 import io.github.toyota32k.binder.observe
 import io.github.toyota32k.binder.spinnerBinding
 import io.github.toyota32k.binder.textBinding
-import io.github.toyota32k.dialog.UtDialogConfig
 import io.github.toyota32k.dialog.broker.UtActivityBrokerStore
 import io.github.toyota32k.dialog.broker.pickers.UtCreateFilePicker
 import io.github.toyota32k.dialog.broker.pickers.UtOpenFilePicker
@@ -45,8 +44,8 @@ import io.github.toyota32k.media.lib.converter.Rotation
 import io.github.toyota32k.media.lib.converter.format
 import io.github.toyota32k.media.lib.converter.toAndroidFile
 import io.github.toyota32k.media.lib.format.Codec
-import io.github.toyota32k.media.lib.strategy.AbstractStrategy
 import io.github.toyota32k.media.lib.strategy.DeviceCapabilities
+import io.github.toyota32k.media.lib.strategy.IAudioStrategy
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
 import io.github.toyota32k.media.lib.strategy.PresetAudioStrategies
 import io.github.toyota32k.media.lib.strategy.PresetVideoStrategies
@@ -72,11 +71,16 @@ data class NamedVideoStrategy(val name: String, val strategy: IVideoStrategy) {
         return name
     }
 }
+data class NamedAudioStrategy(val name: String, val strategy: IAudioStrategy) {
+    override fun toString(): String {
+        return name
+    }
+}
 
 class MainActivity : UtMortalActivity() {
     companion object {
         val logger = UtLog("Main")
-        val strategyList = listOf(
+        val videoStrategies = listOf(
             NamedVideoStrategy("AVC HD720-Low", PresetVideoStrategies.AVC720LowProfile),
             NamedVideoStrategy("AVC HD720-Medium", PresetVideoStrategies.AVC720Profile),
             NamedVideoStrategy("AVC HD720-High", PresetVideoStrategies.AVC720HighProfile),
@@ -87,6 +91,12 @@ class MainActivity : UtMortalActivity() {
             NamedVideoStrategy("HEVC Full HD-Low", PresetVideoStrategies.HEVC1080LowProfile),
             NamedVideoStrategy("HEVC Full HD-Medium", PresetVideoStrategies.HEVC1080Profile),
             NamedVideoStrategy("HEVC Full HD-High", PresetVideoStrategies.HEVC1080HighProfile),
+        )
+        val audioStrategies = listOf(
+            NamedAudioStrategy("AAC LC", PresetAudioStrategies.AACDefault),
+            NamedAudioStrategy("AAC HE-PS", PresetAudioStrategies.AACLowHEv2),
+            NamedAudioStrategy("No Audio", PresetAudioStrategies.NoAudio),
+            NamedAudioStrategy("AAC LC (Mono)", PresetAudioStrategies.AACMono),
         )
     }
     private val activityBrokers = UtActivityBrokerStore(this, UtOpenFilePicker(), UtCreateFilePicker())
@@ -137,6 +147,24 @@ class MainActivity : UtMortalActivity() {
             val summary = Converter.analyze(output.toAndroidFile(application))
             MultilineTextDialog.show("Output File", summary.toString())
         }
+        val videoDeviceCapabilitiesCommand = LiteUnitCommand {
+            val enc = DeviceCapabilities.availableCodecs(namedVideoStrategy.value.strategy.codec, true)
+            val dec = DeviceCapabilities.availableCodecs(namedVideoStrategy.value.strategy.codec, false)
+            val summary = StringBuilder().apply {
+                appendLine(enc.toString())
+                appendLine(dec.toString())
+            }
+            MultilineTextDialog.show("Video Capabilities", summary.toString())
+        }
+        val audioDeviceCapabilitiesCommand = LiteUnitCommand {
+            val enc = DeviceCapabilities.availableCodecs(PresetAudioStrategies.AACDefault.codec, true)
+            val dec = DeviceCapabilities.availableCodecs(PresetAudioStrategies.AACDefault.codec, false)
+            val summary = StringBuilder().apply {
+                appendLine(enc.toString())
+                appendLine(dec.toString())
+            }
+            MultilineTextDialog.show("Audio Capabilities", summary.toString())
+        }
 
         val inputFile: MutableStateFlow<Uri?> = MutableStateFlow(null)
         val outputFile: MutableStateFlow<Uri?> = MutableStateFlow(null)
@@ -153,7 +181,8 @@ class MainActivity : UtMortalActivity() {
         val softwareDecode: MutableStateFlow<Boolean> = MutableStateFlow(false)
         val playOutput: MutableStateFlow<Boolean> = MutableStateFlow(false)
 
-        val namedVideoStrategy = MutableStateFlow<NamedVideoStrategy>(strategyList[0])
+        val namedVideoStrategy = MutableStateFlow<NamedVideoStrategy>(videoStrategies[0])
+        val namedAudioStrategy = MutableStateFlow<NamedAudioStrategy>(audioStrategies[0])
 
         fun updatePlayerSource() {
             val src = if(!playOutput.value) {
@@ -278,7 +307,7 @@ class MainActivity : UtMortalActivity() {
                     val converter = Converter.Factory()
                         .input(srcFile)
                         .output(trimFile)
-                        .audioStrategy(if(noAudio.value) PresetAudioStrategies.NoAudio else PresetAudioStrategies.AACDefault)
+                        .audioStrategy(namedAudioStrategy.value.strategy)
                         .rotate(rotation)
                         .addTrimmingRanges(*ranges.map { Converter.Factory.RangeMs(it.start, it.end) }.toTypedArray())
                         .setProgressHandler {
@@ -402,8 +431,10 @@ class MainActivity : UtMortalActivity() {
             }
             .checkBinding(controls.useSoftwareDecoder, viewModel.softwareDecode)
             .checkBinding(controls.useSoftwareEncoder, viewModel.softwareEncode)
-            .checkBinding(controls.noAudio, viewModel.noAudio)
-            .spinnerBinding(controls.encodeQuality, viewModel.namedVideoStrategy, strategyList)
+            .spinnerBinding(controls.videoStrategy, viewModel.namedVideoStrategy, videoStrategies)
+            .spinnerBinding(controls.audioStrategy, viewModel.namedAudioStrategy, audioStrategies)
+            .bindCommand(viewModel.videoDeviceCapabilitiesCommand, controls.videoCapabilityButton)
+            .bindCommand(viewModel.audioDeviceCapabilitiesCommand, controls.audioCapabilityButton)
 
         controls.videoViewer.bindViewModel(viewModel.playerControllerModel, binder)
 

@@ -5,6 +5,7 @@ import kotlin.math.min
 
 interface AudioRemixer {
     fun remix(inSBuff: ShortBuffer, outSBuff: ShortBuffer)
+    fun checkOverflow(inSBuff: ShortBuffer, outSBuff: ShortBuffer): Boolean
 
     companion object {
         val DOWNMIX: AudioRemixer = object : AudioRemixer {
@@ -18,19 +19,31 @@ interface AudioRemixer {
                 val outSpace = outSBuff.remaining()
                 val samplesToBeProcessed = min(inRemaining, outSpace)
                 (0 until samplesToBeProcessed).forEach { // i ->
-                    // Convert to unsigned
+                    // Viktor's algorithm
                     val a = inSBuff.get() + SIGNED_SHORT_LIMIT
                     val b = inSBuff.get() + SIGNED_SHORT_LIMIT
                     var m: Int // Pick the equation
-                    m = if (a < SIGNED_SHORT_LIMIT || b < SIGNED_SHORT_LIMIT) { // Viktor's first equation when both sources are "quiet"
+                    m = if (a < SIGNED_SHORT_LIMIT && b < SIGNED_SHORT_LIMIT) {
+                        // Viktor's first equation when both sources are "quiet"
                         // (i.e. less than middle of the dynamic range)
                         a * b / SIGNED_SHORT_LIMIT
-                    } else { // Viktor's second equation when one or both sources are loud
+                    } else {
+                        // Viktor's second equation when one or both sources are loud
                         2 * (a + b) - a * b / SIGNED_SHORT_LIMIT - UNSIGNED_SHORT_MAX
-                    } // Convert output back to signed short
-                    if (m == UNSIGNED_SHORT_MAX + 1) m = UNSIGNED_SHORT_MAX
-                    outSBuff.put((m - SIGNED_SHORT_LIMIT).toShort())
+                    }
+                    // Convert output back to signed short
+                    outSBuff.put((m.coerceIn(0,UNSIGNED_SHORT_MAX) - SIGNED_SHORT_LIMIT).toShort())
+
+                    // Simple Conversion
+//                    val a = inSBuff.get()
+//                    val b = inSBuff.get()
+//                    val m: Int = a + b
+//                    outSBuff.put(m.coerceIn(-32768, 32767).toShort())
                 }
+            }
+
+            override fun checkOverflow(inSBuff: ShortBuffer, outSBuff: ShortBuffer): Boolean {
+                return inSBuff.remaining() > outSBuff.remaining()*2
             }
         }
         val UPMIX: AudioRemixer = object : AudioRemixer {
@@ -44,10 +57,16 @@ interface AudioRemixer {
                     outSBuff.put(inSample)
                 }
             }
+            override fun checkOverflow(inSBuff: ShortBuffer, outSBuff: ShortBuffer): Boolean {
+                return inSBuff.remaining()*2 > outSBuff.remaining()
+            }
         }
         val PASSTHROUGH: AudioRemixer = object : AudioRemixer {
             override fun remix(inSBuff: ShortBuffer, outSBuff: ShortBuffer) { // Passthrough
                 outSBuff.put(inSBuff)
+            }
+            override fun checkOverflow(inSBuff: ShortBuffer, outSBuff: ShortBuffer): Boolean {
+                return inSBuff.remaining() > outSBuff.remaining()
             }
         }
     }
