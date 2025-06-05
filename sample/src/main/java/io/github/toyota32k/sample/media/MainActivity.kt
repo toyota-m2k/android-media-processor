@@ -55,7 +55,7 @@ import io.github.toyota32k.sample.media.dialog.DetailMessageDialog
 import io.github.toyota32k.sample.media.dialog.MultilineTextDialog
 import io.github.toyota32k.sample.media.dialog.ProgressDialog
 import io.github.toyota32k.utils.UtLog
-import io.github.toyota32k.utils.disposableObserve
+import io.github.toyota32k.utils.lifecycle.disposableObserve
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableStateFlow

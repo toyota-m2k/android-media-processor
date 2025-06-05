@@ -4,7 +4,7 @@ kotlin = "2.1.21"
 agp = "8.10.1"
 
 #libraries
-appcompat = "1.7.0"
+appcompat = "1.7.1"
 material = "1.12.0"
 coroutinesCore = "1.10.2"
 junit = "4.13.2"
@@ -13,10 +13,10 @@ espressoCore = "3.6.1"
 coreKtx = "1.16.0"
 activityKtx = "1.10.1"
 constraintLayout = "2.2.1"
-androidUtilities = "2.8.3"
-androidBinding = "1.6.0"    # for sample only
-androidDialog = "5.5.0"     # for sample only
-androidPlayer = "2.7.0"     # for sample only
+androidUtilities = "3.0.0"
+androidBinding = "1.7.0"    # for sample only
+androidDialog = "5.6.0"     # for sample only
+androidPlayer = "2.8.0"     # for sample only
 
 [libraries]
 appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }
