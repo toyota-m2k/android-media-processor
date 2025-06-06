@@ -3,8 +3,8 @@ package io.github.toyota32k.media.lib.converter
 import android.content.Context
 import android.media.MediaExtractor
 import android.media.MediaMetadataRetriever
+import io.github.toyota32k.logger.UtLog
 import io.github.toyota32k.utils.GenericCloseable
-import io.github.toyota32k.utils.UtLog
 import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL

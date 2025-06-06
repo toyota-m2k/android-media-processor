@@ -2,6 +2,7 @@ package io.github.toyota32k.media.lib.codec
 
 import android.media.MediaCodec
 import android.media.MediaFormat
+import io.github.toyota32k.logger.UtLog
 import io.github.toyota32k.media.lib.converter.Converter
 import io.github.toyota32k.media.lib.format.dump
 import io.github.toyota32k.media.lib.misc.ICancellation
@@ -10,7 +11,6 @@ import io.github.toyota32k.media.lib.strategy.IAudioStrategy
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
 import io.github.toyota32k.media.lib.surface.InputSurface
 import io.github.toyota32k.media.lib.track.Muxer
-import io.github.toyota32k.utils.UtLog
 
 class VideoEncoder(strategy: IVideoStrategy, format:MediaFormat, encoder:MediaCodec, report: Report, cancellation: ICancellation)
     :BaseEncoder(strategy, format, encoder, report, cancellation) {

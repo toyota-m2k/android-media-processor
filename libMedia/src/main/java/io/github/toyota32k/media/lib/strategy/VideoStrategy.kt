@@ -6,6 +6,7 @@ import android.media.MediaCodecInfo.CodecCapabilities
 import android.media.MediaCodecList
 import android.media.MediaFormat
 import android.util.Size
+import io.github.toyota32k.logger.UtLog
 import io.github.toyota32k.media.lib.format.BitRateMode
 import io.github.toyota32k.media.lib.format.Codec
 import io.github.toyota32k.media.lib.format.ColorFormat
@@ -22,7 +23,6 @@ import io.github.toyota32k.media.lib.format.width
 import io.github.toyota32k.media.lib.strategy.DeviceCapabilities.capabilities
 import io.github.toyota32k.media.lib.strategy.DeviceCapabilities.isHardwareAccelerated
 import io.github.toyota32k.media.lib.strategy.DeviceCapabilities.isSoftwareOnly
-import io.github.toyota32k.utils.UtLog
 import kotlin.math.min
 import kotlin.math.roundToInt
 

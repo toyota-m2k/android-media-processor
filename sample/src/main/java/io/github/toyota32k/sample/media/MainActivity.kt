@@ -36,6 +36,8 @@ import io.github.toyota32k.lib.player.model.Range
 import io.github.toyota32k.lib.player.model.chapter.ChapterEditor
 import io.github.toyota32k.lib.player.model.chapter.MutableChapterList
 import io.github.toyota32k.lib.player.model.skipChapter
+import io.github.toyota32k.logger.UtLog
+import io.github.toyota32k.logger.UtLogConfig
 import io.github.toyota32k.media.lib.converter.AndroidFile
 import io.github.toyota32k.media.lib.converter.ConvertResult
 import io.github.toyota32k.media.lib.converter.Converter
@@ -54,7 +56,6 @@ import io.github.toyota32k.sample.media.databinding.ActivityMainBinding
 import io.github.toyota32k.sample.media.dialog.DetailMessageDialog
 import io.github.toyota32k.sample.media.dialog.MultilineTextDialog
 import io.github.toyota32k.sample.media.dialog.ProgressDialog
-import io.github.toyota32k.utils.UtLog
 import io.github.toyota32k.utils.lifecycle.disposableObserve
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
@@ -386,7 +387,7 @@ class MainActivity : UtMortalActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        UtLog.logLevel = Log.VERBOSE
+        UtLogConfig.logLevel = Log.VERBOSE
         enableEdgeToEdge()
 //        UtDialogConfig.useLegacyTheme()
 

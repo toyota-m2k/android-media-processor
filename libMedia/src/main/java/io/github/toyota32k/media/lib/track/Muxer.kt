@@ -3,6 +3,7 @@ package io.github.toyota32k.media.lib.track
 import android.media.MediaCodec
 import android.media.MediaFormat
 import android.media.MediaMuxer
+import io.github.toyota32k.logger.UtLog
 import io.github.toyota32k.media.lib.converter.Converter
 import io.github.toyota32k.media.lib.converter.IOutputMediaFile
 import io.github.toyota32k.media.lib.converter.Rotation
@@ -11,7 +12,6 @@ import io.github.toyota32k.media.lib.format.MetaData
 import io.github.toyota32k.media.lib.misc.ISO6709LocationParser
 import io.github.toyota32k.media.lib.utils.DurationEstimator
 import io.github.toyota32k.media.lib.utils.ExpandableByteBuffer
-import io.github.toyota32k.utils.UtLog
 import java.io.Closeable
 import java.nio.ByteBuffer
 import java.nio.ByteOrder

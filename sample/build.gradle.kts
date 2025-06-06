@@ -41,7 +41,6 @@ dependencies {
     implementation(libs.material)
     implementation(libs.activityKtx)
     implementation(libs.constraintLayout)
-    implementation(libs.android.utilities)
     implementation(libs.android.binding)
     implementation(libs.android.dialog)
     implementation(libs.android.player)

@@ -2,6 +2,8 @@ package io.github.toyota32k.media.lib.converter
 
 import android.content.Context
 import android.net.Uri
+import io.github.toyota32k.logger.UtLog
+import io.github.toyota32k.logger.UtLogConfig
 import io.github.toyota32k.media.lib.format.ContainerFormat
 import io.github.toyota32k.media.lib.misc.ICancellation
 import io.github.toyota32k.media.lib.misc.RingBuffer
@@ -15,9 +17,6 @@ import io.github.toyota32k.media.lib.track.AudioTrack
 import io.github.toyota32k.media.lib.track.Muxer
 import io.github.toyota32k.media.lib.track.Track
 import io.github.toyota32k.media.lib.track.VideoTrack
-import io.github.toyota32k.utils.IAwaiter
-import io.github.toyota32k.utils.UtLog
-import io.github.toyota32k.utils.UtLoggerInstance
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -54,8 +53,9 @@ class Converter {
         }
 
         @Suppress("unused")
+        @Deprecated("use UtLogConfig.externalLogger directly")
         fun setExternalLogger(externalLogger:IAmpLogger) {
-            UtLoggerInstance.externalLogger = externalLogger.asUtExternalLogger()
+            UtLogConfig.externalLogger = externalLogger.asUtExternalLogger()
         }
     }
 

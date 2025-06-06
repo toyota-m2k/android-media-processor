@@ -5,6 +5,7 @@ import android.media.MediaExtractor
 import android.media.MediaExtractor.SEEK_TO_CLOSEST_SYNC
 import android.media.MediaFormat
 import android.util.Log
+import io.github.toyota32k.logger.UtLog
 import io.github.toyota32k.media.lib.codec.BaseCodec
 import io.github.toyota32k.media.lib.codec.BaseDecoder
 import io.github.toyota32k.media.lib.converter.CloseableExtractor
@@ -16,7 +17,6 @@ import io.github.toyota32k.media.lib.misc.ICancellation
 import io.github.toyota32k.media.lib.track.Muxer
 import io.github.toyota32k.media.lib.utils.DurationEstimator
 import io.github.toyota32k.media.lib.utils.TimeSpan
-import io.github.toyota32k.utils.UtLog
 import java.io.Closeable
 import java.nio.ByteBuffer
 import kotlin.math.abs

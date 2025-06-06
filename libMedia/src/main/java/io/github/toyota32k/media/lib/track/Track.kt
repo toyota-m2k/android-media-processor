@@ -1,11 +1,11 @@
 package io.github.toyota32k.media.lib.track
 
+import io.github.toyota32k.logger.UtLog
 import io.github.toyota32k.media.lib.codec.BaseDecoder
 import io.github.toyota32k.media.lib.codec.BaseEncoder
 import io.github.toyota32k.media.lib.converter.Converter
 import io.github.toyota32k.media.lib.extractor.Extractor
 import io.github.toyota32k.media.lib.misc.ICancellation
-import io.github.toyota32k.utils.UtLog
 import java.io.Closeable
 
 abstract class Track(val extractor:Extractor, type:Muxer.SampleType, cancellation: ICancellation) : Closeable, ICancellation by cancellation {

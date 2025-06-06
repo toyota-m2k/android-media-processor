@@ -2,6 +2,7 @@ package io.github.toyota32k.media.lib.track
 
 import android.media.MediaCodec
 import android.media.MediaFormat
+import io.github.toyota32k.logger.UtLog
 import io.github.toyota32k.media.lib.codec.AudioDecoder
 import io.github.toyota32k.media.lib.codec.AudioEncoder
 import io.github.toyota32k.media.lib.converter.Converter
@@ -13,7 +14,6 @@ import io.github.toyota32k.media.lib.misc.ICancellation
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.strategy.AudioStrategy
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
-import io.github.toyota32k.utils.UtLog
 
 class AudioTrack
 private constructor(strategy:IAudioStrategy, extractor: Extractor, inputFormat:MediaFormat, decoder: MediaCodec, outputFormat: MediaFormat, encoder: MediaCodec, report:Report, cancellation: ICancellation)

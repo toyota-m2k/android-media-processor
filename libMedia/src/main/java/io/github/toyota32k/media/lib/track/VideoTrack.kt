@@ -4,6 +4,7 @@ import android.media.MediaCodec
 import android.media.MediaCodecInfo
 import android.media.MediaCodecList
 import android.media.MediaFormat
+import io.github.toyota32k.logger.UtLog
 import io.github.toyota32k.media.lib.codec.VideoDecoder
 import io.github.toyota32k.media.lib.codec.VideoEncoder
 import io.github.toyota32k.media.lib.converter.Converter
@@ -17,7 +18,6 @@ import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.strategy.DeviceCapabilities
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
 import io.github.toyota32k.media.lib.strategy.VideoStrategy.Companion.logger
-import io.github.toyota32k.utils.UtLog
 
 class VideoTrack
     private constructor(strategy:IVideoStrategy, extractor:Extractor, inputFormat:MediaFormat, decoder: MediaCodec, outputFormat:MediaFormat, encoder: MediaCodec, report: Report, val metaData: MetaData, cancellation: ICancellation)

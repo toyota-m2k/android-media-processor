@@ -2,13 +2,13 @@ package io.github.toyota32k.media.lib.strategy
 
 import android.media.MediaCodec
 import android.media.MediaFormat
+import io.github.toyota32k.logger.UtLog
 import io.github.toyota32k.media.lib.format.Codec
 import io.github.toyota32k.media.lib.format.Profile
 import io.github.toyota32k.media.lib.format.bitRate
 import io.github.toyota32k.media.lib.format.channelCount
 import io.github.toyota32k.media.lib.format.mime
 import io.github.toyota32k.media.lib.format.sampleRate
-import io.github.toyota32k.utils.UtLog
 
 open class AudioStrategy (
     codec:Codec,

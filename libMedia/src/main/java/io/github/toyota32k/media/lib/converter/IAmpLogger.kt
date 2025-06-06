@@ -1,6 +1,6 @@
 package io.github.toyota32k.media.lib.converter
 
-import io.github.toyota32k.utils.IUtExternalLogger
+import io.github.toyota32k.logger.IUtExternalLogger
 
 /**
  * 利用側で、android-utilities への依存関係を持たなくてよいように、IUtExternalLogger 互換のi/fを再定義する。
