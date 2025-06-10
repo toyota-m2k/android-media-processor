@@ -51,12 +51,6 @@ class Converter {
                 Summary()
             }
         }
-
-        @Suppress("unused")
-        @Deprecated("use UtLogConfig.externalLogger directly")
-        fun setExternalLogger(externalLogger:IAmpLogger) {
-            UtLogConfig.externalLogger = externalLogger.asUtExternalLogger()
-        }
     }
 
     lateinit var inPath:IInputMediaFile
