@@ -504,10 +504,10 @@ class Converter {
                 }
             }.deferred.await()
         } catch(_:CancellationException) {
-            return ConvertResult.cancelled
+            ConvertResult.cancelled
         } catch(e:Throwable) {
             logger.error(e)
-            return ConvertResult.error(e)
+            ConvertResult.error(e)
         } finally {
             cancellation = null
         }
@@ -518,7 +518,7 @@ class Converter {
      */
     private suspend fun executeCore(cancellation: ICancellation):ConvertResult {
         return withContext(Dispatchers.IO) {
-            try {
+            val result = try {
                 report = Report().apply { start() }
                 AudioTrack.create(inPath, audioStrategy, report, cancellation).use { audioTrack->
                 VideoTrack.create(inPath, videoStrategy, report, cancellation, preferSoftwareDecoder).use { videoTrack->
@@ -579,15 +579,16 @@ class Converter {
             }
             catch(e:Throwable) {
                 logger.stackTrace(e)
-                if(deleteOutputOnError) {
-                    try {
-                        outPath.delete()
-                    } catch(ef:Throwable) {
-                        logger.stackTrace(ef,"cannot delete output file: $outPath")
-                    }
-                }
                 ConvertResult.error(e)
             }
+            if(!result.succeeded && deleteOutputOnError) {
+                try {
+                    outPath.delete()
+                } catch(ef:Throwable) {
+                    logger.stackTrace(ef,"cannot delete output file: $outPath")
+                }
+            }
+            result
         }
     }
 }

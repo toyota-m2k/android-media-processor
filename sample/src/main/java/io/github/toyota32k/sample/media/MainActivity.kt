@@ -56,7 +56,10 @@ import io.github.toyota32k.sample.media.databinding.ActivityMainBinding
 import io.github.toyota32k.sample.media.dialog.DetailMessageDialog
 import io.github.toyota32k.sample.media.dialog.MultilineTextDialog
 import io.github.toyota32k.sample.media.dialog.ProgressDialog
+import io.github.toyota32k.utils.asCloseable
+import io.github.toyota32k.utils.conditional
 import io.github.toyota32k.utils.lifecycle.disposableObserve
+import io.github.toyota32k.utils.use
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -303,55 +306,54 @@ class MainActivity : UtMortalActivity() {
 
             UtImmortalTask.launchTask("trimming") {
                 val result = ProgressDialog.withProgressDialog<ConvertResult> { sink ->
-                    sink.message = "Trimming Now"
-                    val rotation = if(playerModel.rotation.value!=0) Rotation(playerModel.rotation.value, relative = true) else Rotation.nop
-                    val converter = Converter.Factory()
-                        .input(srcFile)
-                        .output(trimFile)
-                        .audioStrategy(namedAudioStrategy.value.strategy)
-                        .rotate(rotation)
-                        .addTrimmingRanges(*ranges.map { Converter.Factory.RangeMs(it.start, it.end) }.toTypedArray())
-                        .setProgressHandler {
-                            sink.progress = it.percentage
-                            sink.progressText = it.format()
-                        }
-                        .apply {
-                            if(softwareDecode.value) {
-                                preferSoftwareDecoder(true)
-                            }
-                            val s = namedVideoStrategy.value.strategy as VideoStrategy
-                            if(softwareEncode.value) {
-                                videoStrategy(s.preferSoftwareEncoder())
-                            } else {
-                                videoStrategy(s)
-                            }
-                        }
-                        .build()
-                    sink.cancelled.disposableObserve(currentCoroutineContext()) { cancelled->
-                        if(cancelled) {
-                            converter.cancel()
-                        }
-                    }
                     withContext(Dispatchers.IO) {
-                        try {
-                            converter.execute().also { convertResult ->
-                                if (convertResult.succeeded) {
-                                    logger.debug(convertResult.toString())
-                                    sink.message = "Optimizing Now..."
-                                    if (!FastStart.process(inFile = trimFile, outFile = optFile) {
-                                            sink.progress = it.percentage
-                                            sink.progressText = it.format()
-                                        }) {
-                                        // 変換不要
-                                        optFile.copyFrom(trimFile)
-                                    }
-                                    converted.value = true
+                        sink.message = "Trimming Now"
+                        val rotation = if (playerModel.rotation.value != 0) Rotation(playerModel.rotation.value, relative = true) else Rotation.nop
+                        val converter = Converter.Factory()
+                            .input(srcFile)
+                            .output(trimFile)
+                            .audioStrategy(namedAudioStrategy.value.strategy)
+                            .rotate(rotation)
+                            .addTrimmingRanges(*ranges.map { Converter.Factory.RangeMs(it.start, it.end) }.toTypedArray())
+                            .setProgressHandler {
+                                sink.progress = it.percentage
+                                sink.progressText = it.format()
+                            }
+                            .preferSoftwareDecoder(softwareDecode.value)
+                            .apply {
+                                val s = namedVideoStrategy.value.strategy as VideoStrategy
+                                if (softwareEncode.value) {
+                                    videoStrategy(s.preferSoftwareEncoder())
+                                } else {
+                                    videoStrategy(s)
                                 }
                             }
-                        } catch (e: Throwable) {
-                            ConvertResult.error(e)
-                        } finally {
-                            trimFile.safeDelete()
+                            .build()
+                        sink.cancelled.disposableObserve { cancelled ->
+                            if (cancelled) {
+                                converter.cancel()
+                            }
+                        }.use {
+                            try {
+                                converter.execute().also { convertResult ->
+                                    if (convertResult.succeeded) {
+                                        logger.debug(convertResult.toString())
+                                        sink.message = "Optimizing Now..."
+                                        if (!FastStart.process(inFile = trimFile, outFile = optFile) {
+                                                sink.progress = it.percentage
+                                                sink.progressText = it.format()
+                                            }) {
+                                            // 変換不要
+                                            optFile.copyFrom(trimFile)
+                                        }
+                                        converted.value = true
+                                    }
+                                }
+                            } catch (e: Throwable) {
+                                ConvertResult.error(e)
+                            } finally {
+                                trimFile.safeDelete()
+                            }
                         }
                     }
                 }
