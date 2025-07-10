@@ -16,8 +16,8 @@ constraintLayout = "2.2.1"
 #androidLogger = "LOCAL"
 androidUtilities = "4.2.4"
 androidBinding = "1.9.2"    # for sample only
-androidDialog = "5.9.1"     # for sample only
-androidPlayer = "2.10.1"     # for sample only
+androidDialog = "5.9.2"     # for sample only
+androidPlayer = "3.0.3"     # for sample only
 
 [libraries]
 appcompat = { module = "androidx.appcompat:appcompat", version.ref = "appcompat" }

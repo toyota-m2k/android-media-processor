@@ -371,7 +371,7 @@ class MainActivity : UtMortalActivity() {
 
         private fun setSource(file:AndroidFile) {
             val videoSource = VideoSource(file)
-            playerModel.setSource(videoSource, autoPlay = false)
+            playerModel.setSource(videoSource)
             chapterEditor = ChapterEditor(videoSource.chapterList as IMutableChapterList)
         }
 
