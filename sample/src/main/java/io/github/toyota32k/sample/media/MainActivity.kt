@@ -56,12 +56,9 @@ import io.github.toyota32k.sample.media.databinding.ActivityMainBinding
 import io.github.toyota32k.sample.media.dialog.DetailMessageDialog
 import io.github.toyota32k.sample.media.dialog.MultilineTextDialog
 import io.github.toyota32k.sample.media.dialog.ProgressDialog
-import io.github.toyota32k.utils.asCloseable
-import io.github.toyota32k.utils.conditional
 import io.github.toyota32k.utils.lifecycle.disposableObserve
 import io.github.toyota32k.utils.use
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
@@ -111,7 +108,7 @@ class MainActivity : UtMortalActivity() {
 
 
     class VideoSource(val file:AndroidFile) : IMediaSourceWithChapter {
-        override val chapterList: IChapterList = MutableChapterList()
+        val chapterList: IChapterList = MutableChapterList()
         override val id: String
             get() = file.safeUri.toString()
         override val name: String
@@ -121,6 +118,9 @@ class MainActivity : UtMortalActivity() {
         override var startPosition = AtomicLong()
         override val trimming: Range = Range.empty
         override val type: String = "mp4"
+        override suspend fun getChapterList(): IChapterList {
+            return chapterList
+        }
     }
 
     class MainViewModel(application: Application) : AndroidViewModel(application) {
@@ -179,7 +179,7 @@ class MainActivity : UtMortalActivity() {
         val outputFileName = outputFile.map {it?.toAndroidFile(application)?.getFileName() ?: "select output file"}
         val readyToConvert = combine(inputFileAvailable, outputFileAvailable) {i,o-> i && o }
         val converted = MutableStateFlow(false)
-        val noAudio = MutableStateFlow(false)
+//        val noAudio = MutableStateFlow(false)
 
         val softwareEncode: MutableStateFlow<Boolean> = MutableStateFlow(false)
         val softwareDecode: MutableStateFlow<Boolean> = MutableStateFlow(false)
