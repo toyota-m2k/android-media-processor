@@ -87,6 +87,31 @@ object PresetVideoStrategies {
         bitRateMode = null,
     )
 
+    private fun VideoStrategy.toHdrStrategy(profile: Profile?=null, level:Level?=null): VideoStrategy {
+        return when (codec) {
+            Codec.HEVC -> derived(
+                profile = profile ?: Profile.HEVCProfileMain10,
+                level = level ?: Level.HEVCMainTierLevel52,
+                fallbackProfiles = noLevelProfiles(Profile.HEVCProfileMain10)
+            )
+
+            Codec.VP9 -> derived(
+                profile = profile ?: Profile.VP9Profile2HDR,
+                level = level,
+                fallbackProfiles = noLevelProfiles(Profile.VP9Profile2HDR)
+            )
+
+            Codec.AV1 -> derived(
+                profile = profile ?: Profile.AV1ProfileMain10HDR10,
+                level = level,
+                fallbackProfiles = noLevelProfiles(Profile.AV1ProfileMain10HDR10)
+            )
+
+            else -> throw IllegalArgumentException("HDR is not supported for codec: $codec")
+        }
+    }
+
+    //------------------------------------------------------------------------------
     // HEVC - H.265
     // FullHD 1080p
     object HEVC1080LowProfile : VideoStrategy(
@@ -100,7 +125,10 @@ object PresetVideoStrategies {
         iFrameInterval =MinDefault(1),
         colorFormat =ColorFormat.COLOR_FormatSurface,
         bitRateMode = BitRateMode.VBR,
-    )
+    ), IHDRSupport {
+        override fun hdr(profile: Profile?, level:Level?): VideoStrategy
+            = toHdrStrategy(profile, level)
+    }
 
     object HEVC1080Profile : VideoStrategy(
         codec = Codec.HEVC,
@@ -113,20 +141,26 @@ object PresetVideoStrategies {
         iFrameInterval =MinDefault(1),
         colorFormat =ColorFormat.COLOR_FormatSurface,
         bitRateMode = null,
-    )
+    ), IHDRSupport {
+        override fun hdr(profile: Profile?, level:Level?): VideoStrategy
+                = toHdrStrategy(profile, level)
+    }
 
     object HEVC1080HighProfile : VideoStrategy(
         codec = Codec.HEVC,
-        profile = Profile.HEVCProfileMain10,
-        level = Level.HEVCHighTierLevel5,
-        fallbackProfiles =noLevelProfiles(Profile.HEVCProfileMain),
+        profile = Profile.HEVCProfileMain,
+        level = Level.HEVCMainTierLevel4,
+        fallbackProfiles = null,
         sizeCriteria =FHD1080SizeCriteria,
         bitRate =MaxDefault(30*1000*1000, 15*1000*1000),
         frameRate =MaxDefault(30),
         iFrameInterval =MinDefault(1),
         colorFormat =ColorFormat.COLOR_FormatSurface,
         bitRateMode = null,
-    )
+    ), IHDRSupport {
+        override fun hdr(profile: Profile?, level:Level?): VideoStrategy
+                = toHdrStrategy(profile, level)
+    }
 
     // HEVC - H.265
     // HD 720p
@@ -142,7 +176,10 @@ object PresetVideoStrategies {
         iFrameInterval = MinDefault(1),
         colorFormat = ColorFormat.COLOR_FormatSurface,
         bitRateMode = BitRateMode.VBR,
-    )
+    ), IHDRSupport {
+        override fun hdr(profile: Profile?, level:Level?): VideoStrategy
+                = toHdrStrategy(profile, level)
+    }
 
     object HEVC720LowProfile : VideoStrategy(
         codec = Codec.HEVC,
@@ -155,6 +192,9 @@ object PresetVideoStrategies {
         iFrameInterval = MinDefault(1),
         colorFormat = ColorFormat.COLOR_FormatSurface,
         bitRateMode = BitRateMode.VBR,
-    )
+    ), IHDRSupport {
+        override fun hdr(profile: Profile?, level:Level?): VideoStrategy
+                = toHdrStrategy(profile, level)
+    }
 
 }

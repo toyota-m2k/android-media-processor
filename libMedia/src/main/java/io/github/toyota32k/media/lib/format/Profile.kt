@@ -1,6 +1,15 @@
 package io.github.toyota32k.media.lib.format
 
 import android.media.MediaFormat
+import io.github.toyota32k.media.lib.format.Profile.AV1ProfileMain10HDR10
+import io.github.toyota32k.media.lib.format.Profile.AV1ProfileMain10HDR10Plus
+import io.github.toyota32k.media.lib.format.Profile.HEVCProfileMain10
+import io.github.toyota32k.media.lib.format.Profile.HEVCProfileMain10HDR10
+import io.github.toyota32k.media.lib.format.Profile.HEVCProfileMain10HDR10Plus
+import io.github.toyota32k.media.lib.format.Profile.VP9Profile2HDR
+import io.github.toyota32k.media.lib.format.Profile.VP9Profile2HDR10Plus
+import io.github.toyota32k.media.lib.format.Profile.VP9Profile3HDR
+import io.github.toyota32k.media.lib.format.Profile.VP9Profile3HDR10Plus
 
 enum class Profile(val codec: Codec, val value:Int) {
     /**
@@ -220,5 +229,24 @@ enum class Profile(val codec: Codec, val value:Int) {
             val profile = if(codec.media==Media.Video)  { mediaFormat.profile } else { mediaFormat.aacProfile } ?: return null
             return fromValue(codec, profile)
         }
+
+        fun isHDR(profile:Profile?):Boolean {
+            if(profile==null) return false
+            return when(profile) {
+                HEVCProfileMain10,
+                HEVCProfileMain10HDR10,
+                HEVCProfileMain10HDR10Plus,
+                VP9Profile2HDR,
+                VP9Profile3HDR,
+                VP9Profile2HDR10Plus,
+                VP9Profile3HDR10Plus,
+                AV1ProfileMain10HDR10,
+                AV1ProfileMain10HDR10Plus -> true
+                else -> false
+            }
+        }
     }
 }
+
+fun Profile.isHDR(): Boolean
+    = Profile.isHDR(this)

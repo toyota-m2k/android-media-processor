@@ -342,6 +342,10 @@ open class VideoStrategy(
     }
 }
 
+interface IHDRSupport {
+    fun hdr(profile:Profile?=null, level:Level?=null): IVideoStrategy
+}
+
 // ToDo: 可変ビットレート対応
 // コーデックが可変ビットレートに対応しているかどうかの確認
 // MediaCodecInfo codecInfo = MediaCodecList.getCodecInfoAt(index); // indexはコーデックのインデックス
