@@ -32,13 +32,13 @@ open class VideoStrategy(
     level: Level? = null,
     fallbackProfiles: Array<ProfileLv>? = null,
 
-    val sizeCriteria: SizeCriteria?,
-    val bitRate: MaxDefault, // = Int.MAX_VALUE,
-    val frameRate: MaxDefault, // = Int.MAX_VALUE,
-    val iFrameInterval:MinDefault, // = DEFAULT_IFRAME_INTERVAL,
-    val colorFormat:ColorFormat?, // = DEFAULT_COLOR_FORMAT,
-    val bitRateMode: BitRateMode?,
-    val encoderType: EncoderType = EncoderType.HARDWARE,
+    override val sizeCriteria: SizeCriteria?,
+    override val bitRate: MaxDefault, // = Int.MAX_VALUE,
+    override val frameRate: MaxDefault, // = Int.MAX_VALUE,
+    override val iFrameInterval:MinDefault, // = DEFAULT_IFRAME_INTERVAL,
+    override val colorFormat:ColorFormat?, // = DEFAULT_COLOR_FORMAT,
+    override val bitRateMode: BitRateMode?,
+    override val encoderType: EncoderType = EncoderType.HARDWARE,
 ) : AbstractStrategy(codec,profile,level, fallbackProfiles), IVideoStrategy {
     enum class EncoderType {
         DEFAULT,
@@ -56,20 +56,19 @@ open class VideoStrategy(
     /**
      * 既存のVideoStrategy（Preset*とか）から、必要なパラメータを書き換えて、新しいVideoStrategyを作成する。
      */
-    @Suppress("unused")
-    fun derived(
-        codec: Codec = this.codec,
-        profile: Profile = this.profile,
-        level: Level? = this.maxLevel,
-        fallbackProfiles:Array<ProfileLv>? = this.fallbackProfiles,
-        sizeCriteria: SizeCriteria? = this.sizeCriteria,
-        bitRate: MaxDefault = this.bitRate, // = Int.MAX_VALUE,
-        frameRate: MaxDefault = this.frameRate, // = Int.MAX_VALUE,
-        iFrameInterval:MinDefault = this.iFrameInterval, // = DEFAULT_IFRAME_INTERVAL,
-        colorFormat:ColorFormat? = this.colorFormat, // = DEFAULT_COLOR_FORMAT,
-        bitRateMode: BitRateMode? = this.bitRateMode,
-        encoderType: EncoderType = this.encoderType,
-    ):VideoStrategy {
+    override fun derived(
+        codec: Codec,
+        profile: Profile,
+        level: Level?,
+        fallbackProfiles:Array<ProfileLv>?,
+        sizeCriteria: SizeCriteria?,
+        bitRate: MaxDefault,
+        frameRate: MaxDefault,
+        iFrameInterval:MinDefault,
+        colorFormat:ColorFormat?,
+        bitRateMode: BitRateMode?,
+        encoderType: EncoderType,
+    ): IVideoStrategy {
         return VideoStrategy(
             codec,
             profile,
@@ -83,20 +82,20 @@ open class VideoStrategy(
             bitRateMode)
     }
 
-    private fun preferEncoderType(encoderType:EncoderType):VideoStrategy {
+    private fun preferEncoderType(encoderType:EncoderType):IVideoStrategy {
         return if(this.encoderType==encoderType) {
             this
         } else {
             derived(encoderType=encoderType)
         }
     }
-    fun preferSoftwareEncoder(): VideoStrategy {
+    fun preferSoftwareEncoder(): IVideoStrategy {
         return preferEncoderType(EncoderType.SOFTWARE)
     }
-    fun preferHardwareEncoder(): VideoStrategy {
+    fun preferHardwareEncoder(): IVideoStrategy {
         return preferEncoderType(EncoderType.HARDWARE)
     }
-    fun preferDefaultEncoder(): VideoStrategy {
+    fun preferDefaultEncoder(): IVideoStrategy {
         return preferEncoderType(EncoderType.DEFAULT)
     }
 
@@ -108,6 +107,8 @@ open class VideoStrategy(
         val iFrameInterval = this.iFrameInterval.value(inputFormat.iFrameInterval)
         var width = inputFormat.width ?: metaData.width ?: throw IllegalArgumentException("inputFormat have no size params.")
         var height = inputFormat.height ?: metaData.height ?: throw IllegalArgumentException("inputFormat have no size params.")
+        val sizeCriteria = this.sizeCriteria
+        val bitRateMode = this.bitRateMode
         if(sizeCriteria!=null) {
             val size = calcVideoSize(width, height, sizeCriteria)
             width = size.width
@@ -178,7 +179,7 @@ open class VideoStrategy(
      */
     protected fun selectMostSuitableProfile(supported: List<MediaCodecInfo.CodecProfileLevel>) : MediaCodecInfo.CodecProfileLevel? {
         fun findProfileWithLevel(profile:Profile, level:Level?): MediaCodecInfo.CodecProfileLevel? {
-            return supported.firstOrNull { it.profile == profile.value && (level==null || it.level>=level.value) }
+            return supported.firstOrNull { it.profile == profile.value && (level==null || it.level<=level.value) }
         }
         fun findProfileWithoutLevel(profile:Profile, level:Level?): MediaCodecInfo.CodecProfileLevel? {
             return if(level==null) null else findProfileWithLevel(profile, null)
@@ -207,6 +208,8 @@ open class VideoStrategy(
                     }
                 }
             }
+            // profile/level ともに適合するものが見つからなかった。
+            // 次は、levelを無視して、profileだけで探す。
             findProfile = ::findProfileWithoutLevel
         }
         return null
@@ -259,9 +262,10 @@ open class VideoStrategy(
 
         fun checkProfileLevel(cap: CodecCapabilities?): Boolean {
             if(cap==null) return false
-            return cap.profileLevels.find {
+            val maxLevel = this.maxLevel
+            return cap.profileLevels.any {
                 pl -> pl.profile == profile.value &&
-                (maxLevel == null || pl.level >= maxLevel.value) }!=null
+                (maxLevel == null || pl.level <= maxLevel.value) }
         }
 //        val defaultCodec = super.createEncoder()
 //        val cap = getCapabilitiesOf(defaultCodec.codecInfo)
@@ -282,7 +286,7 @@ open class VideoStrategy(
         }
 
 
-        var codec = (if(encoderType==EncoderType.HARDWARE) {
+        val codec = (if(encoderType==EncoderType.HARDWARE) {
             // hardware accelerated なコーデックを優先して探す
             supportedCodec { isHardwareAccelerated(it) }
         } else {

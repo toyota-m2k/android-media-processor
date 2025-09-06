@@ -5,11 +5,13 @@ import android.net.Uri
 import io.github.toyota32k.logger.UtLog
 import io.github.toyota32k.logger.UtLogConfig
 import io.github.toyota32k.media.lib.format.ContainerFormat
+import io.github.toyota32k.media.lib.format.isHDR
 import io.github.toyota32k.media.lib.misc.ICancellation
 import io.github.toyota32k.media.lib.misc.RingBuffer
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.report.Summary
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
+import io.github.toyota32k.media.lib.strategy.IHDRSupport
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
 import io.github.toyota32k.media.lib.strategy.PresetAudioStrategies
 import io.github.toyota32k.media.lib.strategy.PresetVideoStrategies
@@ -81,6 +83,9 @@ class Converter {
         private var trimStart:Long = 0L
         private var trimEnd:Long = 0L
 
+        private var mKeepProfile:Boolean = false
+        private var mKeepHDR: Boolean = false
+
         fun input(path: File): Factory {
             converter.inPath = AndroidFile(path)
             return this
@@ -128,6 +133,21 @@ class Converter {
         }
         fun audioStrategy(s: IAudioStrategy):Factory {
             converter.audioStrategy = s
+            return this
+        }
+
+        /**
+         * Videoトラックを同じコーデックで再エンコードするとき、Profile/Levelを入力ファイルに合わせる
+         */
+        fun keepVideoProfile(flag:Boolean):Factory {
+            mKeepProfile = flag
+            return this
+        }
+        /**
+         * HDRが有効なVideoトラックを再エンコードするとき、出力コーデックで可能ならHDRを維持するProfileを選択する。
+         */
+        fun keepHDR(flag:Boolean):Factory {
+            mKeepProfile = flag
             return this
         }
 
@@ -184,9 +204,36 @@ class Converter {
             return this
         }
 
+        /**
+         * mKeepHDR, mKeepProfile の設定に基づいて、videoStrategyを調整する
+         */
+        private fun adjustVideoStrategy(strategy:IVideoStrategy):IVideoStrategy {
+            if (!mKeepHDR && !mKeepProfile) return strategy
+            val summary = analyze(converter.inPath)
+            val srcCodec = summary.videoSummary?.codec ?: return strategy
+            val srcProfile = summary.videoSummary?.profile ?: return strategy
+            val srcLevel = summary.videoSummary?.level ?: strategy.maxLevel
+
+            return if (mKeepProfile && strategy.codec == srcCodec && strategy.profile != srcProfile) {
+                strategy.derived(profile = srcProfile, level = srcLevel)
+            } else if (mKeepHDR && srcProfile.isHDR() && strategy is IHDRSupport) {
+                if (strategy.codec == srcCodec) {
+                    strategy.hdr(srcProfile, srcLevel)
+                } else {
+                    strategy.hdr()
+                }
+            } else {
+                strategy
+            }
+        }
+
         fun build():Converter {
             if(!converter::inPath.isInitialized) throw IllegalStateException("input file is not specified.")
             if(!converter::outPath.isInitialized) throw IllegalStateException("output file is not specified.")
+
+            if (mKeepProfile || mKeepHDR) {
+                converter.videoStrategy =  adjustVideoStrategy(converter.videoStrategy)
+            }
 
             logger.info("### media converter information ###")
             logger.info("input : ${converter.inPath}")

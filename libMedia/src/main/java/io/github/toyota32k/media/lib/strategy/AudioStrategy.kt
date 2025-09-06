@@ -14,23 +14,22 @@ open class AudioStrategy (
     codec:Codec,
     profile: Profile,                            // profile は AAC Profile として扱う。AAC以外のAudioコーデックは知らん。
     fallbackProfiles: Array<ProfileLv>?,
-    val sampleRate:MaxDefault,
-    val channelCount: Int,      // 1 or 2,  ... 0なら入力と同じチャネル数で出力
-    val bitRatePerChannel:MaxDefault,         //      // 1ch当たりのビットレート
+    override val sampleRate:MaxDefault,
+    override val channelCount: Int,      // 1 or 2,  ... 0なら入力と同じチャネル数で出力
+    override val bitRatePerChannel:MaxDefault,         //      // 1ch当たりのビットレート
 ) : AbstractStrategy(codec, profile, null, fallbackProfiles), IAudioStrategy {
 
     /**
      * 既存のAudioStrategyから、必要なパラメータを書き換えて新しいAudioStrategyを作成する。
      */
-    @Suppress("unused")
-    fun derived(
-        codec:Codec = this.codec,
-        profile: Profile = this.profile,                            // profile は AAC Profile として扱う。AAC以外のAudioコーデックは知らん。
-        fallbackProfiles: Array<ProfileLv>? = this.fallbackProfiles,
-        sampleRate:MaxDefault = this.sampleRate,
-        channelCount: Int = this.channelCount,
-        bitRatePerChannel:MaxDefault = this.bitRatePerChannel,         //      // 1ch当たりのビットレート
-    ):AudioStrategy {
+    override fun derived(
+        codec:Codec,
+        profile: Profile,
+        fallbackProfiles: Array<ProfileLv>?,
+        sampleRate:MaxDefault,
+        channelCount: Int,
+        bitRatePerChannel:MaxDefault,
+    ) : IAudioStrategy {
         return AudioStrategy(codec, profile, fallbackProfiles, sampleRate, channelCount, bitRatePerChannel)
     }
 

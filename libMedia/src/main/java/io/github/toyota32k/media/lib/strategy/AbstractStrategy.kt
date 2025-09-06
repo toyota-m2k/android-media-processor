@@ -26,8 +26,8 @@ data class ProfileLv(val profile: Profile, val maxLevel: Level?=null)
 abstract class AbstractStrategy(
     override val codec: Codec,
     override val profile: Profile,
-    val maxLevel:Level? = null,
-    val fallbackProfiles: Array<ProfileLv>? = null,
+    override val maxLevel:Level? = null,
+    override val fallbackProfiles: Array<ProfileLv>? = null,
 ) : IStrategy {
     override val name: String get() = this.javaClass.simpleName
     override fun createEncoder(): MediaCodec {

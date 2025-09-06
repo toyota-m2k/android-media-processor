@@ -87,24 +87,24 @@ object PresetVideoStrategies {
         bitRateMode = null,
     )
 
-    private fun VideoStrategy.toHdrStrategy(profile: Profile?=null, level:Level?=null): VideoStrategy {
+    private fun IVideoStrategy.toHdrStrategy(profile: Profile?=null, level:Level?=null): IVideoStrategy {
         return when (codec) {
             Codec.HEVC -> derived(
                 profile = profile ?: Profile.HEVCProfileMain10,
-                level = level ?: Level.HEVCMainTierLevel52,
-                fallbackProfiles = noLevelProfiles(Profile.HEVCProfileMain10)
+                level = level,
+                fallbackProfiles = noLevelProfiles(Profile.HEVCProfileMain10, Profile.HEVCProfileMain10HDR10, Profile.HEVCProfileMain10HDR10Plus, Profile.HEVCProfileMain)
             )
 
             Codec.VP9 -> derived(
                 profile = profile ?: Profile.VP9Profile2HDR,
                 level = level,
-                fallbackProfiles = noLevelProfiles(Profile.VP9Profile2HDR)
+                fallbackProfiles = noLevelProfiles(Profile.VP9Profile2HDR, Profile.VP9Profile1)
             )
 
             Codec.AV1 -> derived(
                 profile = profile ?: Profile.AV1ProfileMain10HDR10,
                 level = level,
-                fallbackProfiles = noLevelProfiles(Profile.AV1ProfileMain10HDR10)
+                fallbackProfiles = noLevelProfiles(Profile.AV1ProfileMain10HDR10, Profile.AV1ProfileMain10, Profile.AV1ProfileMain8)
             )
 
             else -> throw IllegalArgumentException("HDR is not supported for codec: $codec")
@@ -126,7 +126,7 @@ object PresetVideoStrategies {
         colorFormat =ColorFormat.COLOR_FormatSurface,
         bitRateMode = BitRateMode.VBR,
     ), IHDRSupport {
-        override fun hdr(profile: Profile?, level:Level?): VideoStrategy
+        override fun hdr(profile: Profile?, level:Level?): IVideoStrategy
             = toHdrStrategy(profile, level)
     }
 
@@ -142,7 +142,7 @@ object PresetVideoStrategies {
         colorFormat =ColorFormat.COLOR_FormatSurface,
         bitRateMode = null,
     ), IHDRSupport {
-        override fun hdr(profile: Profile?, level:Level?): VideoStrategy
+        override fun hdr(profile: Profile?, level:Level?): IVideoStrategy
                 = toHdrStrategy(profile, level)
     }
 
@@ -158,7 +158,7 @@ object PresetVideoStrategies {
         colorFormat =ColorFormat.COLOR_FormatSurface,
         bitRateMode = null,
     ), IHDRSupport {
-        override fun hdr(profile: Profile?, level:Level?): VideoStrategy
+        override fun hdr(profile: Profile?, level:Level?): IVideoStrategy
                 = toHdrStrategy(profile, level)
     }
 
@@ -177,7 +177,7 @@ object PresetVideoStrategies {
         colorFormat = ColorFormat.COLOR_FormatSurface,
         bitRateMode = BitRateMode.VBR,
     ), IHDRSupport {
-        override fun hdr(profile: Profile?, level:Level?): VideoStrategy
+        override fun hdr(profile: Profile?, level:Level?): IVideoStrategy
                 = toHdrStrategy(profile, level)
     }
 
@@ -193,7 +193,7 @@ object PresetVideoStrategies {
         colorFormat = ColorFormat.COLOR_FormatSurface,
         bitRateMode = BitRateMode.VBR,
     ), IHDRSupport {
-        override fun hdr(profile: Profile?, level:Level?): VideoStrategy
+        override fun hdr(profile: Profile?, level:Level?): IVideoStrategy
                 = toHdrStrategy(profile, level)
     }
 
