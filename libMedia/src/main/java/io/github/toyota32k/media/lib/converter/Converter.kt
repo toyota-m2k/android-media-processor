@@ -139,15 +139,15 @@ class Converter {
         /**
          * Videoトラックを同じコーデックで再エンコードするとき、Profile/Levelを入力ファイルに合わせる
          */
-        fun keepVideoProfile(flag:Boolean):Factory {
+        fun keepVideoProfile(flag:Boolean=true):Factory {
             mKeepProfile = flag
             return this
         }
         /**
          * HDRが有効なVideoトラックを再エンコードするとき、出力コーデックで可能ならHDRを維持するProfileを選択する。
          */
-        fun keepHDR(flag:Boolean):Factory {
-            mKeepProfile = flag
+        fun keepHDR(flag:Boolean=true):Factory {
+            mKeepHDR = flag
             return this
         }
 
