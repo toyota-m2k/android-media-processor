@@ -30,6 +30,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
 import kotlin.math.min
+import kotlin.time.Duration
 
 /**
  * 動画ファイルのトランスコード/トリミングを行うコンバータークラス
@@ -61,6 +62,7 @@ class Converter {
     var videoStrategy: IVideoStrategy = PresetVideoStrategies.AVC720Profile
     var audioStrategy:IAudioStrategy=PresetAudioStrategies.AACDefault
     var trimmingRangeList : ITrimmingRangeList = ITrimmingRangeList.empty() // TrimmingRange.Empty
+    var maxDurationUs: Long = 0L   // 最大時間 (us)。<=0 なら制限なし
     var deleteOutputOnError:Boolean = true
     var rotation: Rotation? = null
     var containerFormat: ContainerFormat = ContainerFormat.MPEG_4
@@ -86,125 +88,230 @@ class Converter {
         private var mKeepProfile:Boolean = false
         private var mKeepHDR: Boolean = false
 
-        fun input(path: File): Factory {
-            converter.inPath = AndroidFile(path)
-            return this
-        }
-
-        fun input(uri: Uri, context: Context): Factory {
-            converter.inPath = AndroidFile(uri, context)
-            return this
-        }
-
-        fun input(url: String, context: Context): Factory {
-            if(!url.startsWith("http")) throw IllegalArgumentException("url must be http or https")
-            converter.inPath = HttpInputFile(context, url)
-            return this
-        }
-
-        fun input(source: IHttpStreamSource, context: Context): Factory {
-            converter.inPath = HttpInputFile(context, source)
-            return this
-        }
-
-        fun input(src:IInputMediaFile): Factory {
+        /**
+         * 入力ファイルを設定（必須）
+         * 通常は、適当な型の引数をとるバリエーションを利用する。
+         * @param IInputMediaFile
+         */
+        fun input(src:IInputMediaFile) = apply {
             converter.inPath = src
-            return this
         }
 
-        fun output(path: File): Factory {
-            converter.outPath = AndroidFile(path)
-            return this
+        /**
+         * 入力ファイルを設定
+         * @param File
+         */
+        fun input(path: File)
+            = input(AndroidFile(path))
+
+        /**
+         * 入力ファイルを設定
+         * @param Uri
+         * @param Context
+         */
+        fun input(uri: Uri, context: Context)
+            = input(AndroidFile(uri, context))
+
+        /**
+         * 入力ファイルを設定
+         * @param String URL (http/https)
+         * @param Context
+         */
+        fun input(url: String, context: Context) = apply {
+            if(!url.startsWith("http")) throw IllegalArgumentException("url must be http or https")
+            input (HttpInputFile(context, url))
         }
 
-        fun output(uri: Uri, context: Context): Factory {
-            converter.outPath = AndroidFile(uri, context)
-            return this
-        }
+        /**
+         * 入力ファイルを設定
+         * @param IHttpStreamSource
+         * @param Context
+         */
+        fun input(source: IHttpStreamSource, context: Context)
+            = input(HttpInputFile(context, source))
 
-        fun output(dst:IOutputMediaFile):Factory {
+        /**
+         * 出力ファイルを設定（必須）
+         * 通常は、適当な型の引数をとるバリエーションを利用する。
+         * ただし、inputと異なり、HttpFileは利用不可
+         * @param IOutputMediaFile
+         */
+        fun output(dst:IOutputMediaFile) = apply {
             converter.outPath = dst
-            return this
         }
 
-        fun videoStrategy(s:IVideoStrategy):Factory {
+        /**
+         * 出力ファイルを設定
+         * @param File
+         */
+        fun output(path: File)
+            = output(AndroidFile(path))
+
+        /**
+         * 出力ファイルを設定
+         * @param Uri
+         * @param Context
+         */
+        fun output(uri: Uri, context: Context)
+            = output(AndroidFile(uri, context))
+
+
+        /**
+         * VideoStrategyを設定
+         */
+        fun videoStrategy(s:IVideoStrategy) = apply {
             converter.videoStrategy = s
-            return this
         }
-        fun audioStrategy(s: IAudioStrategy):Factory {
+
+        /**
+         * AudioStrategyを設定
+         */
+        fun audioStrategy(s: IAudioStrategy) = apply {
             converter.audioStrategy = s
-            return this
         }
 
         /**
          * Videoトラックを同じコーデックで再エンコードするとき、Profile/Levelを入力ファイルに合わせる
          */
-        fun keepVideoProfile(flag:Boolean=true):Factory {
+        fun keepVideoProfile(flag:Boolean=true) = apply {
             mKeepProfile = flag
-            return this
         }
         /**
          * HDRが有効なVideoトラックを再エンコードするとき、出力コーデックで可能ならHDRを維持するProfileを選択する。
          */
-        fun keepHDR(flag:Boolean=true):Factory {
+        fun keepHDR(flag:Boolean=true) = apply {
             mKeepHDR = flag
             return this
         }
 
-        fun addTrimmingRange(startMs:Long, endMs:Long):Factory {
-            trimmingRangeList.addRange(startMs*1000, endMs*1000)
-            return this
+        /**
+         * トリミング範囲 (開始位置、終了位置) クラス (ms)
+         */
+        data class RangeMs(val startMs:Long, val endMs:Long) {
+            constructor(start:Duration?, end: Duration?):this(
+                startMs = start?.inWholeMilliseconds ?: 0L,
+                endMs = end?.inWholeMilliseconds ?: 0L
+            )
         }
 
-        data class RangeMs(val startMs:Long, val endMs:Long)
+        /**
+         * トリミング範囲を追加
+         * @param startMs 開始位置 (ms)
+         * @param endMs 終了位置 (ms)   0なら最後まで
+         */
+        fun addTrimmingRange(startMs:Long, endMs:Long) = apply {
+            trimmingRangeList.addRange(startMs*1000, endMs*1000)
+        }
 
-        fun addTrimmingRanges(vararg ranges:RangeMs):Factory {
+        /**
+         * トリミング範囲を追加
+         * @param start 開始位置 (Duration) nullなら先頭から
+         * @param end 終了位置 (Duration) nullなら最後まで
+         */
+        fun addTrimmingRange(start:Duration?, end:Duration?)
+            = addTrimmingRange(start?.inWholeMilliseconds ?: 0L, end?.inWholeMilliseconds ?: 0L)
+
+        /**
+         * トリミング範囲を追加
+         * @param range トリミング範囲 (ms)
+         */
+        fun addTrimmingRange(range: RangeMs) = apply {
+            return addTrimmingRange(range.startMs, range.endMs)
+        }
+
+        /**
+         * トリミング範囲を一括追加
+         */
+        fun addTrimmingRanges(vararg ranges:RangeMs) = apply {
             ranges.forEach {
                 addTrimmingRange(it.startMs, it.endMs)
             }
-            return this
         }
 
-        fun trimmingStartFrom(timeMs:Long):Factory {
+        /**
+         * 指定された位置より前をトリミング
+         */
+        fun trimmingStartFrom(timeMs:Long) = apply {
             if(timeMs>0) {
                 trimStart = timeMs * 1000L
             }
-            return this
         }
 
-        fun trimmingEndTo(timeMs:Long):Factory {
+        /**
+         * 指定された位置より前をトリミング
+         */
+        fun trimmingStartFrom(time: Duration)
+            = trimmingStartFrom(time.inWholeMilliseconds)
+
+        /**
+         * 指定された位置より後をトリミング
+         */
+        fun trimmingEndTo(timeMs:Long) = apply {
             if(timeMs>0) {
                 trimEnd = timeMs * 1000L
             }
-            return this
+        }
+        /**
+         * 指定された位置より後をトリミング
+         */
+        fun trimmingEndTo(time: Duration)
+            = trimmingEndTo(time.inWholeMilliseconds)
+
+        /**
+         * 最大動画長を指定 (ms)
+         * 0以下なら制限なし
+         */
+        fun maxDuration(durationMs:Long) = apply {
+            converter.maxDurationUs = durationMs * 1000L
         }
 
-        fun setProgressHandler(proc:(IProgress)->Unit):Factory {
+        /**
+         * 最大動画長を指定 (Duration)
+         * nullまたは0以下なら制限なし
+         */
+        fun maxDuration(duration: Duration?)
+            = maxDuration(duration?.inWholeMilliseconds ?: 0L)
+
+        /**
+         * 進捗報告ハンドラを設定
+         */
+        fun setProgressHandler(proc:(IProgress)->Unit) = apply {
             converter.onProgress = proc
-            return this
         }
 
-        fun deleteOutputOnError(flag:Boolean):Factory {
+        /**
+         * エラー発生時に出力ファイルを削除するかどうか
+         * デフォルトは true
+         */
+        fun deleteOutputOnError(flag:Boolean) = apply {
             converter.deleteOutputOnError = flag
-            return this
         }
 
-        fun rotate(rotation: Rotation):Factory {
+        /**
+         * 動画の向きを指定
+         */
+        fun rotate(rotation: Rotation) = apply {
             converter.rotation = rotation
-            return this
         }
 
-        fun containerFormat(format: ContainerFormat):Factory {
+        /**
+         * コンテナフォーマットを指定
+         * MPEG_4 以外はテストしていません。
+         */
+        fun containerFormat(format: ContainerFormat) = apply {
             converter.containerFormat = format
-            return this
         }
 
+        /**
+         * ソフトウェアデコーダーを優先するかどうか
+         */
         fun preferSoftwareDecoder(flag:Boolean):Factory {
             converter.preferSoftwareDecoder = flag
             return this
         }
 
         /**
+         * 内部メソッド：build()時にVideoStrategyを調整する
          * mKeepHDR, mKeepProfile の設定に基づいて、videoStrategyを調整する
          */
         private fun adjustVideoStrategy(strategy:IVideoStrategy):IVideoStrategy {
