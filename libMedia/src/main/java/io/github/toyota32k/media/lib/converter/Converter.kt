@@ -3,7 +3,6 @@ package io.github.toyota32k.media.lib.converter
 import android.content.Context
 import android.net.Uri
 import io.github.toyota32k.logger.UtLog
-import io.github.toyota32k.logger.UtLogConfig
 import io.github.toyota32k.media.lib.format.ContainerFormat
 import io.github.toyota32k.media.lib.format.isHDR
 import io.github.toyota32k.media.lib.misc.ICancellation
@@ -61,8 +60,12 @@ class Converter {
 
     var videoStrategy: IVideoStrategy = PresetVideoStrategies.AVC720Profile
     var audioStrategy:IAudioStrategy=PresetAudioStrategies.AACDefault
-    var trimmingRangeList : ITrimmingRangeList = ITrimmingRangeList.empty() // TrimmingRange.Empty
-    var maxDurationUs: Long = 0L   // 最大時間 (us)。<=0 なら制限なし
+    private var trimmingRangeKeeper : ITrimmingRangeKeeper = TrimmingRangeKeeperImpl.empty
+    var trimmingRangeList: ITrimmingRangeList
+        get() = trimmingRangeKeeper
+        set(value) {
+            trimmingRangeKeeper = value as? ITrimmingRangeKeeper ?: TrimmingRangeKeeperImpl(value)
+        }
     var deleteOutputOnError:Boolean = true
     var rotation: Rotation? = null
     var containerFormat: ContainerFormat = ContainerFormat.MPEG_4
@@ -84,6 +87,7 @@ class Converter {
         // for backward compatibility only
         private var trimStart:Long = 0L
         private var trimEnd:Long = 0L
+        private var limitDurationUs: Long = 0L
 
         private var mKeepProfile:Boolean = false
         private var mKeepHDR: Boolean = false
@@ -261,16 +265,16 @@ class Converter {
          * 最大動画長を指定 (ms)
          * 0以下なら制限なし
          */
-        fun maxDuration(durationMs:Long) = apply {
-            converter.maxDurationUs = durationMs * 1000L
+        fun limitDuration(durationMs:Long) = apply {
+            limitDurationUs = durationMs * 1000L
         }
 
         /**
          * 最大動画長を指定 (Duration)
          * nullまたは0以下なら制限なし
          */
-        fun maxDuration(duration: Duration?)
-            = maxDuration(duration?.inWholeMilliseconds ?: 0L)
+        fun limitDuration(duration: Duration?)
+            = limitDuration(duration?.inWholeMilliseconds ?: 0L)
 
         /**
          * 進捗報告ハンドラを設定
@@ -355,7 +359,11 @@ class Converter {
             if(trimmingRangeList.isNotEmpty) {
 //                logger.info("trimming start: ${trimStart / 1000} ms")
 //                logger.info("trimming end  : ${trimEnd / 1000} ms")
-                converter.trimmingRangeList = trimmingRangeList
+                converter.trimmingRangeKeeper = TrimmingRangeKeeperImpl(trimmingRangeList)
+            }
+            if(limitDurationUs>0) {
+                converter.trimmingRangeKeeper.limitDurationUs = limitDurationUs
+                logger.info("limit duration: ${limitDurationUs / 1000} ms")
             }
 
             logger.info("delete output on error = ${converter.deleteOutputOnError}")
@@ -679,10 +687,10 @@ class Converter {
                 Muxer(videoTrack.metaData, outPath, audioTrack!=null, rotation, containerFormat).use { muxer->
                     videoTrack.chain(muxer)
                     audioTrack?.chain(muxer)
-                    trimmingRangeList = videoTrack.extractor.adjustAndSetTrimmingRangeList(trimmingRangeList, muxer.durationUs)
-                    audioTrack?.extractor?.setTrimmingRangeList(trimmingRangeList)
+                    trimmingRangeKeeper = videoTrack.extractor.adjustAndSetTrimmingRangeList(trimmingRangeKeeper, muxer.durationUs)
+                    audioTrack?.extractor?.setTrimmingRangeList(trimmingRangeKeeper)
                     report.updateInputFileInfo(inPath.getLength(), muxer.durationUs/1000L)
-                    Progress.create(trimmingRangeList, onProgress).use { progress ->
+                    Progress.create(trimmingRangeKeeper, onProgress).use { progress ->
                         var tick = -1L
                         var count = 0
                         val tracks = TrackMediator(muxer, videoTrack, audioTrack)
@@ -723,10 +731,10 @@ class Converter {
                             }
                             report.updateOutputFileInfo(outPath.getLength(), videoTrack.extractor.naturalDurationUs / 1000L)
                             report.end()
-                            report.setDurationInfo(trimmingRangeList.trimmedDurationUs, videoTrack.extractor.naturalDurationUs, audioTrack?.extractor?.naturalDurationUs ?: 0L, muxer.naturalDurationUs)
+                            report.setDurationInfo(trimmingRangeKeeper.trimmedDurationUs, videoTrack.extractor.naturalDurationUs, audioTrack?.extractor?.naturalDurationUs ?: 0L, muxer.naturalDurationUs)
                             logger.info(report.toString())
                             progress?.finish()
-                            ConvertResult.succeeded(trimmingRangeList, report)
+                            ConvertResult.succeeded(trimmingRangeKeeper, report)
                         }
                     }
                 }}}
