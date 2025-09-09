@@ -24,3 +24,4 @@ app/build
 .idea/kotlinc.xml
 .idea/AndroidProjectSystem.xml
 .idea/emulatorDisplays.xml
+.idea/deviceManager.xml

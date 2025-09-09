@@ -159,6 +159,7 @@ var MediaFormat.channelCount:Int?
 val MediaFormat.duration:Int?
     get() = safeGetIntegerOrNull(MediaFormat.KEY_DURATION)
 
+
 fun MediaFormat.dump(logger: UtLog, message:String) {
     logger.info("### $message")
     val codec = Codec.fromFormat(this)

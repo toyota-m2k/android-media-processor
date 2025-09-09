@@ -5,11 +5,13 @@ import android.media.MediaCodecInfo
 import android.media.MediaCodecInfo.CodecCapabilities
 import android.media.MediaCodecList
 import android.media.MediaFormat
+import android.os.Build
 import android.util.Size
 import io.github.toyota32k.logger.UtLog
 import io.github.toyota32k.media.lib.format.BitRateMode
 import io.github.toyota32k.media.lib.format.Codec
 import io.github.toyota32k.media.lib.format.ColorFormat
+import io.github.toyota32k.media.lib.format.HDR
 import io.github.toyota32k.media.lib.format.Level
 import io.github.toyota32k.media.lib.format.MetaData
 import io.github.toyota32k.media.lib.format.Profile
@@ -18,7 +20,10 @@ import io.github.toyota32k.media.lib.format.bitRateMode
 import io.github.toyota32k.media.lib.format.frameRate
 import io.github.toyota32k.media.lib.format.height
 import io.github.toyota32k.media.lib.format.iFrameInterval
+import io.github.toyota32k.media.lib.format.isHDR
 import io.github.toyota32k.media.lib.format.mime
+import io.github.toyota32k.media.lib.format.safeGetInteger
+import io.github.toyota32k.media.lib.format.safeGetIntegerOrNull
 import io.github.toyota32k.media.lib.format.width
 import io.github.toyota32k.media.lib.strategy.DeviceCapabilities.capabilities
 import io.github.toyota32k.media.lib.strategy.DeviceCapabilities.isHardwareAccelerated
@@ -117,9 +122,22 @@ open class VideoStrategy(
         val pl = supportedProfileByEncoder(encoder) ?: throw IllegalStateException("no supported profile.")
         val brm = if(bitRateMode!=null && isBitrateModeSupported(encoder, bitRateMode)) bitRateMode else null
 
+        // Support HDR
+        val inputProfile = Profile.fromFormat(inputFormat)
+        val outputProfile = Profile.fromValue(codec, pl.profile)
+        val hdrInfo = if (inputProfile?.isHDR()==true && outputProfile?.isHDR()==true) {
+            // input/output ともにHDR対応プロファイル なら、HDR情報を引き継ぐ。
+            HDR.Info.fromFormat(inputFormat)
+        } else null
+//        val colorStandard = inputFormat.safeGetIntegerOrNull(MediaFormat.KEY_COLOR_STANDARD)
+//        val colorRange = inputFormat.safeGetIntegerOrNull(MediaFormat.KEY_COLOR_RANGE)
+//        val colorTransfer = inputFormat.safeGetIntegerOrNull(MediaFormat.KEY_COLOR_TRANSFER)
+//        val hdrStaticInfo = inputFormat.getByteBuffer(MediaFormat.KEY_HDR_STATIC_INFO)
+//        val hdrPludInfo = inputFormat.getByteBuffer(MediaFormat.KEY_HDR10_PLUS_INFO)
+
         logger.info("Video Format ------------------------------------------------------")
         logger.info("- Type            ${inputFormat.mime?:"n/a"} --> ${codec.mime}")
-        logger.info("- Profile         ${Profile.fromFormat(inputFormat)?:"n/a"} --> ${Profile.fromValue(codec, pl.profile)?:"n/a"}")
+        logger.info("- Profile         ${inputProfile?:"n/a"} --> ${Profile.fromValue(codec, pl.profile)?:"n/a"}")
         logger.info("- Level           ${Level.fromFormat(inputFormat)} --> ${Level.fromValue(codec,pl.level)?:"n/a"}")
         logger.info("- Width           ${inputFormat.width?:"n/a"}")
         logger.info("- Width(Meta)     ${metaData.width?:"n/a"} --> $width")
@@ -133,6 +151,13 @@ open class VideoStrategy(
         logger.info("- iFrameInterval  ${inputFormat.iFrameInterval?:"n/a"} --> $iFrameInterval")
         logger.info("- colorFormat     ${ColorFormat.fromFormat(inputFormat)?:"n/a"} --> ${colorFormat?:"n/a"}")
         logger.info("- Duration(Meta)  ${metaData.duration?:"n/a"}")
+        if (hdrInfo?.isHDR==true) {
+            logger.info("- ColorStandard   ${hdrInfo.colorStandard?:"n/a"}")
+            logger.info("- ColorRange      ${hdrInfo.colorRange?:"n/a"}")
+            logger.info("- ColorTransfer   ${hdrInfo.colorTransfer?:"n/a"}")
+            logger.info("- HDRStaticInfo   ${if(hdrInfo.hdrStaticInfo!=null) "present (${hdrInfo.hdrStaticInfo.limit()} bytes)" else "n/a"}")
+            logger.info("- HDR10PlusInfo   ${if(hdrInfo.hdr10PlusInfo!=null) "present (${hdrInfo.hdr10PlusInfo.limit()} bytes)" else "n/a"}")
+        }
         logger.info("-------------------------------------------------------------------")
 
         return MediaFormat.createVideoFormat(codec.mime, width, height).apply {
@@ -145,6 +170,15 @@ open class VideoStrategy(
             if(brm!=null) {
                 setInteger(MediaFormat.KEY_BITRATE_MODE, brm.value)
             }
+            if (hdrInfo?.isHDR==true) {
+                // output も HDR対応プロファイルなので、HDR情報を引き継ぐ。
+                hdrInfo.colorStandard?.let { setInteger(MediaFormat.KEY_COLOR_STANDARD, it.value) }
+                hdrInfo.colorRange?.let { setInteger(MediaFormat.KEY_COLOR_RANGE, it.value) }
+                hdrInfo.colorTransfer?.let { setInteger(MediaFormat.KEY_COLOR_TRANSFER, it.value) }
+                hdrInfo.hdrStaticInfo?.let { setByteBuffer(MediaFormat.KEY_HDR_STATIC_INFO, it) }
+                hdrInfo.hdr10PlusInfo?.let { if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) { setByteBuffer(MediaFormat.KEY_HDR10_PLUS_INFO, it) }}
+            }
+
 //            setInteger(MediaFormat.KEY_MAX_HEIGHT, height)
 //            setInteger(MediaFormat.KEY_MAX_WIDTH, width)
         }

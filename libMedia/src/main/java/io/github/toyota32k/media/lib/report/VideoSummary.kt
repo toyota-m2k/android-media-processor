@@ -4,6 +4,7 @@ import android.media.MediaFormat
 import io.github.toyota32k.media.lib.format.BitRateMode
 import io.github.toyota32k.media.lib.format.Codec
 import io.github.toyota32k.media.lib.format.ColorFormat
+import io.github.toyota32k.media.lib.format.HDR
 import io.github.toyota32k.media.lib.format.Level
 import io.github.toyota32k.media.lib.format.MetaData
 import io.github.toyota32k.media.lib.format.Profile
@@ -26,7 +27,9 @@ data class VideoSummary(
     val bitRateMode: BitRateMode?,
     val frameRate: Int,
     val iFrameInterval: Int,
-    val colorFormat: ColorFormat?) : IAttributes {
+    val colorFormat: ColorFormat?,
+    val hdrInfo: HDR.Info?,
+    ) : IAttributes {
     constructor(org:VideoSummary?, format: MediaFormat, metaData: MetaData?) : this(
         org?.codec ?: Codec.fromFormat(format),
         org?.profile ?: Profile.fromFormat(format),
@@ -39,11 +42,17 @@ data class VideoSummary(
         bitRateMode = BitRateMode.fromFormat(format) ?: org?.bitRateMode,
         frameRate = format.frameRate?: metaData?.frameRate ?: org?.frameRate ?: -1,
         iFrameInterval = format.iFrameInterval?: org?.iFrameInterval ?: -1,
-        colorFormat = ColorFormat.fromFormat(format) ?: org?.colorFormat)
+        colorFormat = ColorFormat.fromFormat(format) ?: org?.colorFormat,
+        hdrInfo = HDR.Info.fromFormat(format)
+    )
+
 
     private fun Int.format():String {
         return if(this<0) "n/a" else String.format(Locale.US, "%,d", this)
     }
+
+    val isHDR: Boolean
+        get() = hdrInfo?.isHDR == true
 
 //    fun dump(logger: UtLog, message:String) {
 //        logger.info(message)
@@ -68,7 +77,7 @@ data class VideoSummary(
         get() = emptyList()
 
     override fun toList(): List<IAttributes.KeyValue> {
-        return listOf(
+        val list = listOf(
             IAttributes.KeyValue("Codec", "${codec?:"n/a"}"),
             IAttributes.KeyValue("Profile", "${profile?:"n/a"}"),
             IAttributes.KeyValue("Level", "${level?:"n/a"}"),
@@ -81,5 +90,17 @@ data class VideoSummary(
             IAttributes.KeyValue("iFrame Interval", "${iFrameInterval.format()} sec"),
             IAttributes.KeyValue("Color Format", "${colorFormat?:"n/a"}"),
         )
+        return if (hdrInfo==null) {
+            list
+        } else {
+            list + listOf(
+                IAttributes.KeyValue("HDR", "${hdrInfo.isHDR}"),
+                IAttributes.KeyValue("colorStandard", "${hdrInfo.colorStandard}"),
+                IAttributes.KeyValue("colorRange", "${hdrInfo.colorRange}"),
+                IAttributes.KeyValue("colorTransfer", "${hdrInfo.colorTransfer}"),
+                IAttributes.KeyValue("hdrStaticInfo",if(hdrInfo.hdrStaticInfo!=null) "available" else "n/a"),
+                IAttributes.KeyValue("hdr10PlusInfo",if(hdrInfo.hdr10PlusInfo!=null) "available" else "n/a"),
+                )
+        }
     }
 }
