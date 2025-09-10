@@ -11,8 +11,9 @@ import io.github.toyota32k.media.lib.codec.BaseDecoder
 import io.github.toyota32k.media.lib.converter.CloseableExtractor
 import io.github.toyota32k.media.lib.converter.Converter
 import io.github.toyota32k.media.lib.converter.IInputMediaFile
-import io.github.toyota32k.media.lib.converter.ITrimmingRangeList
-import io.github.toyota32k.media.lib.converter.TrimmingRangeListImpl
+import io.github.toyota32k.media.lib.converter.ITrimmingRangeKeeper
+import io.github.toyota32k.media.lib.converter.PositionState
+import io.github.toyota32k.media.lib.converter.TrimmingRangeKeeperImpl
 import io.github.toyota32k.media.lib.misc.ICancellation
 import io.github.toyota32k.media.lib.track.Muxer
 import io.github.toyota32k.media.lib.utils.DurationEstimator
@@ -77,14 +78,14 @@ class Extractor private constructor(
     }
     var eos:Boolean = false
         private set
-    private var trimmingRangeList : ITrimmingRangeList = ITrimmingRangeList.empty()
+    private var trimmingRangeList : ITrimmingRangeKeeper = TrimmingRangeKeeperImpl.empty
 
     /**
      * オーディオトラックはだいたいどこへでもシーク可能なのに対して、ビデオトラックは、キーフレームにしかシークできないので、
      * あらかじめ、与えられたチャプターの先頭位置を、CLOSESTなシーク可能位置に調整しておき、音声トラックもこれを参照することで、
      * 音声と映像のズレの最小化を図る。
      */
-    fun adjustAndSetTrimmingRangeList(originalList: ITrimmingRangeList, durationUs:Long):ITrimmingRangeList {
+    fun adjustAndSetTrimmingRangeList(originalList: ITrimmingRangeKeeper, durationUs:Long):ITrimmingRangeKeeper {
         if(originalList.list.isEmpty()) {
             originalList.closeBy(durationUs)
             this.trimmingRangeList = originalList
@@ -97,7 +98,7 @@ class Extractor private constructor(
 
         // 与えられたRangeList の開始位置を、実際にビデオトラックでシーク可能な位置に調整する。
         // 終了位置は、readSampleData()が適当に刻んでくるので、そのまま使う。
-        val newList = TrimmingRangeListImpl()
+        val newList = TrimmingRangeKeeperImpl()
         val trackIdx = findTrackIdx(extractor, "video")
         extractor.selectTrack(trackIdx)
         for (range in originalList.list) {
@@ -116,6 +117,7 @@ class Extractor private constructor(
         extractor.seekTo(0L, SEEK_TO_CLOSEST_SYNC)
 
         newList.closeBy(durationUs)
+        newList.limitDurationUs = originalList.limitDurationUs
         this.trimmingRangeList = newList
         logger.verbose("adjusted trimming ranges:")
         trimmingRangeList.list.forEach {
@@ -123,7 +125,8 @@ class Extractor private constructor(
         }
         return newList
     }
-    fun setTrimmingRangeList(list:ITrimmingRangeList) {
+
+    fun setTrimmingRangeList(list:ITrimmingRangeKeeper) {
         this.trimmingRangeList = list
         // オーディオトラックを先頭にシークしておく
         // 通常は、オープンしたら呼び出し位置は先頭を指しているのだが、特定の動画ファイルでは、sampleTimeが負値を持っていることがあった。
@@ -159,7 +162,7 @@ class Extractor private constructor(
             // シークする（＝デコーダーにデータを書き込まない）場合は、decoder.dequeueInputBuffer() を呼んではならない。
             // dequeueInputBuffer すると、dequeue済みバッファーとして予約され queueInputBuffer されるまで使えなくなる。
             // これを何度も繰り返す（=トリミング区間が増える）と、使えるバッファがなくなって、"no buffer in the decoder" が発生する。
-            if (positionState == ITrimmingRangeList.PositionState.OUT_OF_RANGE) {
+            if (positionState == PositionState.OUT_OF_RANGE) {
                 logger.debug("FOUND End Of Chapter: ${TimeSpan.formatAutoM(startPositionUs / 1000)}")
                 val position = trimmingRangeList.getNextValidPosition(startPositionUs)
                 if (position != null) {
@@ -185,7 +188,7 @@ class Extractor private constructor(
             } else {
                 effected = true
                 val idx = extractor.sampleTrackIndex
-                if (idx < 0 || positionState == ITrimmingRangeList.PositionState.END) {
+                if (idx < 0 || positionState == PositionState.END) {
                     logger.debug("found eos")
                     if (durationEstimator.estimatedDurationUs < trimmingRangeList.trimmedDurationUs - 2 * 1000 * 1000) {
                         // 読み込んだ時間が、期待する時間より2秒以上短ければ、たぶんなんかエラーが起きている。
