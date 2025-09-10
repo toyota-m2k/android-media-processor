@@ -185,7 +185,6 @@ class Converter {
          */
         fun keepHDR(flag:Boolean=true) = apply {
             mKeepHDR = flag
-            return this
         }
 
         /**
