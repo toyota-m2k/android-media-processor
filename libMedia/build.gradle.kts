@@ -48,7 +48,6 @@ kotlin {
 
 dependencies {
     implementation(libs.appcompat)
-    implementation(libs.material)
     implementation(libs.coroutinesCore)
     implementation(libs.documentfile)
     api(libs.android.utilities)
