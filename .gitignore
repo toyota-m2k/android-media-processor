@@ -25,3 +25,5 @@ app/build
 .idea/AndroidProjectSystem.xml
 .idea/emulatorDisplays.xml
 .idea/deviceManager.xml
+.idea/copilot.data.migration.agent.xml
+.idea/copilot.data.migration.edit.xml

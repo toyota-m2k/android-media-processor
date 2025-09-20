@@ -1,6 +1,6 @@
 [versions]
 #plugins
-kotlin = "2.2.10"
+kotlin = "2.2.20"
 agp = "8.13.0"
 
 #libraries
@@ -11,12 +11,12 @@ junit = "4.13.2"
 junitExt = "1.3.0"
 espressoCore = "3.7.0"
 coreKtx = "1.17.0"
-activityKtx = "1.10.1"
+activityKtx = "1.11.0"
 constraintLayout = "2.2.1"
 androidUtilities = "4.7.1"
 androidBinding = "1.9.11"    # for sample only
 androidDialog = "6.1.0"     # for sample only
-androidPlayer = "3.3.1"
+androidPlayer = "3.4.0"
 documentfile = "1.1.0"     # for sample only
 
 [libraries]
