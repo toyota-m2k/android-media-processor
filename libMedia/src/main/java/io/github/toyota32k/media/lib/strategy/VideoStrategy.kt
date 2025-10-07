@@ -233,8 +233,9 @@ open class VideoStrategy(
 
             // 以上で、対応するプロファイルが見つからなければ、
             // フォールバックプロファイルに一致するものを探す
-            if (fallbackProfiles != null) {
-                for (v in fallbackProfiles) {
+            val fallbacks = fallbackProfiles
+            if (fallbacks != null) {
+                for (v in fallbacks) {
                     pl = findProfile(v.profile, maxLevel)
                     if (pl != null) {
                         // profile/level が合致するものが見つかった

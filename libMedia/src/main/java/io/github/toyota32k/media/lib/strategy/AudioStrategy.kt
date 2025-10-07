@@ -89,6 +89,5 @@ open class AudioStrategy (
 
     companion object {
         val logger = UtLog("Audio", IStrategy.logger)
-
     }
 }
