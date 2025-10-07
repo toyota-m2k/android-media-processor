@@ -19,8 +19,10 @@ object FastStart {
      * @param removeFree true にすると、MOOV Atomが先頭にあっても（= Fast Start readyであっても）、Free Atom が存在すれば true を返す。
      * @return true: 必要 / false: 不要
      */
-    fun check(inUri: Uri, context: Context, removeFree:Boolean=true):Boolean {
-        val inFile = AndroidFile(inUri, context)
+    fun check(inUri: Uri, context: Context, removeFree:Boolean=true):Boolean
+        = check(AndroidFile(inUri, context))
+
+    fun check(inFile: AndroidFile, removeFree:Boolean=true):Boolean {
         return try {
             inFile.fileInputStream { inStream->
                 processImpl(inStream, null, removeFree, null)
