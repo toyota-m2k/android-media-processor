@@ -694,9 +694,6 @@ class Converter {
                         var count = 0
                         val tracks = TrackMediator(muxer, videoTrack, audioTrack)
                         while (!tracks.eos && !cancellation.isCancelled) {
-//                        val ve = videoTrack.next(muxer, this)
-//                        val ae = audioTrack?.next(muxer, this) ?: false
-//                        if(!ve&&!ae) {
                             if (!tracks.next()) {
                                 if (videoTrack.decoder.eos && audioTrack?.decoder?.eos != false) {
                                     count++
@@ -706,11 +703,7 @@ class Converter {
                                         logger.info("decoders reached EOS but encoder not working ... forced to stop muxer")
                                         videoTrack.encoder.forceEos(muxer)
                                         audioTrack?.encoder?.forceEos(muxer)
-//                                    val fv = videoTrack.encoder.forceEos(muxer)
-//                                    val fa = audioTrack?.encoder?.forceEos(muxer)==true
-//                                    sendALetterToYou(fv, fa)
                                     }
-//                                throw TimeoutException("no response from transcoder.")
                                 }
                             } else {
                                 tick = -1
