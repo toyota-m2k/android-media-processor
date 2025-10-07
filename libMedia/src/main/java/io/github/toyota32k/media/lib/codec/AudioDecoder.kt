@@ -88,8 +88,11 @@ class AudioDecoder(strategy:IAudioStrategy, format: MediaFormat, decoder:MediaCo
      * @return  true: データを処理した / false: 何もしなかった (no-effect)
      */
     override fun consume() :Boolean {
-        if (isCancelled || eos) {
+        if (isCancelled) {
             return false
+        }
+        if (eos) {
+            return super.consume()
         }
 
         if (!decoderEos) {

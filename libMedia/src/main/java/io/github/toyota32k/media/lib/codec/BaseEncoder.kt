@@ -56,7 +56,10 @@ abstract class BaseEncoder(
                     if (bufferInfo.flags.and(MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
                         logger.debug("found end of stream.")
                         eos = true
-                        bufferInfo.set(0, 0, 0, bufferInfo.flags)
+                        // muxer.stop() で終端されるので、これは不要（むしろ不正な動画ファイルができる恐れあり）らしい。by Copilot
+                        // bufferInfo.set(0, 0, 0, bufferInfo.flags)
+                        encoder.releaseOutputBuffer(result, false)
+                        return true
                     }
                     else if (bufferInfo.flags.and(MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) { // SPS or PPS, which should be passed by MediaFormat.
                         logger.debug("codec config.")
