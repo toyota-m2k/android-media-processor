@@ -18,6 +18,7 @@ import io.github.toyota32k.binder.command.LiteUnitCommand
 import io.github.toyota32k.binder.command.bindCommand
 import io.github.toyota32k.binder.enableBinding
 import io.github.toyota32k.binder.materialRadioButtonGroupBinding
+import io.github.toyota32k.binder.multiEnableBinding
 import io.github.toyota32k.binder.multiVisibilityBinding
 import io.github.toyota32k.binder.observe
 import io.github.toyota32k.binder.spinnerBinding
@@ -43,6 +44,7 @@ import io.github.toyota32k.media.lib.converter.ConvertResult
 import io.github.toyota32k.media.lib.converter.Converter
 import io.github.toyota32k.media.lib.converter.FastStart
 import io.github.toyota32k.media.lib.converter.Rotation
+import io.github.toyota32k.media.lib.converter.Splitter
 import io.github.toyota32k.media.lib.converter.format
 import io.github.toyota32k.media.lib.converter.toAndroidFile
 import io.github.toyota32k.media.lib.format.Codec
@@ -52,6 +54,7 @@ import io.github.toyota32k.media.lib.strategy.IVideoStrategy
 import io.github.toyota32k.media.lib.strategy.PresetAudioStrategies
 import io.github.toyota32k.media.lib.strategy.PresetVideoStrategies
 import io.github.toyota32k.media.lib.strategy.VideoStrategy
+import io.github.toyota32k.sample.media.MainActivity.MainViewModel.SourceIndex
 import io.github.toyota32k.sample.media.databinding.ActivityMainBinding
 import io.github.toyota32k.sample.media.dialog.DetailMessageDialog
 import io.github.toyota32k.sample.media.dialog.MultilineTextDialog
@@ -151,6 +154,11 @@ class MainActivity : UtMortalActivity() {
             val summary = Converter.analyze(output.toAndroidFile(application))
             MultilineTextDialog.show("Output File", summary.toString())
         }
+        val analyzeOutputFile2Command = LiteUnitCommand {
+            val output = outputFile2.value ?: return@LiteUnitCommand
+            val summary = Converter.analyze(output.toAndroidFile(application))
+            MultilineTextDialog.show("Output File 2", summary.toString())
+        }
         val videoDeviceCapabilitiesCommand = LiteUnitCommand {
             val enc = DeviceCapabilities.availableCodecs(namedVideoStrategy.value.strategy.codec, true)
             val dec = DeviceCapabilities.availableCodecs(namedVideoStrategy.value.strategy.codec, false)
@@ -172,33 +180,46 @@ class MainActivity : UtMortalActivity() {
 
         val inputFile: MutableStateFlow<Uri?> = MutableStateFlow(null)
         val outputFile: MutableStateFlow<Uri?> = MutableStateFlow(null)
+        val outputFile2: MutableStateFlow<Uri?> = MutableStateFlow(null)
 
         val inputFileAvailable = inputFile.map { it!=null }
         val outputFileAvailable = outputFile.map { it!=null }
+        val outputFile2Available = outputFile2.map { it!=null }
         val inputFileName = inputFile.map { it?.toAndroidFile(application)?.getFileName() ?: "select input file"}
         val outputFileName = outputFile.map {it?.toAndroidFile(application)?.getFileName() ?: "select output file"}
+        val outputFile2Name = outputFile2.map {it?.toAndroidFile(application)?.getFileName() ?: "select output file"}
         val readyToConvert = combine(inputFileAvailable, outputFileAvailable) {i,o-> i && o }
         val converted = MutableStateFlow(false)
-//        val noAudio = MutableStateFlow(false)
+        val splitted = MutableStateFlow(false)
 
         val softwareEncode: MutableStateFlow<Boolean> = MutableStateFlow(false)
         val softwareDecode: MutableStateFlow<Boolean> = MutableStateFlow(false)
-        val playOutput: MutableStateFlow<Boolean> = MutableStateFlow(false)
+        enum class SourceIndex {
+            Input,
+            Output,
+            Output2,
+        }
+        val playSource: MutableStateFlow<SourceIndex> = MutableStateFlow(SourceIndex.Input)
 
         val namedVideoStrategy = MutableStateFlow<NamedVideoStrategy>(videoStrategies[0])
         val namedAudioStrategy = MutableStateFlow<NamedAudioStrategy>(audioStrategies[0])
 
         fun updatePlayerSource() {
-            val src = if(!playOutput.value) {
-                // Inputを再生
-                inputFile.value?.toAndroidFile(getApplication())
-            } else if(converted.value){
-                outputFile.value?.toAndroidFile(getApplication())
-            } else {
-                null
+            val src = when (playSource.value) {
+                SourceIndex.Input -> {
+                    // Inputを再生
+                    inputFile.value?.toAndroidFile(getApplication())
+                }
+                SourceIndex.Output -> {
+                    if (converted.value || splitted.value) outputFile.value?.toAndroidFile(getApplication()) else null
+                }
+                SourceIndex.Output2 -> {
+                    if (splitted.value) outputFile2.value?.toAndroidFile(getApplication()) else null
+                }
             }
             if(src!=null) {
                 setSource(src)
+                playerModel.rotate(io.github.toyota32k.lib.player.model.Rotation.NONE)
             } else {
                 playerModel.reset()
             }
@@ -211,7 +232,9 @@ class MainActivity : UtMortalActivity() {
                     val file = activity.activityBrokers.openFilePicker.selectFile(arrayOf("video/*"))
                     if (file!=null) {
                         inputFile.value = file
-                        playOutput.value = false
+                        playSource.value = SourceIndex.Input
+                        converted.value = false
+                        splitted.value = false
                         updatePlayerSource()
                     }
                 }
@@ -229,7 +252,26 @@ class MainActivity : UtMortalActivity() {
                     if(file!=null) {
                         outputFile.value = file
                         converted.value = false
-                        playOutput.value = false
+                        splitted.value = false
+                        playSource.value = SourceIndex.Input
+                        updatePlayerSource()
+                    }
+                }
+                true
+            }
+        }
+        val selectOutputFile2Command = LiteUnitCommand {
+            UtImmortalTask.launchTask {
+                withOwner {
+                    val activity = it.asActivity() as MainActivity
+                    val inFile = inputFile.value?.let { AndroidFile(it, application).getFileName() }
+                    val outFile = if(inFile.isNullOrBlank()) "output-2.mp4" else "output-2-$inFile"
+                    val file = activity.activityBrokers.createFilePicker.selectFile(outFile, "video/mp4")
+                    if(file!=null) {
+                        outputFile2.value = file
+                        converted.value = false
+                        splitted.value = false
+                        playSource.value = SourceIndex.Input
                         updatePlayerSource()
                     }
                 }
@@ -305,6 +347,8 @@ class MainActivity : UtMortalActivity() {
             val ranges = chapterEditor.enabledRanges(Range.empty)
 
             UtImmortalTask.launchTask("trimming") {
+                splitted.value = false
+                converted.value = false
                 val result = ProgressDialog.withProgressDialog<ConvertResult> { sink ->
                     withContext(Dispatchers.IO) {
                         sink.message = "Trimming Now"
@@ -369,6 +413,85 @@ class MainActivity : UtMortalActivity() {
             }
         }
 
+        val commandChop = LiteUnitCommand() {
+            val srcFile = AndroidFile(inputFile.value ?: return@LiteUnitCommand, application)
+            val opt1File = AndroidFile(outputFile.value ?: return@LiteUnitCommand, application)
+            val opt2File = outputFile2.value?.run { AndroidFile(this, application) }
+            val trim1File = AndroidFile( File(application.cacheDir ?: return@LiteUnitCommand, "chop1"))
+            val trim2File = if (opt2File!=null) AndroidFile( File(application.cacheDir ?: return@LiteUnitCommand, "chop2")) else null
+
+
+            val position = playerControllerModel.playerModel.currentPosition
+            UtImmortalTask.launchTask("chopping") {
+                splitted.value = false
+                converted.value = false
+                val result = ProgressDialog.withProgressDialog<Splitter.Result> { sink ->
+                    withContext(Dispatchers.IO) {
+                        sink.message = "Chopping Now"
+                        val rotation = if (playerModel.rotation.value != 0) Rotation(playerModel.rotation.value, relative = true) else Rotation.nop
+                        val splitter = Splitter.Factory()
+                            .input(srcFile)
+                            .splitAtMs(position)
+                            .outputFirstHalf(trim1File)
+                            .apply {
+                                if (trim2File!=null) outputLastHalf(trim2File)
+                            }
+                            .rotate(rotation)
+                            .setProgressHandler {
+                                sink.progress = it.percentage
+                                sink.progressText = it.format()
+                            }
+                            .build()
+                        sink.cancelled.disposableObserve { cancelled ->
+                            if (cancelled) {
+                                splitter.cancel()
+                            }
+                        }.use {
+                            try {
+                                splitter.split().also { convertResult ->
+                                    if (convertResult.isSucceeded) {
+                                        logger.debug(convertResult.toString())
+                                        sink.message = "Optimizing Now..."
+                                        if (!FastStart.process(inFile = trim1File, outFile = opt1File) {
+                                                sink.progress = it.percentage
+                                                sink.progressText = it.format()
+                                            }) {
+                                            // 変換不要
+                                            opt1File.copyFrom(trim1File)
+                                        }
+
+                                        if (trim2File!=null && opt2File!=null) {
+                                            if (!FastStart.process(inFile = trim2File, outFile = opt2File) {
+                                                    sink.progress = it.percentage
+                                                    sink.progressText = it.format()
+                                                }) {
+                                                // 変換不要
+                                                opt2File.copyFrom(trim2File)
+                                            }
+                                        }
+                                        splitted.value = true
+                                    }
+                                }
+                            } catch (e: Throwable) {
+                                Splitter.Result(Splitter.SingleResult.error(e), null)
+                            } finally {
+                                trim1File.safeDelete()
+                                trim2File?.safeDelete()
+                            }
+                        }
+                    }
+                }
+                if (result.isSucceeded) {
+                    // 変換成功
+                    showConfirmMessageBox("Split media file", "Completed.")
+                } else if (!result.isCancelled) {
+                    showConfirmMessageBox("Error.", result.first.error?.message ?: "unknown")
+                }
+            }
+        }
+
+
+
         private fun setSource(file:AndroidFile) {
             val videoSource = VideoSource(file)
             playerModel.setSource(videoSource)
@@ -395,7 +518,7 @@ class MainActivity : UtMortalActivity() {
 
         controls = ActivityMainBinding.inflate(layoutInflater)
         setContentView(controls.root)
-        ViewCompat.setOnApplyWindowInsetsListener(findViewById(R.id.main)) { v, insets ->
+        ViewCompat.setOnApplyWindowInsetsListener(controls.root) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             insets
@@ -407,6 +530,8 @@ class MainActivity : UtMortalActivity() {
             .bindCommand(viewModel.analyzeInputFileCommand, controls.inputAnalyzeButton)
             .bindCommand(viewModel.selectOutputFileCommand, controls.outputFileButton)
             .bindCommand(viewModel.analyzeOutputFileCommand, controls.outputAnalyzeButton)
+            .bindCommand(viewModel.selectOutputFile2Command, controls.output2FileButton)
+            .bindCommand(viewModel.analyzeOutputFile2Command, controls.output2AnalyzeButton)
             .bindCommand(viewModel.commandAddChapter, controls.makeChapter)
             .bindCommand(viewModel.commandAddSkippingChapter, controls.makeChapterAndSkip)
             .bindCommand(viewModel.commandRemoveChapter, controls.removeNextChapter)
@@ -419,17 +544,27 @@ class MainActivity : UtMortalActivity() {
             .enableBinding(controls.inputAnalyzeButton, viewModel.inputFileAvailable)
             .enableBinding(controls.outputAnalyzeButton, combine(viewModel.outputFileAvailable, viewModel.converted) {o,c->o&&c})
             .enableBinding(controls.saveVideo, viewModel.readyToConvert)
+            .multiEnableBinding(arrayOf(controls.buttonOutput2,controls.output2AnalyzeButton),  viewModel.outputFile2Available)
             .textBinding(controls.inputFileButton, viewModel.inputFileName)
             .textBinding(controls.outputFileButton, viewModel.outputFileName)
-            .materialRadioButtonGroupBinding(controls.playSelector, viewModel.playOutput, object: IIDValueResolver<Boolean> {
-                override fun id2value(id: Int): Boolean? {
-                    return id==controls.buttonOutput.id
+            .textBinding(controls.output2FileButton, viewModel.outputFile2Name)
+            .materialRadioButtonGroupBinding(controls.playSelector, viewModel.playSource, object: IIDValueResolver<SourceIndex> {
+                override fun id2value(id: Int): SourceIndex {
+                    return when(id) {
+                        controls.buttonOutput.id -> SourceIndex.Output
+                        controls.buttonOutput2.id -> SourceIndex.Output2
+                        else -> SourceIndex.Input
+                    }
                 }
-                override fun value2id(v: Boolean): Int {
-                    return if(v) controls.buttonOutput.id else controls.buttonInput.id
+                override fun value2id(v: SourceIndex): Int {
+                    return when(v) {
+                        SourceIndex.Output -> controls.buttonOutput.id
+                        SourceIndex.Output2 -> controls.buttonOutput2.id
+                        else -> controls.buttonInput.id
+                    }
                 }
             })
-            .observe(viewModel.playOutput) {
+            .observe(viewModel.playSource) {
                 viewModel.updatePlayerSource()
             }
             .checkBinding(controls.useSoftwareDecoder, viewModel.softwareDecode)
@@ -438,6 +573,7 @@ class MainActivity : UtMortalActivity() {
             .spinnerBinding(controls.audioStrategy, viewModel.namedAudioStrategy, audioStrategies)
             .bindCommand(viewModel.videoDeviceCapabilitiesCommand, controls.videoCapabilityButton)
             .bindCommand(viewModel.audioDeviceCapabilitiesCommand, controls.audioCapabilityButton)
+            .bindCommand(viewModel.commandChop, controls.chop)
 
         controls.videoViewer.bindViewModel(viewModel.playerControllerModel, binder)
 
