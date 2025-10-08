@@ -383,7 +383,7 @@ class MainActivity : UtMortalActivity() {
                                     if (convertResult.succeeded) {
                                         logger.debug(convertResult.toString())
                                         sink.message = "Optimizing Now..."
-                                        if (!FastStart.process(inFile = trimFile, outFile = optFile) {
+                                        if (!FastStart.process(inFile = trimFile, outFile = optFile, removeFree=true) {
                                                 sink.progress = it.percentage
                                                 sink.progressText = it.format()
                                             }) {
@@ -409,33 +409,25 @@ class MainActivity : UtMortalActivity() {
                 } else if (!result.cancelled) {
                     showConfirmMessageBox("Error.", result.errorMessage ?: result.exception?.message ?: "unknown")
                 }
-                true
             }
         }
 
-        val commandChop = LiteUnitCommand() {
+        val commandTrimming = LiteUnitCommand() {
             val srcFile = AndroidFile(inputFile.value ?: return@LiteUnitCommand, application)
-            val opt1File = AndroidFile(outputFile.value ?: return@LiteUnitCommand, application)
-            val opt2File = outputFile2.value?.run { AndroidFile(this, application) }
-            val trim1File = AndroidFile( File(application.cacheDir ?: return@LiteUnitCommand, "chop1"))
-            val trim2File = if (opt2File!=null) AndroidFile( File(application.cacheDir ?: return@LiteUnitCommand, "chop2")) else null
+            val optFile = AndroidFile(outputFile.value ?: return@LiteUnitCommand, application)
+            val trimFile = AndroidFile( File(application.cacheDir ?: return@LiteUnitCommand, "trimming"))
 
+            val ranges = chapterEditor.enabledRanges(Range.empty)
 
-            val position = playerControllerModel.playerModel.currentPosition
-            UtImmortalTask.launchTask("chopping") {
+            UtImmortalTask.launchTask("trimming") {
                 splitted.value = false
                 converted.value = false
-                val result = ProgressDialog.withProgressDialog<Splitter.Result> { sink ->
+                val result = ProgressDialog.withProgressDialog { sink ->
                     withContext(Dispatchers.IO) {
-                        sink.message = "Chopping Now"
+                        sink.message = "Trimming Now"
                         val rotation = if (playerModel.rotation.value != 0) Rotation(playerModel.rotation.value, relative = true) else Rotation.nop
                         val splitter = Splitter.Factory()
                             .input(srcFile)
-                            .splitAtMs(position)
-                            .outputFirstHalf(trim1File)
-                            .apply {
-                                if (trim2File!=null) outputLastHalf(trim2File)
-                            }
                             .rotate(rotation)
                             .setProgressHandler {
                                 sink.progress = it.percentage
@@ -448,11 +440,72 @@ class MainActivity : UtMortalActivity() {
                             }
                         }.use {
                             try {
-                                splitter.split().also { convertResult ->
-                                    if (convertResult.isSucceeded) {
-                                        logger.debug(convertResult.toString())
+                                splitter.trim(trimFile, *ranges.map { Converter.Factory.RangeMs(it.start, it.end) }.toTypedArray()).also { result ->
+                                    if (result.succeeded) {
                                         sink.message = "Optimizing Now..."
-                                        if (!FastStart.process(inFile = trim1File, outFile = opt1File) {
+                                        if (!FastStart.process(inFile = trimFile, outFile = optFile, removeFree=true) {
+                                                sink.progress = it.percentage
+                                                sink.progressText = it.format()
+                                            }) {
+                                            // 変換不要
+                                            optFile.copyFrom(trimFile)
+                                        }
+                                        converted.value = true
+                                    }
+                                }
+                            } catch (e: Throwable) {
+                                Splitter.Result.error(e)
+                            } finally {
+                                trimFile.safeDelete()
+                            }
+                        }
+                    }
+                }
+                if (result.succeeded) {
+                    // 変換成功
+                    val srcLen = srcFile.getLength()
+                    val dstLen = optFile.getLength()
+                    showConfirmMessageBox("Trimming without ReEncoding", "Completed")
+                } else if (!result.cancelled) {
+                    showConfirmMessageBox("Error.", result.error?.message ?: "unknown")
+                }
+            }
+
+        }
+
+        val commandChop = LiteUnitCommand() {
+            val opt2File = outputFile2.value?.run { AndroidFile(this, application) } ?: return@LiteUnitCommand
+            val srcFile = AndroidFile(inputFile.value ?: return@LiteUnitCommand, application)
+            val opt1File = AndroidFile(outputFile.value ?: return@LiteUnitCommand, application)
+            val trim1File = AndroidFile( File(application.cacheDir ?: return@LiteUnitCommand, "chop1"))
+            val trim2File = AndroidFile( File(application.cacheDir ?: return@LiteUnitCommand, "chop2"))
+
+            val position = playerControllerModel.playerModel.currentPosition
+            UtImmortalTask.launchTask("chopping") {
+                splitted.value = false
+                converted.value = false
+                val result = ProgressDialog.withProgressDialog<Splitter.Result> { sink ->
+                    withContext(Dispatchers.IO) {
+                        sink.message = "Splitting Now"
+                        val rotation = if (playerModel.rotation.value != 0) Rotation(playerModel.rotation.value, relative = true) else Rotation.nop
+                        val splitter = Splitter.Factory()
+                            .input(srcFile)
+                            .rotate(rotation)
+                            .setProgressHandler {
+                                sink.progress = it.percentage
+                                sink.progressText = it.format()
+                            }
+                            .build()
+                        sink.cancelled.disposableObserve { cancelled ->
+                            if (cancelled) {
+                                splitter.cancel()
+                            }
+                        }.use {
+                            try {
+                                splitter.chop(trim1File, trim2File, position).also { result ->
+                                    if (result.succeeded) {
+                                        sink.message = "Optimizing First File..."
+                                        if (!FastStart.process(inFile = trim1File, outFile = opt1File, removeFree=true) {
                                                 sink.progress = it.percentage
                                                 sink.progressText = it.format()
                                             }) {
@@ -460,32 +513,31 @@ class MainActivity : UtMortalActivity() {
                                             opt1File.copyFrom(trim1File)
                                         }
 
-                                        if (trim2File!=null && opt2File!=null) {
-                                            if (!FastStart.process(inFile = trim2File, outFile = opt2File) {
-                                                    sink.progress = it.percentage
-                                                    sink.progressText = it.format()
-                                                }) {
-                                                // 変換不要
-                                                opt2File.copyFrom(trim2File)
-                                            }
+                                        sink.message = "Optimizing Last File..."
+                                        if (!FastStart.process(inFile = trim2File, outFile = opt2File, removeFree=true) {
+                                                sink.progress = it.percentage
+                                                sink.progressText = it.format()
+                                            }) {
+                                            // 変換不要
+                                            opt2File.copyFrom(trim2File)
                                         }
                                         splitted.value = true
                                     }
                                 }
                             } catch (e: Throwable) {
-                                Splitter.Result(Splitter.SingleResult.error(e), null)
+                                Splitter.Result.error(e)
                             } finally {
                                 trim1File.safeDelete()
-                                trim2File?.safeDelete()
+                                trim2File.safeDelete()
                             }
                         }
                     }
                 }
-                if (result.isSucceeded) {
+                if (result.succeeded) {
                     // 変換成功
                     showConfirmMessageBox("Split media file", "Completed.")
-                } else if (!result.isCancelled) {
-                    showConfirmMessageBox("Error.", result.first.error?.message ?: "unknown")
+                } else if (!result.cancelled) {
+                    showConfirmMessageBox("Error.", result.error?.message ?: "unknown")
                 }
             }
         }
@@ -538,13 +590,12 @@ class MainActivity : UtMortalActivity() {
             .bindCommand(viewModel.commandRemoveChapterPrev, controls.removePrevChapter)
             .bindCommand(viewModel.commandRedo, controls.redo)
             .bindCommand(viewModel.commandUndo, controls.undo)
-            .bindCommand(viewModel.commandConvert, controls.saveVideo)
             .bindCommand(viewModel.commandToggleSkip, controls.makeRegionSkip)
             .multiVisibilityBinding(arrayOf(controls.chapterButtons, controls.videoViewer), viewModel.inputFileAvailable, hiddenMode = VisibilityBinding.HiddenMode.HideByInvisible)
             .enableBinding(controls.inputAnalyzeButton, viewModel.inputFileAvailable)
             .enableBinding(controls.outputAnalyzeButton, combine(viewModel.outputFileAvailable, viewModel.converted) {o,c->o&&c})
             .enableBinding(controls.saveVideo, viewModel.readyToConvert)
-            .multiEnableBinding(arrayOf(controls.buttonOutput2,controls.output2AnalyzeButton),  viewModel.outputFile2Available)
+            .multiEnableBinding(arrayOf(controls.buttonOutput2,controls.output2AnalyzeButton, controls.chopVideo),  viewModel.outputFile2Available)
             .textBinding(controls.inputFileButton, viewModel.inputFileName)
             .textBinding(controls.outputFileButton, viewModel.outputFileName)
             .textBinding(controls.output2FileButton, viewModel.outputFile2Name)
@@ -573,7 +624,9 @@ class MainActivity : UtMortalActivity() {
             .spinnerBinding(controls.audioStrategy, viewModel.namedAudioStrategy, audioStrategies)
             .bindCommand(viewModel.videoDeviceCapabilitiesCommand, controls.videoCapabilityButton)
             .bindCommand(viewModel.audioDeviceCapabilitiesCommand, controls.audioCapabilityButton)
-            .bindCommand(viewModel.commandChop, controls.chop)
+            .bindCommand(viewModel.commandConvert, controls.saveVideo)
+            .bindCommand(viewModel.commandChop, controls.chopVideo)
+            .bindCommand(viewModel.commandTrimming, controls.trimVideo)
 
         controls.videoViewer.bindViewModel(viewModel.playerControllerModel, binder)
 
