@@ -6,44 +6,34 @@ import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMuxer
 import android.net.Uri
+import io.github.toyota32k.media.lib.converter.Converter.Factory.RangeMs
 import io.github.toyota32k.media.lib.format.ContainerFormat
 import io.github.toyota32k.media.lib.format.MetaData
-import io.github.toyota32k.media.lib.format.getDuration
-import io.github.toyota32k.media.lib.misc.ICancellation
 import io.github.toyota32k.media.lib.misc.ISO6709LocationParser
 import io.github.toyota32k.media.lib.track.Muxer.Companion.logger
-import kotlinx.coroutines.Deferred
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.Closeable
 import java.io.File
 import java.nio.ByteBuffer
 import kotlin.coroutines.cancellation.CancellationException
-import kotlin.math.max
+import kotlin.math.min
 
-interface ISplitProgress : IProgress {
-    val progressFirst: Boolean
-}
 /**
  * 元の形式のまま（デコード・再エンコードしないで）動画ファイルを分割する。
  */
 class Splitter(
     val inPath:IInputMediaFile,
-    val splitAtUs: Long,
-    val out1Path: IOutputMediaFile,
-    val out2Path: IOutputMediaFile? = null,
     private val deleteOutputOnError:Boolean = true,
     private val rotation: Rotation? = null,
-    onProgress : ((ISplitProgress)->Unit)? = null
+    onProgress : ((IProgress)->Unit)? = null
     ) {
     private val progress = Progress(onProgress)
+    private val actualSoughtMap = mutableMapOf<Long,Long>()
 
 
     class Factory(inPath:IInputMediaFile?=null, splitAtMs:Long=-1L) {
-        private var mSplitAtMs: Long = splitAtMs
         private var mInPath: IInputMediaFile? = inPath
-        private var mOut1File: IOutputMediaFile? = null
-        private var mOut2File: IOutputMediaFile? = null
         private var mDeleteOutputOnError:Boolean = true
         private var mRotation: Rotation? = null
         private var mOnProgress : ((IProgress)->Unit)? = null
@@ -96,63 +86,9 @@ class Splitter(
         fun input(source: IHttpStreamSource, context: Context)
             = input(HttpInputFile(context, source))
 
-        /**
-         * 前半出力ファイルを設定（必須）
-         * 通常は、適当な型の引数をとるバリエーションを利用する。
-         * ただし、inputと異なり、HttpFileは利用不可
-         * @param IOutputMediaFile
-         */
-        fun outputFirstHalf(dst :IOutputMediaFile) = apply {
-            mOut1File = dst
-        }
-
-        /**
-         * 前半出力ファイルを設定
-         * @param File
-         */
-        fun outputFirstHalf(path: File)
-            = outputFirstHalf(io.github.toyota32k.media.lib.converter.AndroidFile(path))
-
-        /**
-         * 前半出力ファイルを設定
-         * @param Uri
-         * @param Context
-         */
-        fun outputFirstHalf(uri: Uri, context: Context)
-            = outputFirstHalf(AndroidFile(uri, context))
-
-        /**
-         * 後半出力ファイルを設定（オプショナル）
-         * 通常は、適当な型の引数をとるバリエーションを利用する。
-         * ただし、inputと異なり、HttpFileは利用不可
-         * @param IOutputMediaFile
-         */
-        fun outputLastHalf(dst :IOutputMediaFile) = apply {
-            mOut2File = dst
-        }
-
-        /**
-         * 後半出力ファイルを設定
-         * @param File
-         */
-        fun outputLastHalf(path: File)
-            = outputFirstHalf(io.github.toyota32k.media.lib.converter.AndroidFile(path))
-
-        /**
-         * 後半出力ファイルを設定
-         * @param Uri
-         * @param Context
-         */
-        fun outputLastHalf(uri: Uri, context: Context)
-            = outputFirstHalf(AndroidFile(uri, context))
-
         // endregion
 
         // region Misc
-
-        fun splitAtMs(ms:Long) = apply {
-            mSplitAtMs = ms
-        }
 
         fun deleteOutputOnError(flag:Boolean) = apply {
             mDeleteOutputOnError = flag
@@ -174,13 +110,8 @@ class Splitter(
 
         fun build(): Splitter {
             val inPath = mInPath ?: throw IllegalStateException("input file is not specified.")
-            val out1Path = mOut1File ?: throw IllegalStateException("output file is not specified.")
-            if (mSplitAtMs < 0) throw IllegalStateException("split time is not specified.")
             return Splitter(
                 inPath = inPath,
-                splitAtUs = mSplitAtMs*1000L,
-                out1Path = out1Path,
-                out2Path = mOut2File,
                 deleteOutputOnError = mDeleteOutputOnError,
                 rotation = mRotation,
                 onProgress = mOnProgress
@@ -199,8 +130,19 @@ class Splitter(
         }
     }
 
-    class TrackInfo(inPath:IInputMediaFile, video:Boolean, val startTimeUs:Long, val endTimeUs:Long):Closeable {
+    class RangeUs(val start:Long, val end:Long) {
+        companion object {
+            fun fromMs(startMs:Long, endMs:Long) : RangeUs =
+                if (endMs<=0 || endMs==Long.MAX_VALUE) RangeUs(startMs*1000L, Long.MAX_VALUE)
+                else RangeUs(startMs*1000L, endMs*1000L)
+            fun fromMs(rangeMs:RangeMs) : RangeUs =
+                fromMs(rangeMs.startMs, rangeMs.endMs)
+        }
+    }
+
+    class TrackInfo(inPath:IInputMediaFile, video:Boolean):Closeable {
         private val rawExtractor = inPath.openExtractor()
+        private var presentationTimeUs:Long = 0L
         val extractor = rawExtractor.obj
         val trackIndex:Int = findTrackIdx(video)
         var muxerIndex:Int = -1
@@ -213,7 +155,6 @@ class Splitter(
         init {
             if (isAvailable) {
                 extractor.selectTrack(trackIndex)
-                extractor.seekTo(startTimeUs, MediaExtractor.SEEK_TO_CLOSEST_SYNC)
             }
         }
 
@@ -236,9 +177,19 @@ class Splitter(
             }
         }
 
-        fun readAndWrite(buffer: ByteBuffer, bufferInfo: MediaCodec.BufferInfo) : Boolean {
-            if (!isAvailable) return true   // トラックが存在しない場合は常にEOSとして扱う
-            if (sampleTimeUs == -1L || (endTimeUs in 1..<sampleTimeUs)) {
+        fun initialSeek(us:Long):Long {
+            return if (isAvailable) {
+                done = false
+                extractor.seekTo(us, MediaExtractor.SEEK_TO_CLOSEST_SYNC)
+                extractor.sampleTime
+            } else -1
+        }
+
+        fun readAndWrite(buffer: ByteBuffer, bufferInfo: MediaCodec.BufferInfo, rangeUs:RangeUs) : Long {
+            if (!isAvailable) return 0L   // トラックが存在しない場合は常にEOSとして扱う
+            val startTime = sampleTimeUs
+            var handled:Long = 0L
+            if (sampleTimeUs == -1L || (rangeUs.end in 1..<sampleTimeUs)) {
                 done = true
             } else {
                 bufferInfo.offset = 0
@@ -246,14 +197,15 @@ class Splitter(
                 if (bufferInfo.size < 0) {
                     done = true
                 } else {
-                    bufferInfo.presentationTimeUs = sampleTimeUs - startTimeUs
+                    bufferInfo.presentationTimeUs = presentationTimeUs //sampleTimeUs - rangeUs.start
                     bufferInfo.flags = if (extractor.sampleFlags and MediaExtractor.SAMPLE_FLAG_SYNC != 0) MediaCodec.BUFFER_FLAG_KEY_FRAME else 0
                     muxer.writeSampleData(muxerIndex, buffer, bufferInfo)
                     extractor.advance()
+                    handled = sampleTimeUs - startTime
+                    presentationTimeUs += handled
                 }
             }
-            return done
-
+            return handled
         }
 
         override fun close() {
@@ -287,13 +239,33 @@ class Splitter(
         }
     }
 
+    private fun extractRange(videoTrack:TrackInfo, audioTrack:TrackInfo, rangeUs:RangeUs, buffer: ByteBuffer, bufferInfo: MediaCodec.BufferInfo) {
+        val posVideo = videoTrack.initialSeek(rangeUs.start)
+        audioTrack.initialSeek(if(posVideo>=0) posVideo else rangeUs.start)
+        while (!videoTrack.done || !audioTrack.done) {
+            if (isCancelled) {
+                throw CancellationException()
+            }
+            if (!videoTrack.done && (audioTrack.done || videoTrack.sampleTimeUs < audioTrack.sampleTimeUs)) {
+                // video track を処理
+                val dealt = videoTrack.readAndWrite(buffer, bufferInfo, rangeUs)
+                progress.updateVideo(dealt)
+            } else {
+                // audio track を処理
+                val dealt = audioTrack.readAndWrite(buffer, bufferInfo, rangeUs)
+                progress.updateAudio(dealt)
+            }
+        }
+        actualSoughtMap[rangeUs.start] = if(posVideo>=0) posVideo else rangeUs.start
+    }
 
-    private fun extract(inputMetaData:MetaData, startTimeUs:Long, endTimeUs:Long, outPath: IOutputMediaFile) {
+
+    private fun extractRangesToFile(inputMetaData:MetaData, outPath: IOutputMediaFile, vararg rangesUs:RangeUs) {
         if (isCancelled) throw CancellationException("not started")
         Closeables().use { closer ->
             // Extractorの準備
-            val videoTrack = closer.add(TrackInfo(inPath, video = true, startTimeUs, endTimeUs))
-            val audioTrack = closer.add(TrackInfo(inPath, video = false, startTimeUs, endTimeUs))
+            val videoTrack = closer.add(TrackInfo(inPath, video = true))
+            val audioTrack = closer.add(TrackInfo(inPath, video = false))
             if (!videoTrack.isAvailable || !audioTrack.isAvailable) throw IllegalStateException("no track available")
             // Muxerの準備
             val muxer = closer.add(outPath.openMuxer(ContainerFormat.MPEG_4)).obj.apply {
@@ -304,90 +276,136 @@ class Splitter(
             muxer.start()
 
             // Extractorから読み上げてMuxerへ書き込む
+            // バッファを確保
             val bufferSize = 1 * 1024 * 1024 // 1MB
             val buffer = ByteBuffer.allocate(bufferSize)
             val bufferInfo = MediaCodec.BufferInfo()
-            val startTick = System.currentTimeMillis()
-            while (!videoTrack.done || !audioTrack.done) {
-                if (isCancelled) {
-                    throw CancellationException()
-                }
-                if (!videoTrack.done && (audioTrack.done || videoTrack.sampleTimeUs < audioTrack.sampleTimeUs)) {
-                    // video track を処理
-                    videoTrack.readAndWrite(buffer, bufferInfo)
-                } else {
-                    // audio track を処理
-                    audioTrack.readAndWrite(buffer, bufferInfo)
-                }
-                if (progress.percentage>10) {
-                    val spent = System.currentTimeMillis() - startTick
-                    val remaining = spent * 100 / progress.percentage - spent
-                    progress.remainingTime = remaining
-                }
-                progress.current = max(videoTrack.sampleTimeUs, audioTrack.sampleTimeUs)
+
+            // 要求された範囲を取り出す
+            for (rangeUs in rangesUs) {
+                extractRange(videoTrack, audioTrack, rangeUs, buffer, bufferInfo)
             }
+            // ファイナライズ
             muxer.stop()
         }
     }
 
-    data class SingleResult(val succeeded:Boolean, val error:Throwable?) {
-        val isCancelled : Boolean get() = error is CancellationException
-        val isError: Boolean get() = error != null
+    data class Result(val succeeded:Boolean, val error:Throwable?) {
+        val cancelled : Boolean get() = error is CancellationException
+        val hasError: Boolean get() = error != null && !cancelled
         companion object {
-            val cancelled = SingleResult(false, CancellationException())
-            val success = SingleResult(true, null)
-            fun error(e:Throwable) = SingleResult(false, e)
+            val cancelled = Result(false, CancellationException())
+            val success = Result(true, null)
+            fun error(e:Throwable) = Result(false, e)
         }
     }
-    data class Result(val first:SingleResult, val last:SingleResult?) {
-        val isCancelled: Boolean get() = first.isCancelled || last?.isCancelled == true
-        val isError: Boolean get() = first.isError || last?.isError == true
-        val isSucceeded: Boolean get() = first.succeeded && last?.succeeded != false
-    }
 
-    class Progress(val onProgress:((ISplitProgress)->Unit)?) : ISplitProgress {
+    class Progress(val onProgress:((IProgress)->Unit)?) : IProgress {
+        private val startTick = System.currentTimeMillis()
+        private var videoLength = 0L
+        private var audioLength = 0L
+
         override var total: Long = 0L
-        override var current: Long = 0L
-            set(v) { field = v; if (total>0L) { onProgress?.invoke(this) } }
+        override val current: Long
+            get() = min(videoLength, audioLength)
         override var remainingTime: Long = -1L
-        override var progressFirst: Boolean = true
+            private set
 
-        fun setPart(first:Boolean, partDuration:Long) {
-            total = 0L
-            current = 0L
-            remainingTime = -1L
-            progressFirst = first
-            total = partDuration
-            onProgress?.invoke(this)
+        fun updateVideo(video:Long) {
+            val prev = current
+            videoLength += video
+            if (prev!=current && total>0) {
+                if (percentage>10) {
+                    remainingTime = (System.currentTimeMillis() - startTick) * (100 - percentage) / percentage
+                }
+                onProgress?.invoke(this)
+            }
         }
 
+        fun updateAudio(audio:Long) {
+            val prev = current
+            audioLength += audio
+            if (prev!=current) {
+                if (percentage>10) {
+                    remainingTime = (System.currentTimeMillis() - startTick) * (100 - percentage) / percentage
+                }
+                onProgress?.invoke(this)
+            }
+        }
     }
 
-    suspend fun split() : Result {
+    suspend fun trim(outPath: IOutputMediaFile, startMs: Long, endMs:Long): Result {
+        actualSoughtMap.clear()
         isCancelled = false
         return withContext(Dispatchers.IO) {
             val metaData = MetaData.fromFile(inPath)
+            val actualEndMs = if (endMs>=0) endMs else metaData.duration?:Long.MAX_VALUE
+            if (startMs<0 || actualEndMs<=startMs) return@withContext Result.error(IllegalArgumentException("invalid range: $startMs-$actualEndMs"))
             try {
-                progress.setPart(true, splitAtUs)
-                extract(metaData, 0L, splitAtUs, out1Path)
+                progress.total = if (actualEndMs==Long.MAX_VALUE) -1L else actualEndMs-startMs
+                extractRangesToFile(metaData, outPath, RangeUs.fromMs(startMs, actualEndMs))
+                Result.success
             } catch (e:Throwable) {
                 if (deleteOutputOnError) {
-                    runCatching { out1Path.delete() }
+                    runCatching { outPath.delete() }
                 }
-                return@withContext Result(SingleResult.error(e), null)
+                Result.error(e)
             }
-            if (out2Path == null) return@withContext Result(SingleResult.success, null)
+        }
+
+    }
+
+    suspend fun trim(outPath: IOutputMediaFile, vararg ranges: RangeMs):Result {
+        actualSoughtMap.clear()
+        isCancelled = false
+        return withContext(Dispatchers.IO) {
+            if (ranges.isEmpty()) return@withContext Result.error(IllegalArgumentException("ranges is empty"))
+            val metaData = MetaData.fromFile(inPath)
+            val duration = metaData.duration ?: Long.MAX_VALUE
+            progress.total = ranges.fold(0L) { acc, range ->
+                if (acc<0) return@fold -1
+                val actualEnd = if (range.endMs<0||range.endMs==Long.MAX_VALUE) duration else range.endMs
+                if (actualEnd == Long.MAX_VALUE) -1
+                else acc + (actualEnd - range.startMs)
+            }
             try {
-                val duration = (metaData.duration ?: 0) * 1000L
-                progress.setPart(false, duration-splitAtUs)
-                extract(metaData, splitAtUs, Long.MAX_VALUE, out2Path)
-                Result(SingleResult.success, SingleResult.success)
+                extractRangesToFile(metaData, outPath, *(ranges.map { RangeUs.fromMs(it) }.toTypedArray()))
+                Result.success
             } catch (e:Throwable) {
                 if (deleteOutputOnError) {
-                    runCatching { out2Path.delete() }
+                    runCatching { outPath.delete() }
                 }
-                Result(SingleResult.success, SingleResult.error(e))
+                Result.error(e)
+            }
+        }
+
+    }
+
+    suspend fun chop(out1Path: IOutputMediaFile, out2Path: IOutputMediaFile, atTimeMs:Long) : Result {
+        actualSoughtMap.clear()
+        isCancelled = false
+        return withContext(Dispatchers.IO) {
+            if (atTimeMs<=0L) return@withContext Result.error(IllegalArgumentException("invalid time: $atTimeMs"))
+            val metaData = MetaData.fromFile(inPath)
+            try {
+                progress.total = metaData.duration?:-1L
+                extractRangesToFile(metaData, out1Path, RangeUs.fromMs(0L,atTimeMs))
+                extractRangesToFile(metaData, out2Path, RangeUs.fromMs(atTimeMs, Long.MAX_VALUE))
+                Result.success
+            } catch (e:Throwable) {
+                if (deleteOutputOnError) {
+                    runCatching {
+                        out1Path.delete()
+                        out2Path.delete()
+                    }
+                }
+                return@withContext Result.error(e)
             }
         }
     }
+
+    fun correctPosition(timeUs:Long):Long {
+        return actualSoughtMap[timeUs] ?: timeUs
+    }
+
 }

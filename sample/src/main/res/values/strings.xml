@@ -32,4 +32,9 @@
     <string name="chop">Chop</string>
     <string name="output_2_label_short">OUT2:</string>
     <string name="label_split">Split at current position</string>
+    <string name="execute_crop">Crop</string>
+    <string name="execute_trimming">Trim</string>
+    <string name="label_params"><![CDATA[Source & Destination]]></string>
+    <string name="label_execute">Execution</string>
+    <string name="execute_chop">Chop</string>
 </resources>

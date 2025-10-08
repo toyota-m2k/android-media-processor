@@ -10,8 +10,20 @@ import java.io.IOException
 import java.io.InputStream
 
 
-@Suppress("unused")
 object FastStart {
+    enum class CheckResult {
+        AlreadyOptimized,   // already optimezed and no need to process
+        HasFreeAtom,        // this mp4 file has free atom ... should be processed
+        MoovAtomAtEnd,      // placing the moov atom at the end ... must be precessed.
+        Error,              // something went wrong
+    }
+    private enum class ProcessResult(val checkResult:CheckResult) {
+        AlreadyOptimized(CheckResult.AlreadyOptimized),
+        HasFreeAtom(CheckResult.HasFreeAtom),
+        MoovAtomAtEnd(CheckResult.MoovAtomAtEnd),
+        Converted(CheckResult.AlreadyOptimized),        // converted by processImpl()
+    }
+
     /**
      * Fast Start が必要かどうかをチェックする
      * @param inUri 入力（動画）ファイル
@@ -19,17 +31,17 @@ object FastStart {
      * @param removeFree true にすると、MOOV Atomが先頭にあっても（= Fast Start readyであっても）、Free Atom が存在すれば true を返す。
      * @return true: 必要 / false: 不要
      */
-    fun check(inUri: Uri, context: Context, removeFree:Boolean=true):Boolean
+    fun check(inUri: Uri, context: Context):CheckResult
         = check(AndroidFile(inUri, context))
 
-    fun check(inFile: AndroidFile, removeFree:Boolean=true):Boolean {
+    fun check(inFile: AndroidFile):CheckResult {
         return try {
             inFile.fileInputStream { inStream->
-                processImpl(inStream, null, removeFree, null)
+                processImpl(inStream, null, true, null).checkResult
             }
         } catch(e:Throwable) {
             logger.error(e)
-            false
+            CheckResult.Error
         }
     }
 
@@ -40,29 +52,29 @@ object FastStart {
      * @param context  uri解決用コンテキスト（ApplicationContextでok）
      * @return true: 処理した / false: 処理は不要だった、あるいはエラーのため処理できなかった
      */
-    fun process(inUri:Uri, outUri:Uri, context:Context, progressCallback: ((IProgress) -> Unit)?):Boolean {
-        return process(AndroidFile(inUri, context), AndroidFile(outUri, context), progressCallback)
+    fun process(inUri:Uri, outUri:Uri, context:Context, removeFree:Boolean, progressCallback: ((IProgress) -> Unit)?):Boolean {
+        return process(AndroidFile(inUri, context), AndroidFile(outUri, context), removeFree, progressCallback)
     }
-    fun process(inFile:AndroidFile, outFile:AndroidFile, progressCallback: ((IProgress) -> Unit)?):Boolean {
+    fun process(inFile:AndroidFile, outFile:AndroidFile, removeFree:Boolean, progressCallback: ((IProgress) -> Unit)?):Boolean {
         var result = false
         try {
-            inFile.fileInputStream { inStream->
+            result = inFile.fileInputStream { inStream->
                 outFile.fileOutputStream { outStream ->
-                    result = processImpl(inStream, outStream, true, progressCallback)
+                    processImpl(inStream, outStream, removeFree, progressCallback) == ProcessResult.Converted
                 }
             }
         } catch(e:Throwable) {
             logger.error(e)
-            result = false
         } finally {
             if(!result) {
+                // コンバートされなければ outFile を削除
                 outFile.safeDelete()
             }
         }
         return result
     }
 
-    val logger = UtLog("FastStart2", Converter.logger)
+    val logger = UtLog("FastStart", Converter.logger)
 
     private const val CHUNK_SIZE = 8192
 
@@ -183,7 +195,7 @@ object FastStart {
         }
     }
 
-    private fun processImpl(inputStream: FileInputStream, outputStream: FileOutputStream?, removeFree:Boolean, progressCallback:((IProgress)->Unit)?): Boolean {
+    private fun processImpl(inputStream: FileInputStream, outputStream: FileOutputStream?, removeFree:Boolean, progressCallback:((IProgress)->Unit)?): ProcessResult {
         val index: ArrayList<Atom> = try {
             getIndex(inputStream)
         } catch (ex: IOException) {
@@ -206,15 +218,28 @@ object FastStart {
                 logger.info("Removing free atom at ${atom.start} (${atom.size} bytes)")
             }
         }
+        var state = ProcessResult.MoovAtomAtEnd
         var offset = (moov!!.size - freeSize).toInt()
         if (moov.start < mdatStart) {
+            // moov atom は先頭（mdatより前）にある
             offset -= moov.size.toInt()
-            if (!removeFree || freeSize == 0L) {
-                //good to go already!
-                logger.info("File already suitable.")
-                return false
+            if (freeSize==0L) {
+                state = ProcessResult.AlreadyOptimized
+            } else {
+                state = ProcessResult.HasFreeAtom
             }
         }
+        if(outputStream==null) {
+            logger.debug("check result = $state")
+            return state
+        }
+
+        if(state == ProcessResult.AlreadyOptimized || (!removeFree && state==ProcessResult.HasFreeAtom)) {
+            logger.info("No need to process. state=$state")
+            return state
+        }
+
+
         val moovContents = ByteArray(moov.size.toInt())
         try {
             inputStream.channel.position(moov.start)
@@ -257,9 +282,6 @@ object FastStart {
         } catch (ex: IOException) {
             logger.error(ex)
             throw FastStartException("IO Exception while patching moov.")
-        }
-        if(outputStream==null) {
-            return true
         }
         logger.debug("Writing output file:")
 
@@ -329,6 +351,6 @@ object FastStart {
             outputStream.close()
         } catch (e: IOException) { /* Intentionally empty */
         }
-        return true
+        return ProcessResult.Converted
     }
 }

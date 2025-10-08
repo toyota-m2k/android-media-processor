@@ -43,24 +43,24 @@ class Muxer(inputMetaData: MetaData, outPath: IOutputMediaFile, private val hasA
     }
 
     private fun setupMetaDataBy(metaData: MetaData, rotation: Rotation?) {
-            val metaRotation = metaData.rotation
-            if (metaRotation != null) {
-                val r = rotation?.rotate(metaRotation) ?: metaRotation
-                muxer.setOrientationHint(r)
-                logger.info("metadata: rotation=$metaRotation --> $r")
-            } else if(rotation!=null){
-                muxer.setOrientationHint(rotation.rotate(0))
+        val metaRotation = metaData.rotation
+        if (metaRotation != null) {
+            val r = rotation?.rotate(metaRotation) ?: metaRotation
+            muxer.setOrientationHint(r)
+            logger.info("metadata: rotation=$metaRotation --> $r")
+        } else if(rotation!=null){
+            muxer.setOrientationHint(rotation.rotate(0))
+        }
+        val locationString = metaData.location
+        if (locationString != null) {
+            val location: FloatArray? = ISO6709LocationParser.parse(locationString)
+            if (location != null) {
+                muxer.setLocation(location[0], location[1])
+                logger.info("metadata: latitude=${location[0]}, longitude=${location[1]}")
+            } else {
+                logger.error("metadata: failed to parse the location metadata: $locationString")
             }
-            val locationString = metaData.location
-            if (locationString != null) {
-                val location: FloatArray? = ISO6709LocationParser.parse(locationString)
-                if (location != null) {
-                    muxer.setLocation(location[0], location[1])
-                    logger.info("metadata: latitude=${location[0]}, longitude=${location[1]}")
-                } else {
-                    logger.error("metadata: failed to parse the location metadata: $locationString")
-                }
-            }
+        }
         val duration = metaData.duration
         if(duration!=null) {
             durationUs = duration*1000L
