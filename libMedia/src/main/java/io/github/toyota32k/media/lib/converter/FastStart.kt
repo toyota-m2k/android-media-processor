@@ -11,11 +11,11 @@ import java.io.InputStream
 
 
 object FastStart {
-    enum class CheckResult {
-        AlreadyOptimized,   // already optimezed and no need to process
-        HasFreeAtom,        // this mp4 file has free atom ... should be processed
-        MoovAtomAtEnd,      // placing the moov atom at the end ... must be precessed.
-        Error,              // something went wrong
+    enum class CheckResult(val optimizable:Boolean) {
+        AlreadyOptimized(false),   // already optimezed and no need to process
+        HasFreeAtom(true),        // this mp4 file has free atom ... should be processed
+        MoovAtomAtEnd(true),      // placing the moov atom at the end ... must be precessed.
+        Error(false),              // something went wrong
     }
     private enum class ProcessResult(val checkResult:CheckResult) {
         AlreadyOptimized(CheckResult.AlreadyOptimized),
@@ -55,13 +55,12 @@ object FastStart {
     fun process(inUri:Uri, outUri:Uri, context:Context, removeFree:Boolean, progressCallback: ((IProgress) -> Unit)?):Boolean {
         return process(AndroidFile(inUri, context), AndroidFile(outUri, context), removeFree, progressCallback)
     }
+
     fun process(inFile:AndroidFile, outFile:AndroidFile, removeFree:Boolean, progressCallback: ((IProgress) -> Unit)?):Boolean {
         var result = false
         try {
             result = inFile.fileInputStream { inStream->
-                outFile.fileOutputStream { outStream ->
-                    processImpl(inStream, outStream, removeFree, progressCallback) == ProcessResult.Converted
-                }
+                processImpl(inStream, outFile, removeFree, progressCallback) == ProcessResult.Converted
             }
         } catch(e:Throwable) {
             logger.error(e)
@@ -195,7 +194,7 @@ object FastStart {
         }
     }
 
-    private fun processImpl(inputStream: FileInputStream, outputStream: FileOutputStream?, removeFree:Boolean, progressCallback:((IProgress)->Unit)?): ProcessResult {
+    private fun processImpl(inputStream: FileInputStream, outputFile: AndroidFile?, removeFree:Boolean, progressCallback:((IProgress)->Unit)?): ProcessResult {
         val index: ArrayList<Atom> = try {
             getIndex(inputStream)
         } catch (ex: IOException) {
@@ -229,7 +228,7 @@ object FastStart {
                 state = ProcessResult.HasFreeAtom
             }
         }
-        if(outputStream==null) {
+        if(outputFile==null) {
             logger.debug("check result = $state")
             return state
         }
@@ -285,71 +284,65 @@ object FastStart {
         }
         logger.debug("Writing output file:")
 
-        //write FTYP
-        for (atom in index) {
-            if (atom.type.equals("ftyp", ignoreCase = true)) {
-                logger.debug("Writing ftyp...")
-                try {
-                    inputStream.channel.position(atom.start)
-                    val data = ByteArray(atom.size.toInt())
-                    inputStream.read(data)
-                    outputStream.write(data)
-                } catch (ex: IOException) {
-                    logger.error(ex)
-                    throw FastStartException("IO Exception during writing ftyp.")
+        outputFile.fileOutputStream { outputStream ->
+            //write FTYP
+            for (atom in index) {
+                if (atom.type.equals("ftyp", ignoreCase = true)) {
+                    logger.debug("Writing ftyp...")
+                    try {
+                        inputStream.channel.position(atom.start)
+                        val data = ByteArray(atom.size.toInt())
+                        inputStream.read(data)
+                        outputStream.write(data)
+                    } catch (ex: IOException) {
+                        logger.error(ex)
+                        throw FastStartException("IO Exception during writing ftyp.")
+                    }
                 }
             }
-        }
 
-        //write MOOV
-        try {
-            logger.debug("Writing moov...")
-            //if(DEBUG) System.out.println("Modified moov contents:\n"+moovOut.toString());
-            moovOut.writeTo(outputStream)
-            moovIn.close()
-            moovOut.close()
-        } catch (ex: IOException) {
-            logger.error(ex)
-            throw FastStartException("IO Exception during writing moov.")
-        }
-
-        //write everything else!
-        for (atom in index) {
-            if (atom.type.equals("ftyp", ignoreCase = true) ||
-                atom.type.equals("moov", ignoreCase = true) ||
-                atom.type.equals("free", ignoreCase = true)
-            ) {
-                continue
-            }
-            logger.debug("Writing ${atom.type}...")
-            val progress = Progress(atom.size, progressCallback)
+            //write MOOV
             try {
-                inputStream.channel.position(atom.start)
-                val chunk = ByteArray(CHUNK_SIZE)
-                for (i in 0 until atom.size / CHUNK_SIZE) {
-                    inputStream.read(chunk)
-                    outputStream.write(chunk)
-                    progress.update(progress.current + CHUNK_SIZE)
-                }
-                val remainder = (atom.size % CHUNK_SIZE).toInt()
-                if (remainder > 0) {
-                    inputStream.read(chunk, 0, remainder)
-                    outputStream.write(chunk, 0, remainder)
-                }
-                progress.update(atom.size)
+                logger.debug("Writing moov...")
+                //if(DEBUG) System.out.println("Modified moov contents:\n"+moovOut.toString());
+                moovOut.writeTo(outputStream)
+                moovIn.close()
+                moovOut.close()
             } catch (ex: IOException) {
                 logger.error(ex)
-                throw FastStartException("IO Exception during output writing.")
+                throw FastStartException("IO Exception during writing moov.")
             }
-        }
-        logger.info("Write complete!")
 
-        //cleanup
-        try {
-            inputStream.close()
-            outputStream.flush()
-            outputStream.close()
-        } catch (e: IOException) { /* Intentionally empty */
+            //write everything else!
+            for (atom in index) {
+                if (atom.type.equals("ftyp", ignoreCase = true) ||
+                    atom.type.equals("moov", ignoreCase = true) ||
+                    atom.type.equals("free", ignoreCase = true)
+                ) {
+                    continue
+                }
+                logger.debug("Writing ${atom.type}...")
+                val progress = Progress(atom.size, progressCallback)
+                try {
+                    inputStream.channel.position(atom.start)
+                    val chunk = ByteArray(CHUNK_SIZE)
+                    for (i in 0 until atom.size / CHUNK_SIZE) {
+                        inputStream.read(chunk)
+                        outputStream.write(chunk)
+                        progress.update(progress.current + CHUNK_SIZE)
+                    }
+                    val remainder = (atom.size % CHUNK_SIZE).toInt()
+                    if (remainder > 0) {
+                        inputStream.read(chunk, 0, remainder)
+                        outputStream.write(chunk, 0, remainder)
+                    }
+                    progress.update(atom.size)
+                } catch (ex: IOException) {
+                    logger.error(ex)
+                    throw FastStartException("IO Exception during output writing.")
+                }
+            }
+            logger.info("Write complete!")
         }
         return ProcessResult.Converted
     }

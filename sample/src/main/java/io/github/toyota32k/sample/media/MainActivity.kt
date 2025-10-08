@@ -383,7 +383,7 @@ class MainActivity : UtMortalActivity() {
                                     if (convertResult.succeeded) {
                                         logger.debug(convertResult.toString())
                                         sink.message = "Optimizing Now..."
-                                        if (!FastStart.process(inFile = trimFile, outFile = optFile) {
+                                        if (!FastStart.process(inFile = trimFile, outFile = optFile, removeFree=true) {
                                                 sink.progress = it.percentage
                                                 sink.progressText = it.format()
                                             }) {
@@ -409,7 +409,6 @@ class MainActivity : UtMortalActivity() {
                 } else if (!result.cancelled) {
                     showConfirmMessageBox("Error.", result.errorMessage ?: result.exception?.message ?: "unknown")
                 }
-                true
             }
         }
 
@@ -444,7 +443,7 @@ class MainActivity : UtMortalActivity() {
                                 splitter.trim(trimFile, *ranges.map { Converter.Factory.RangeMs(it.start, it.end) }.toTypedArray()).also { result ->
                                     if (result.succeeded) {
                                         sink.message = "Optimizing Now..."
-                                        if (!FastStart.process(inFile = trimFile, outFile = optFile) {
+                                        if (!FastStart.process(inFile = trimFile, outFile = optFile, removeFree=true) {
                                                 sink.progress = it.percentage
                                                 sink.progressText = it.format()
                                             }) {
@@ -506,7 +505,7 @@ class MainActivity : UtMortalActivity() {
                                 splitter.chop(trim1File, trim2File, position).also { result ->
                                     if (result.succeeded) {
                                         sink.message = "Optimizing First File..."
-                                        if (!FastStart.process(inFile = trim1File, outFile = opt1File) {
+                                        if (!FastStart.process(inFile = trim1File, outFile = opt1File, removeFree=true) {
                                                 sink.progress = it.percentage
                                                 sink.progressText = it.format()
                                             }) {
@@ -515,7 +514,7 @@ class MainActivity : UtMortalActivity() {
                                         }
 
                                         sink.message = "Optimizing Last File..."
-                                        if (!FastStart.process(inFile = trim2File, outFile = opt2File) {
+                                        if (!FastStart.process(inFile = trim2File, outFile = opt2File, removeFree=true) {
                                                 sink.progress = it.percentage
                                                 sink.progressText = it.format()
                                             }) {
