@@ -502,7 +502,7 @@ class Splitter(
      * splitAtMs や startMs で指定した位置と実際に切り取られた位置（キーフレーム位置）は異なる可能性がある。
      */
     fun correctPositionMs(timeMs:Long):Long {
-        return actualSoughtMap[timeMs*1000] ?: timeMs
+        return actualSoughtMap[timeMs*1000L]?.let { it/1000L  } ?: timeMs
     }
 
 }
