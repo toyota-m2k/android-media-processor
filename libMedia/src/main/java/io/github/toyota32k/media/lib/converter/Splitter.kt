@@ -23,15 +23,16 @@ import kotlin.math.min
 /**
  * 元の形式のまま（デコード・再エンコードしないで）動画ファイルを分割する。
  */
-class Splitter(
+class Splitter private constructor(
     val inPath:IInputMediaFile,
-    private val deleteOutputOnError:Boolean = true,
-    private val rotation: Rotation? = null,
-    onProgress : ((IProgress)->Unit)? = null
+    private val deleteOutputOnError:Boolean,
+    private val rotation: Rotation?,
+    private val bufferSize:Int,
+    onProgress : ((IProgress)->Unit)?
     ) {
     companion object {
         val logger = UtLog("Splitter", Converter.logger, Splitter::class.java)
-        const val BUFFER_SIZE:Int = 8 * 1024 * 1024     // 8MB ... 1MB だと extractor.readSampleData() で InvalidArgumentException が発生
+        const val DEFAULT_BUFFER_SIZE:Int = 8 * 1024 * 1024     // 8MB ... 1MB だと extractor.readSampleData() で InvalidArgumentException が発生
     }
     // 進捗報告
     private val progress = ProgressHandler(onProgress)
@@ -48,7 +49,7 @@ class Splitter(
     // 作業用バッファ
     // 個々に確保するのは非経済的なので、クラスとして確保する。
     // 必要に応じて確保し、不要になったら解放できるよう UtLazyResetableValue を利用
-    private val mBuffer = UtLazyResetableValue<ByteBuffer> { ByteBuffer.allocateDirect(BUFFER_SIZE) }
+    private val mBuffer = UtLazyResetableValue<ByteBuffer> { ByteBuffer.allocateDirect(bufferSize) }
     private val buffer: ByteBuffer
         get() = mBuffer.value
     private val mBufferInfo = UtLazyResetableValue<MediaCodec.BufferInfo> { MediaCodec.BufferInfo() }
@@ -70,6 +71,7 @@ class Splitter(
         private var mInPath: IInputMediaFile? = inPath
         private var mDeleteOutputOnError:Boolean = true
         private var mRotation: Rotation? = null
+        private var mBufferSize = DEFAULT_BUFFER_SIZE
         private var mOnProgress : ((IProgress)->Unit)? = null
 
         // region inPath
@@ -140,6 +142,9 @@ class Splitter(
             mOnProgress = proc
         }
 
+        fun setBufferSize(sizeInBytes:Int) = apply {
+            mBufferSize = sizeInBytes.coerceAtLeast(DEFAULT_BUFFER_SIZE)
+        }
         // endregion
 
         fun build(): Splitter {
@@ -148,6 +153,7 @@ class Splitter(
                 inPath = inPath,
                 deleteOutputOnError = mDeleteOutputOnError,
                 rotation = mRotation,
+                bufferSize = mBufferSize,
                 onProgress = mOnProgress
             )
         }
