@@ -5,7 +5,6 @@ import io.github.toyota32k.logger.UtLog
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.FileInputStream
-import java.io.FileOutputStream
 import java.io.IOException
 import java.io.InputStream
 
@@ -137,7 +136,8 @@ object FastStart {
         val index = ArrayList<Atom>()
         var seenMoov = false
         var seenMdat = false
-        while (inputStream.available() > 0) {
+        val fileSize = inputStream.channel.size()
+        while (inputStream.channel.position() < fileSize) {
             try {
                 val atom = readAtom(inputStream)
                 var skippedBytes = 8
@@ -162,7 +162,7 @@ object FastStart {
         return index
     }
 
-    private fun skipToNextTable(inputStream: InputStream): Atom? {
+    private fun skipToNextTable(inputStream: ByteArrayInputStream): Atom? {
         while (inputStream.available() > 0) {
             val atom = readAtom(inputStream)
             if (isTableType(atom.type)) return atom else if (isKnownAncestorType(atom.type)) continue else inputStream.skip(atom.size - 8)
