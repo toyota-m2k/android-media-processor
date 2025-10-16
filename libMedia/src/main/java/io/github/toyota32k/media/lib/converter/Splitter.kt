@@ -39,6 +39,7 @@ class Splitter private constructor(
 
     // 位置補正情報
     private val actualSoughtMap = mutableMapOf<Long,Long>()
+    private var durationMs:Long = 0L
 
     // キャンセル
     private var isCancelled: Boolean = false
@@ -374,24 +375,26 @@ class Splitter private constructor(
             total = totalMs
         }
 
+        private fun updateRemainingTime() {
+            if (percentage>10) {
+                remainingTime = (System.currentTimeMillis() - startTick) * (100 - percentage) / percentage
+            }
+        }
+
         fun updateVideoUs(videoUs:Long) {
             val prev = current
             videoLength += videoUs/1000L
             if (prev!=current && total>0) {
-                if (percentage>10) {
-                    remainingTime = (System.currentTimeMillis() - startTick) * (100 - percentage) / percentage
-                }
+                updateRemainingTime()
                 onProgress?.invoke(this)
             }
         }
 
         fun updateAudioUs(audioUs:Long) {
             val prev = current
-            videoLength += audioUs/1000L
+            audioLength += audioUs/1000L
             if (prev!=current) {
-                if (percentage>10) {
-                    remainingTime = (System.currentTimeMillis() - startTick) * (100 - percentage) / percentage
-                }
+                updateRemainingTime()
                 onProgress?.invoke(this)
             }
         }
@@ -410,7 +413,8 @@ class Splitter private constructor(
         isCancelled = false
         return withContext(Dispatchers.IO) {
             val metaData = MetaData.fromFile(inPath)
-            val actualEndMs = if (endMs>=0) endMs else metaData.duration?:Long.MAX_VALUE
+            durationMs = metaData.duration ?: Long.MAX_VALUE
+            val actualEndMs = if (endMs>=0) endMs else durationMs
             if (startMs<0 || actualEndMs<=startMs) return@withContext Result.error(IllegalArgumentException("invalid range: $startMs-$actualEndMs"))
             try {
                 progress.setTotalMs(if (actualEndMs==Long.MAX_VALUE) -1L else actualEndMs-startMs)
@@ -443,10 +447,10 @@ class Splitter private constructor(
         return withContext(Dispatchers.IO) {
             if (ranges.isEmpty()) return@withContext Result.error(IllegalArgumentException("ranges is empty"))
             val metaData = MetaData.fromFile(inPath)
-            val duration = metaData.duration ?: Long.MAX_VALUE
+            durationMs = metaData.duration ?: Long.MAX_VALUE
             progress.setTotalMs( ranges.fold(0L) { acc, range ->
                 if (acc<0) return@fold -1
-                val actualEnd = if (range.endMs<0||range.endMs==Long.MAX_VALUE) duration else range.endMs
+                val actualEnd = if (range.endMs<0||range.endMs==Long.MAX_VALUE) durationMs else range.endMs
                 if (actualEnd == Long.MAX_VALUE) -1
                 else acc + (actualEnd - range.startMs)
             })
@@ -481,6 +485,7 @@ class Splitter private constructor(
         return withContext(Dispatchers.IO) {
             if (atTimeMs<=0L) return@withContext Result.error(IllegalArgumentException("invalid time: $atTimeMs"))
             val metaData = MetaData.fromFile(inPath)
+            durationMs = metaData.duration ?: Long.MAX_VALUE
             try {
                 progress.setTotalMs( metaData.duration?:-1L )
                 extractRangesToFile(metaData, out1Path, RangeUs.fromMs(0L,atTimeMs))
@@ -511,4 +516,24 @@ class Splitter private constructor(
         return actualSoughtMap[timeMs*1000L]?.let { it/1000L  } ?: timeMs
     }
 
+    fun correctPositionUs(timeUs:Long):Long {
+        return actualSoughtMap[timeUs] ?: timeUs
+    }
+
+    /**
+     * trim() に使った Array<RangeMs> を一括補正する。
+     * trim()後の位置ではなく、元動画のどこで実際に分割したかを示す値を返す。
+     * ConvertResult#adjustedTrimmingRangeList と型互換
+     */
+    fun adjustedRangeList(ranges:Array<RangeMs>) : ITrimmingRangeList {
+        return TrimmingRangeListImpl().apply {
+            for (range in ranges) {
+                if (range.endMs > 0) {
+                    addRange(correctPositionUs(range.startMs * 1000L), correctPositionUs(range.endMs * 1000L))
+                } else {
+                    addRange(correctPositionUs(range.startMs * 1000L), correctPositionUs(durationMs * 1000L))
+                }
+            }
+        }
+    }
 }
