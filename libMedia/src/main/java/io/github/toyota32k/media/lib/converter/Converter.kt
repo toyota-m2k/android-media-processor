@@ -1,7 +1,10 @@
 package io.github.toyota32k.media.lib.converter
 
 import android.content.Context
+import android.graphics.Rect
 import android.net.Uri
+import android.os.Parcel
+import android.os.Parcelable
 import io.github.toyota32k.logger.UtLog
 import io.github.toyota32k.media.lib.format.ContainerFormat
 import io.github.toyota32k.media.lib.format.isHDR
@@ -14,6 +17,10 @@ import io.github.toyota32k.media.lib.strategy.IHDRSupport
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
 import io.github.toyota32k.media.lib.strategy.PresetAudioStrategies
 import io.github.toyota32k.media.lib.strategy.PresetVideoStrategies
+import io.github.toyota32k.media.lib.surface.IMatrixProvider
+import io.github.toyota32k.media.lib.surface.IdentityMatrixProvider
+import io.github.toyota32k.media.lib.surface.MatrixProvider
+import io.github.toyota32k.media.lib.surface.RenderOption
 import io.github.toyota32k.media.lib.track.AudioTrack
 import io.github.toyota32k.media.lib.track.Muxer
 import io.github.toyota32k.media.lib.track.Track
@@ -34,7 +41,19 @@ import kotlin.time.Duration
 /**
  * 動画ファイルのトランスコード/トリミングを行うコンバータークラス
  */
-class Converter {
+class Converter(
+    private val inPath:IInputMediaFile,
+    private val outPath: IOutputMediaFile,
+    private val videoStrategy: IVideoStrategy = PresetVideoStrategies.AVC720Profile,
+    private val audioStrategy:IAudioStrategy=PresetAudioStrategies.AACDefault,
+    private var trimmingRangeKeeper : ITrimmingRangeKeeper = TrimmingRangeKeeperImpl.empty,
+    private val deleteOutputOnError:Boolean = true,
+    private val rotation: Rotation? = null,
+    private val containerFormat: ContainerFormat = ContainerFormat.MPEG_4,
+    private val preferSoftwareDecoder: Boolean = false,  // 　HWデコーダーで読めない動画も、SWデコーダーなら読めるかもしれない。（Videoのみ）
+    private val renderOption: RenderOption = RenderOption.DEFAULT,
+    private val onProgress : ((IProgress)->Unit)? = null,
+) {
     companion object {
         val logger = UtLog("AMP", null, "io.github.toyota32k.media.lib.")
         @Suppress("unused")
@@ -55,22 +74,6 @@ class Converter {
         }
     }
 
-    lateinit var inPath:IInputMediaFile
-    lateinit var outPath: IOutputMediaFile
-
-    var videoStrategy: IVideoStrategy = PresetVideoStrategies.AVC720Profile
-    var audioStrategy:IAudioStrategy=PresetAudioStrategies.AACDefault
-    private var trimmingRangeKeeper : ITrimmingRangeKeeper = TrimmingRangeKeeperImpl.empty
-    var trimmingRangeList: ITrimmingRangeList
-        get() = trimmingRangeKeeper
-        set(value) {
-            trimmingRangeKeeper = value as? ITrimmingRangeKeeper ?: TrimmingRangeKeeperImpl(value)
-        }
-    var deleteOutputOnError:Boolean = true
-    var rotation: Rotation? = null
-    var containerFormat: ContainerFormat = ContainerFormat.MPEG_4
-    var preferSoftwareDecoder: Boolean = false  // 　HWデコーダーで読めない動画も、SWデコーダーなら読めるかもしれない。（Videoのみ）
-    var onProgress : ((IProgress)->Unit)? = null
     lateinit var report :Report
 
     /**
@@ -81,8 +84,17 @@ class Converter {
         companion object {
             val logger = UtLog("Factory", Converter.logger)
         }
-        private val converter = Converter()
+
         private val trimmingRangeList = TrimmingRangeListImpl()
+        private var mInPath:IInputMediaFile? = null
+        private var mOutPath: IOutputMediaFile? = null
+        private var mVideoStrategy: IVideoStrategy = PresetVideoStrategies.AVC720Profile
+        private var mAudioStrategy: IAudioStrategy = PresetAudioStrategies.AACDefault
+        private var mOnProgress:((IProgress)->Unit)? = null
+        private var mDeleteOutputOnError = true
+        private var mRotation: Rotation? = null
+        private var mContainerFormat: ContainerFormat = ContainerFormat.MPEG_4
+        private var mPreferSoftwareDecoder = false
 
         // for backward compatibility only
         private var trimStart:Long = 0L
@@ -91,6 +103,8 @@ class Converter {
 
         private var mKeepProfile:Boolean = false
         private var mKeepHDR: Boolean = false
+        private var mBrightnessFactor = 1f
+        private var mCropRect: Rect? = null
 
         /**
          * 入力ファイルを設定（必須）
@@ -98,7 +112,7 @@ class Converter {
          * @param IInputMediaFile
          */
         fun input(src:IInputMediaFile) = apply {
-            converter.inPath = src
+            mInPath = src
         }
 
         /**
@@ -141,7 +155,7 @@ class Converter {
          * @param IOutputMediaFile
          */
         fun output(dst:IOutputMediaFile) = apply {
-            converter.outPath = dst
+            mOutPath = dst
         }
 
         /**
@@ -164,14 +178,14 @@ class Converter {
          * VideoStrategyを設定
          */
         fun videoStrategy(s:IVideoStrategy) = apply {
-            converter.videoStrategy = s
+            mVideoStrategy = s
         }
 
         /**
          * AudioStrategyを設定
          */
         fun audioStrategy(s: IAudioStrategy) = apply {
-            converter.audioStrategy = s
+            mAudioStrategy = s
         }
 
         /**
@@ -279,7 +293,7 @@ class Converter {
          * 進捗報告ハンドラを設定
          */
         fun setProgressHandler(proc:(IProgress)->Unit) = apply {
-            converter.onProgress = proc
+            mOnProgress = proc
         }
 
         /**
@@ -287,14 +301,14 @@ class Converter {
          * デフォルトは true
          */
         fun deleteOutputOnError(flag:Boolean) = apply {
-            converter.deleteOutputOnError = flag
+            mDeleteOutputOnError = flag
         }
 
         /**
          * 動画の向きを指定
          */
         fun rotate(rotation: Rotation) = apply {
-            converter.rotation = rotation
+            mRotation = rotation
         }
 
         /**
@@ -302,15 +316,33 @@ class Converter {
          * MPEG_4 以外はテストしていません。
          */
         fun containerFormat(format: ContainerFormat) = apply {
-            converter.containerFormat = format
+            mContainerFormat = format
         }
 
         /**
          * ソフトウェアデコーダーを優先するかどうか
          */
         fun preferSoftwareDecoder(flag:Boolean):Factory {
-            converter.preferSoftwareDecoder = flag
+            mPreferSoftwareDecoder = flag
             return this
+        }
+
+        fun brightness(brightness:Float):Factory {
+            mBrightnessFactor = brightness
+            return this
+        }
+        fun crop(rect:Rect) : Factory {
+            mCropRect = rect
+            return this
+        }
+        fun crop(x:Int, y:Int, cx:Int, cy:Int) : Factory {
+            mCropRect = Rect(x, y, x+cx, y+cy)
+            return this
+        }
+
+        private val inputSummary: Summary by lazy {
+            val inPath = mInPath ?: throw IllegalStateException("no input path.")
+            analyze(inPath)
         }
 
         /**
@@ -319,7 +351,7 @@ class Converter {
          */
         private fun adjustVideoStrategy(strategy:IVideoStrategy):IVideoStrategy {
             if (!mKeepHDR && !mKeepProfile) return strategy
-            val summary = analyze(converter.inPath)
+            val summary = inputSummary
             val srcCodec = summary.videoSummary?.codec ?: return strategy
             val srcProfile = summary.videoSummary?.profile ?: return strategy
             val srcLevel = summary.videoSummary?.level ?: strategy.maxLevel
@@ -338,38 +370,57 @@ class Converter {
         }
 
         fun build():Converter {
-            if(!converter::inPath.isInitialized) throw IllegalStateException("input file is not specified.")
-            if(!converter::outPath.isInitialized) throw IllegalStateException("output file is not specified.")
+            if(mInPath==null) throw IllegalStateException("input file is not specified.")
+            if(mOutPath==null) throw IllegalStateException("output file is not specified.")
 
             if (mKeepProfile || mKeepHDR) {
-                converter.videoStrategy =  adjustVideoStrategy(converter.videoStrategy)
+                mVideoStrategy =  adjustVideoStrategy(mVideoStrategy)
             }
 
             logger.info("### media converter information ###")
-            logger.info("input : ${converter.inPath}")
-            logger.info("output: ${converter.outPath}")
-            logger.info("video strategy: ${converter.videoStrategy.javaClass.name}")
-            logger.info("audio strategy: ${converter.audioStrategy.javaClass.name}")
+            logger.info("input : ${mInPath}")
+            logger.info("output: ${mOutPath}")
+            logger.info("video strategy: ${mVideoStrategy.javaClass.name}")
+            logger.info("audio strategy: ${mAudioStrategy.javaClass.name}")
 
             if(trimmingRangeList.isEmpty && (trimStart>0 || trimEnd>0)) {
                 trimmingRangeList.addRange(trimStart, trimEnd)
             }
 
-            if(trimmingRangeList.isNotEmpty) {
-//                logger.info("trimming start: ${trimStart / 1000} ms")
-//                logger.info("trimming end  : ${trimEnd / 1000} ms")
-                converter.trimmingRangeKeeper = TrimmingRangeKeeperImpl(trimmingRangeList)
+            val trimmingRangeKeeper = if(trimmingRangeList.isNotEmpty) {
+                TrimmingRangeKeeperImpl(trimmingRangeList)
+            } else {
+                TrimmingRangeKeeperImpl.empty
             }
             if(limitDurationUs>0) {
-                converter.trimmingRangeKeeper.limitDurationUs = limitDurationUs
+                trimmingRangeKeeper.limitDurationUs = limitDurationUs
                 logger.info("limit duration: ${limitDurationUs / 1000} ms")
             }
 
-            logger.info("delete output on error = ${converter.deleteOutputOnError}")
-            if(converter.onProgress==null) {
+            logger.info("delete output on error = ${mDeleteOutputOnError}")
+            if(mOnProgress==null) {
                 logger.info("no progress handler")
             }
-            return converter
+            val renderOption = if (mCropRect!=null) {
+                val summary = inputSummary.videoSummary ?: throw IllegalStateException("no video information, cannot crop.")
+                RenderOption.create(summary.width, summary.height, mCropRect!!, mBrightnessFactor)
+            } else if (mBrightnessFactor!=1f) {
+                RenderOption.create(mBrightnessFactor)
+            } else {
+                RenderOption.DEFAULT
+            }
+            return Converter(
+                mInPath!!,
+                mOutPath!!,
+                mVideoStrategy,
+                mAudioStrategy,
+                trimmingRangeKeeper,
+                mDeleteOutputOnError,
+                mRotation,
+                mContainerFormat,
+                mPreferSoftwareDecoder,
+                renderOption,
+                mOnProgress)
         }
 
 //        suspend fun execute() : ConvertResult {
@@ -682,7 +733,7 @@ class Converter {
             val result = try {
                 report = Report().apply { start() }
                 AudioTrack.create(inPath, audioStrategy, report, cancellation).use { audioTrack->
-                VideoTrack.create(inPath, videoStrategy, report, cancellation, preferSoftwareDecoder).use { videoTrack->
+                VideoTrack.create(inPath, videoStrategy, report, cancellation, preferSoftwareDecoder, renderOption).use { videoTrack->
                 Muxer(videoTrack.metaData, outPath, audioTrack!=null, rotation, containerFormat).use { muxer->
                     videoTrack.chain(muxer)
                     audioTrack?.chain(muxer)

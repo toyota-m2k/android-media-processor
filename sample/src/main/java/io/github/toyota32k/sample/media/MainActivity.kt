@@ -1,9 +1,11 @@
 package io.github.toyota32k.sample.media
 
 import android.app.Application
+import android.graphics.Rect
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
+import android.util.Size
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.core.view.ViewCompat
@@ -48,6 +50,8 @@ import io.github.toyota32k.media.lib.converter.Splitter
 import io.github.toyota32k.media.lib.converter.format
 import io.github.toyota32k.media.lib.converter.toAndroidFile
 import io.github.toyota32k.media.lib.format.Codec
+import io.github.toyota32k.media.lib.format.getHeight
+import io.github.toyota32k.media.lib.format.getWidth
 import io.github.toyota32k.media.lib.strategy.DeviceCapabilities
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
@@ -351,6 +355,15 @@ class MainActivity : UtMortalActivity() {
                 converted.value = false
                 val result = ProgressDialog.withProgressDialog<ConvertResult> { sink ->
                     withContext(Dispatchers.IO) {
+                        val videoSize = srcFile.openMetadataRetriever().use {
+                            Size(it.obj.getWidth()?:0, it.obj.getHeight()?:0)
+                        }
+                        val subWidth = (videoSize.width*0.6).toInt()
+                        val subHeight = (videoSize.height*0.6).toInt()
+                        val sx = (videoSize.width-subWidth)/2
+                        val sy = (videoSize.height-subHeight)/2
+                        val crop = Rect(sx, sy, sx+subWidth, sy+subHeight)
+
                         sink.message = "Trimming Now"
                         val rotation = if (playerModel.rotation.value != 0) Rotation(playerModel.rotation.value, relative = true) else Rotation.nop
                         val converter = Converter.Factory()
@@ -358,6 +371,8 @@ class MainActivity : UtMortalActivity() {
                             .output(trimFile)
                             .audioStrategy(namedAudioStrategy.value.strategy)
                             .rotate(rotation)
+                            .crop(crop)
+                            .brightness(1.3f)
                             .addTrimmingRanges(*ranges.map { Converter.Factory.RangeMs(it.start, it.end) }.toTypedArray())
                             .setProgressHandler {
                                 sink.progress = it.percentage

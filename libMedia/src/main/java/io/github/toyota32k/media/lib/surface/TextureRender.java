@@ -60,8 +60,9 @@ public class TextureRender {
                     + "precision mediump float;\n"      // highp here doesn't seem to matter
                     + "varying vec2 vTextureCoord;\n"
                     + "uniform samplerExternalOES sTexture;\n"
+                    + "uniform float brightness;\n"
                     + "void main() {\n"
-                    + "  gl_FragColor = texture2D(sTexture, vTextureCoord);\n"
+                    + "  gl_FragColor = texture2D(sTexture, vTextureCoord) * brightness;\n"
                     + "}\n";
     private float[] mMVPMatrix = new float[16];
     private float[] mSTMatrix = new float[16];
@@ -71,7 +72,10 @@ public class TextureRender {
     private int muSTMatrixHandle;
     private int maPositionHandle;
     private int maTextureHandle;
-    public TextureRender() {
+    private int muBrightnessHandle;
+    private RenderOption mRenderOption = RenderOption.DEFAULT;
+    public TextureRender(RenderOption renderOption) {
+        mRenderOption = renderOption;
         mTriangleVertices = ByteBuffer.allocateDirect(
                         mTriangleVerticesData.length * FLOAT_SIZE_BYTES)
                 .order(ByteOrder.nativeOrder()).asFloatBuffer();
@@ -102,9 +106,11 @@ public class TextureRender {
         checkGlError("glVertexAttribPointer maTextureHandle");
         GLES20.glEnableVertexAttribArray(maTextureHandle);
         checkGlError("glEnableVertexAttribArray maTextureHandle");
-        Matrix.setIdentityM(mMVPMatrix, 0);
+        //Matrix.setIdentityM(mMVPMatrix, 0);
+        mRenderOption.getMatrixProvider().createMatrix(mMVPMatrix);
         GLES20.glUniformMatrix4fv(muMVPMatrixHandle, 1, false, mMVPMatrix, 0);
         GLES20.glUniformMatrix4fv(muSTMatrixHandle, 1, false, mSTMatrix, 0);
+        GLES20.glUniform1f(muBrightnessHandle, mRenderOption.getBrightness());
         GLES20.glDrawArrays(GLES20.GL_TRIANGLE_STRIP, 0, 4);
         checkGlError("glDrawArrays");
         GLES20.glFinish();
@@ -136,6 +142,11 @@ public class TextureRender {
         checkGlError("glGetUniformLocation uSTMatrix");
         if (muSTMatrixHandle == -1) {
             throw new RuntimeException("Could not get attrib location for uSTMatrix");
+        }
+        muBrightnessHandle = GLES20.glGetUniformLocation(mProgram, "brightness");
+        checkGlError("glGetUniformLocation brightness");
+        if (muBrightnessHandle == -1) {
+            throw new RuntimeException("Could not get uniform location for brightness");
         }
         int[] textures = new int[1];
         GLES20.glGenTextures(1, textures, 0);

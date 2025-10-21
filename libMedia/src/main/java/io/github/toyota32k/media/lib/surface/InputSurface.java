@@ -88,6 +88,11 @@ public class InputSurface {
         mWidth = getWidth();
         mHeight = getHeight();
     }
+
+    /**
+     * mSurfaceに紐づいた EGLSurfaceを作成する。
+     * EGLSurface のサイズは、mSurface のサイズに自動的に合わせられる。
+     */
     private void createEGLSurface() {
         //EGLConfig[] configs = new EGLConfig[1];
         int[] surfaceAttribs = {
@@ -143,6 +148,9 @@ public class InputSurface {
     }
     /**
      * Makes our EGL context and surface current.
+     *
+     * mEGLContextとmEGLSurfaceをカレントにする。
+     * これにより、TextureRender の描画コマンドが mEGLSurface に対して行われるようになる。
      */
     public void makeCurrent() {
         if (!EGL14.eglMakeCurrent(mEGLDisplay, mEGLSurface, mEGLSurface, mEGLContext)) {
@@ -151,6 +159,8 @@ public class InputSurface {
     }
     /**
      * Calls eglSwapBuffers.  Use this to "publish" the current frame.
+     *
+     * mEGLSurfaceへの描画内容が、Surfaceに反映される。
      */
     public boolean swapBuffers() {
         return EGL14.eglSwapBuffers(mEGLDisplay, mEGLSurface);

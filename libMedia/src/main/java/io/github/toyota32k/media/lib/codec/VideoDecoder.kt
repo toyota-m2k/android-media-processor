@@ -9,15 +9,17 @@ import io.github.toyota32k.media.lib.misc.ICancellation
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
 import io.github.toyota32k.media.lib.surface.OutputSurface
+import io.github.toyota32k.media.lib.surface.RenderOption
 import io.github.toyota32k.media.lib.track.Muxer
 
-class VideoDecoder(strategy: IVideoStrategy, format: MediaFormat, decoder: MediaCodec, report: Report, cancellation: ICancellation)
+class VideoDecoder(strategy: IVideoStrategy, format: MediaFormat, decoder: MediaCodec, renderOption: RenderOption, report: Report, cancellation: ICancellation)
     :BaseDecoder(strategy, format,decoder,report,cancellation)  {
     private lateinit var outputSurface:OutputSurface
+    private val renderOption = renderOption
     override val sampleType = Muxer.SampleType.Video
     override val logger = UtLog("Decoder(Video)", Converter.logger)
     override fun configure() {
-        outputSurface = OutputSurface()
+        outputSurface = OutputSurface(renderOption)
         mediaCodec.configure(mediaFormat, outputSurface.surface, null, 0)
     }
 

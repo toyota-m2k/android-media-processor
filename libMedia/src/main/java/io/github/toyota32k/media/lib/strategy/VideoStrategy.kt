@@ -22,12 +22,11 @@ import io.github.toyota32k.media.lib.format.height
 import io.github.toyota32k.media.lib.format.iFrameInterval
 import io.github.toyota32k.media.lib.format.isHDR
 import io.github.toyota32k.media.lib.format.mime
-import io.github.toyota32k.media.lib.format.safeGetInteger
-import io.github.toyota32k.media.lib.format.safeGetIntegerOrNull
 import io.github.toyota32k.media.lib.format.width
 import io.github.toyota32k.media.lib.strategy.DeviceCapabilities.capabilities
 import io.github.toyota32k.media.lib.strategy.DeviceCapabilities.isHardwareAccelerated
 import io.github.toyota32k.media.lib.strategy.DeviceCapabilities.isSoftwareOnly
+import io.github.toyota32k.media.lib.surface.RenderOption
 import kotlin.math.min
 import kotlin.math.roundToInt
 
@@ -104,7 +103,7 @@ open class VideoStrategy(
         return preferEncoderType(EncoderType.DEFAULT)
     }
 
-    override fun createOutputFormat(inputFormat: MediaFormat, metaData: MetaData, encoder: MediaCodec): MediaFormat {
+    override fun createOutputFormat(inputFormat: MediaFormat, metaData: MetaData, encoder: MediaCodec, renderOption: RenderOption): MediaFormat {
         // bitRate は、MediaFormat に含まれず、MetaDataにのみ含まれるケースがあるようなので、
         // 両方をチェックするようにしてみた。
         val bitRate = this.bitRate.value(inputFormat.bitRate, metaData.bitRate)
@@ -112,6 +111,10 @@ open class VideoStrategy(
         val iFrameInterval = this.iFrameInterval.value(inputFormat.iFrameInterval)
         var width = inputFormat.width ?: metaData.width ?: throw IllegalArgumentException("inputFormat have no size params.")
         var height = inputFormat.height ?: metaData.height ?: throw IllegalArgumentException("inputFormat have no size params.")
+        renderOption.matrixProvider.getOutputVideoSize(width, height).also { adjusted ->
+            width = adjusted.width
+            height = adjusted.height
+        }
         val sizeCriteria = this.sizeCriteria
         val bitRateMode = this.bitRateMode
         if(sizeCriteria!=null) {

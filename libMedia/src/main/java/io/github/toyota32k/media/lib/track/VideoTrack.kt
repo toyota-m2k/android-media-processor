@@ -18,14 +18,15 @@ import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.strategy.DeviceCapabilities
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
 import io.github.toyota32k.media.lib.strategy.VideoStrategy.Companion.logger
+import io.github.toyota32k.media.lib.surface.RenderOption
 
 class VideoTrack
-    private constructor(strategy:IVideoStrategy, extractor:Extractor, inputFormat:MediaFormat, decoder: MediaCodec, outputFormat:MediaFormat, encoder: MediaCodec, report: Report, val metaData: MetaData, cancellation: ICancellation)
+    private constructor(strategy:IVideoStrategy, extractor:Extractor, inputFormat:MediaFormat, decoder: MediaCodec, outputFormat:MediaFormat, encoder: MediaCodec, renderOption:RenderOption, report: Report, val metaData: MetaData, cancellation: ICancellation)
         : Track(extractor, Muxer.SampleType.Video,cancellation) {
 
     // 必ず、Encoder-->Decoder の順に初期化＆開始する。そうしないと、Decoder側の inputSurfaceの初期化に失敗する。
     override val encoder: VideoEncoder = VideoEncoder(strategy, outputFormat, encoder,report,cancellation).apply { start() }
-    override val decoder: VideoDecoder = VideoDecoder(strategy, inputFormat,decoder, report,cancellation).apply { start() }
+    override val decoder: VideoDecoder = VideoDecoder(strategy, inputFormat, decoder, renderOption, report, cancellation).apply { start() }
 
     companion object {
         private fun createSoftwareDecoder(inputFormat: MediaFormat):MediaCodec {
@@ -52,7 +53,7 @@ class VideoTrack
             }
         }
 
-        fun create(inPath: IInputMediaFile, strategy: IVideoStrategy, report: Report, cancellation: ICancellation, preferSoftwareDecode:Boolean) : VideoTrack {
+        fun create(inPath: IInputMediaFile, strategy: IVideoStrategy, report: Report, cancellation: ICancellation, preferSoftwareDecode:Boolean, renderOption: RenderOption) : VideoTrack {
             val extractor = Extractor.create(inPath, Muxer.SampleType.Video, cancellation)
             val metaData = MetaData.fromFile(inPath)
 //            val trackIdx = findTrackIdx(extractor.extractor, "video")
@@ -75,7 +76,7 @@ class VideoTrack
             }
 
             val encoder = strategy.createEncoder()
-            val outputFormat = strategy.createOutputFormat(inputFormat, metaData, encoder)
+            val outputFormat = strategy.createOutputFormat(inputFormat, metaData, encoder, renderOption)
 
             report.updateVideoStrategyName(strategy.name)
             report.updateVideoDecoder(decoder)
@@ -83,7 +84,7 @@ class VideoTrack
             report.updateInputSummary(inputFormat, metaData)
             report.updateOutputSummary(outputFormat)
 
-            return VideoTrack(strategy, extractor, inputFormat, decoder, outputFormat, encoder, report, metaData, cancellation)
+            return VideoTrack(strategy, extractor, inputFormat, decoder, outputFormat, encoder, renderOption, report, metaData, cancellation)
         }
     }
 }

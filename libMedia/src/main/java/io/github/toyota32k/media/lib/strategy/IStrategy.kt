@@ -12,6 +12,7 @@ import io.github.toyota32k.media.lib.format.MetaData
 import io.github.toyota32k.media.lib.format.Profile
 import io.github.toyota32k.media.lib.strategy.VideoStrategy.EncoderType
 import io.github.toyota32k.media.lib.strategy.VideoStrategy.SizeCriteria
+import io.github.toyota32k.media.lib.surface.RenderOption
 
 interface IStrategy {
     val name:String
@@ -53,7 +54,7 @@ interface IVideoStrategy : IStrategy {
     val bitRateMode: BitRateMode?
     val encoderType: EncoderType
 
-    fun createOutputFormat(inputFormat: MediaFormat, metaData: MetaData, encoder:MediaCodec): MediaFormat
+    fun createOutputFormat(inputFormat: MediaFormat, metaData: MetaData, encoder:MediaCodec, renderOption: RenderOption): MediaFormat
 
     fun derived(
         codec: Codec = this.codec,
