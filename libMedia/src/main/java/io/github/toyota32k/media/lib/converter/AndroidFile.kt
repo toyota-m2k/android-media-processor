@@ -16,6 +16,7 @@ import java.io.File
 import java.io.FileDescriptor
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.nio.file.Files
 
 /**
  * Converterの入・出力に利用できるファイルクラス
@@ -55,7 +56,6 @@ class AndroidFile : IInputMediaFile, IOutputMediaFile {
 //        }
 
     private fun getFileSizeFromUri(uri: Uri): Long {
-
         val contentResolver = context?.contentResolver ?: return -1L
         val mimeType = contentResolver.getType(uri) ?: return -1L
 
@@ -181,6 +181,14 @@ class AndroidFile : IInputMediaFile, IOutputMediaFile {
                 "file"-> uri.path?.let { File(it).name }
                 else -> null
             }
+        }
+    }
+
+    fun getContentType() : String? {
+        return when {
+            path != null -> Files.probeContentType(path.toPath())
+            uri != null && context != null -> context.contentResolver.getType(uri)
+            else -> null
         }
     }
 

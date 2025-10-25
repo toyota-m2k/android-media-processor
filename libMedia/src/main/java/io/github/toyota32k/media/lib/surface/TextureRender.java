@@ -44,7 +44,7 @@ public class TextureRender {
             -1.0f,  1.0f, 0.0f, 0.0f, 1.0f,
             1.0f,  1.0f, 0.0f, 1.0f, 1.0f,
     };
-    private FloatBuffer mTriangleVertices;
+    private final FloatBuffer mTriangleVertices;
     private static final String VERTEX_SHADER =
             "uniform mat4 uMVPMatrix;\n"
                     + "uniform mat4 uSTMatrix;\n"
@@ -64,8 +64,8 @@ public class TextureRender {
                     + "void main() {\n"
                     + "  gl_FragColor = texture2D(sTexture, vTextureCoord) * brightness;\n"
                     + "}\n";
-    private float[] mMVPMatrix = new float[16];
-    private float[] mSTMatrix = new float[16];
+    private final float[] mMVPMatrix = new float[16];
+    private final float[] mSTMatrix = new float[16];
     private int mProgram;
     private int mTextureID;
     private int muMVPMatrixHandle;
