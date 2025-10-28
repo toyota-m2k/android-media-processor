@@ -37,8 +37,8 @@ class MatrixProvider(val videoWidth:Int, val videoHeight:Int, val cropX: Int, va
 
 
         Matrix.setIdentityM(output, 0)
-        Matrix.translateM(output, 0, centerX, centerY, 0f)
-        Matrix.scaleM(output, 0, 1f/scaleX, 1f/scaleY, 1f) // 以降は通常通り描画
+        Matrix.scaleM(output, 0, 1/scaleX, 1/scaleY, 1f) // 以降は通常通り描画
+        Matrix.translateM(output, 0, -centerX, -centerY, 0f)
     }
 
     override fun getOutputVideoSize(inputWidth: Int, inputHeight: Int): Size {

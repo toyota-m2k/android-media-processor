@@ -11,6 +11,8 @@ object PresetVideoStrategies {
         VideoStrategy.SizeCriteria(VideoStrategy.HD720_S_SIZE, VideoStrategy.HD720_L_SIZE)
     val FHD1080SizeCriteria =
         VideoStrategy.SizeCriteria(VideoStrategy.FHD1080_S_SIZE, VideoStrategy.FHD1080_L_SIZE)
+    val UHD2160SizeCriteria =
+        VideoStrategy.SizeCriteria(VideoStrategy.UHD2160_S_SIZE, VideoStrategy.UHD2160_L_SIZE)
 
 
     fun noLevelProfiles(vararg elements: Profile): Array<ProfileLv> {
@@ -196,5 +198,40 @@ object PresetVideoStrategies {
         override fun hdr(profile: Profile?, level:Level?): IVideoStrategy
                 = toHdrStrategy(profile, level)
     }
+
+    // HEVC - H.265
+    // UHD 4K
+
+    object HEVC4KProfile : VideoStrategy(
+        codec = Codec.HEVC,
+        profile = Profile.HEVCProfileMain,
+        level = Level.HEVCMainTierLevel4,
+        fallbackProfiles = null,
+        sizeCriteria = UHD2160SizeCriteria,
+        bitRate = MaxDefault(85*1000*1000, 50*1000*1000),
+        frameRate = MaxDefault(30),
+        iFrameInterval =MinDefault(1),
+        colorFormat =ColorFormat.COLOR_FormatSurface,
+        bitRateMode = BitRateMode.VBR,
+    ), IHDRSupport {
+        override fun hdr(profile: Profile?, level:Level?): IVideoStrategy
+                = toHdrStrategy(profile, level)
+    }
+    object HEVC4KLowProfile : VideoStrategy(
+        codec = Codec.HEVC,
+        profile = Profile.HEVCProfileMain,
+        level = Level.HEVCMainTierLevel4,
+        fallbackProfiles = null,
+        sizeCriteria = UHD2160SizeCriteria,
+        bitRate = MaxDefault(50*1000*1000, 30*1000*1000),
+        frameRate = MaxDefault(30),
+        iFrameInterval =MinDefault(1),
+        colorFormat =ColorFormat.COLOR_FormatSurface,
+        bitRateMode = BitRateMode.VBR,
+    ), IHDRSupport {
+        override fun hdr(profile: Profile?, level:Level?): IVideoStrategy
+                = toHdrStrategy(profile, level)
+    }
+
 
 }

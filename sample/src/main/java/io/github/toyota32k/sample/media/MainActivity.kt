@@ -358,11 +358,16 @@ class MainActivity : UtMortalActivity() {
                         val videoSize = srcFile.openMetadataRetriever().use {
                             Size(it.obj.getWidth()?:0, it.obj.getHeight()?:0)
                         }
-                        val subWidth = (videoSize.width*0.6).toInt()
-                        val subHeight = (videoSize.height*0.6).toInt()
-                        val sx = (videoSize.width-subWidth)/2
-                        val sy = (videoSize.height-subHeight)/2
+                        val subWidth = (videoSize.width*0.5).toInt()
+                        val subHeight = (videoSize.height*0.5).toInt()
+                        val sx = videoSize.width-subWidth
+                        val sy = videoSize.height-subHeight
                         val crop = Rect(sx, sy, sx+subWidth, sy+subHeight)
+//                        val crop = Rect(
+//                            532,
+//                             203,
+//                             1663,
+//                             1052)
 
                         sink.message = "Trimming Now"
                         val rotation = if (playerModel.rotation.value != 0) Rotation(playerModel.rotation.value, relative = true) else Rotation.nop

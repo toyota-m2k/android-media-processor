@@ -3,8 +3,6 @@ package io.github.toyota32k.media.lib.converter
 import android.content.Context
 import android.graphics.Rect
 import android.net.Uri
-import android.os.Parcel
-import android.os.Parcelable
 import io.github.toyota32k.logger.UtLog
 import io.github.toyota32k.media.lib.format.ContainerFormat
 import io.github.toyota32k.media.lib.format.isHDR
@@ -17,9 +15,6 @@ import io.github.toyota32k.media.lib.strategy.IHDRSupport
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
 import io.github.toyota32k.media.lib.strategy.PresetAudioStrategies
 import io.github.toyota32k.media.lib.strategy.PresetVideoStrategies
-import io.github.toyota32k.media.lib.surface.IMatrixProvider
-import io.github.toyota32k.media.lib.surface.IdentityMatrixProvider
-import io.github.toyota32k.media.lib.surface.MatrixProvider
 import io.github.toyota32k.media.lib.surface.RenderOption
 import io.github.toyota32k.media.lib.track.AudioTrack
 import io.github.toyota32k.media.lib.track.Muxer
@@ -35,6 +30,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import kotlin.math.max
 import kotlin.math.min
 import kotlin.time.Duration
 
@@ -71,6 +67,24 @@ class Converter(
             } catch(_:Throwable) {
                 Summary()
             }
+        }
+
+        fun checkReEncodingNecessity(file: IInputMediaFile, strategy: IVideoStrategy) : Boolean {
+            val summary = analyze(file).videoSummary ?: return true // ソース情報が不明
+            if (strategy.codec != summary.codec) {
+                // コーデックが違う
+                return true
+            }
+            if (summary.bitRate>0 && summary.bitRate > strategy.bitRate.max) {
+                // ビットレートが、Strategy の max bitRate より大きい
+                return true
+            }
+            if (max(summary.width, summary.height) > strategy.sizeCriteria.longSide ||
+                min(summary.width, summary.height) > strategy.sizeCriteria.shortSide) {
+                // 解像度が、Strategy の制限より大きい（縮小が必要）
+                return true
+            }
+            return false
         }
     }
 

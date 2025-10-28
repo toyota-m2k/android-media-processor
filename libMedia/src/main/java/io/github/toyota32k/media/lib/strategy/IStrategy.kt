@@ -46,7 +46,7 @@ interface IAudioStrategy : IStrategy {
 }
 
 interface IVideoStrategy : IStrategy {
-    val sizeCriteria: SizeCriteria?
+    val sizeCriteria: SizeCriteria
     val bitRate: MaxDefault // = Int.MAX_VALUE,
     val frameRate: MaxDefault // = Int.MAX_VALUE,
     val iFrameInterval:MinDefault // = DEFAULT_IFRAME_INTERVAL,
@@ -61,7 +61,7 @@ interface IVideoStrategy : IStrategy {
         profile: Profile = this.profile,
         level: Level? = this.maxLevel,
         fallbackProfiles:Array<ProfileLv>? = this.fallbackProfiles,
-        sizeCriteria: SizeCriteria? = this.sizeCriteria,
+        sizeCriteria: SizeCriteria = this.sizeCriteria,
         bitRate: MaxDefault = this.bitRate, // = Int.MAX_VALUE,
         frameRate: MaxDefault = this.frameRate, // = Int.MAX_VALUE,
         iFrameInterval:MinDefault = this.iFrameInterval, // = DEFAULT_IFRAME_INTERVAL,

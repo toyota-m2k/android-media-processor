@@ -14,8 +14,8 @@ data class ConvertResult(val succeeded:Boolean, val adjustedTrimmingRangeList: I
         }
         val cancelled:ConvertResult
             get() = ConvertResult(false, null, null, true, null, null)
-        fun error(exception:Throwable):ConvertResult {
-            return if(exception is CancellationException) cancelled else ConvertResult(false, null, null, false, exception.message,exception)
+        fun error(exception:Throwable, errorMessage:String?=null):ConvertResult {
+            return if(exception is CancellationException) cancelled else ConvertResult(false, null, null, false, errorMessage ?: exception.message, exception)
         }
     }
 

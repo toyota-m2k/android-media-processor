@@ -36,7 +36,7 @@ open class VideoStrategy(
     level: Level? = null,
     fallbackProfiles: Array<ProfileLv>? = null,
 
-    override val sizeCriteria: SizeCriteria?,
+    override val sizeCriteria: SizeCriteria,
     override val bitRate: MaxDefault, // = Int.MAX_VALUE,
     override val frameRate: MaxDefault, // = Int.MAX_VALUE,
     override val iFrameInterval:MinDefault, // = DEFAULT_IFRAME_INTERVAL,
@@ -65,7 +65,7 @@ open class VideoStrategy(
         profile: Profile,
         level: Level?,
         fallbackProfiles:Array<ProfileLv>?,
-        sizeCriteria: SizeCriteria?,
+        sizeCriteria: SizeCriteria,
         bitRate: MaxDefault,
         frameRate: MaxDefault,
         iFrameInterval:MinDefault,
@@ -109,18 +109,16 @@ open class VideoStrategy(
         val bitRate = this.bitRate.value(inputFormat.bitRate, metaData.bitRate)
         val frameRate = this.frameRate.value(inputFormat.frameRate, metaData.frameRate)
         val iFrameInterval = this.iFrameInterval.value(inputFormat.iFrameInterval)
-        var width = inputFormat.width ?: metaData.width ?: throw IllegalArgumentException("inputFormat have no size params.")
-        var height = inputFormat.height ?: metaData.height ?: throw IllegalArgumentException("inputFormat have no size params.")
-        renderOption.matrixProvider.getOutputVideoSize(width, height).also { adjusted ->
-            width = adjusted.width
-            height = adjusted.height
-        }
-        val sizeCriteria = this.sizeCriteria
         val bitRateMode = this.bitRateMode
-        if(sizeCriteria!=null) {
-            val size = calcVideoSize(width, height, sizeCriteria)
-            width = size.width
-            height = size.height
+        var outputWidth = inputFormat.width ?: metaData.width ?: throw IllegalArgumentException("inputFormat have no size params.")
+        var outputHeight = inputFormat.height ?: metaData.height ?: throw IllegalArgumentException("inputFormat have no size params.")
+        renderOption.matrixProvider.getOutputVideoSize(outputWidth, outputHeight).also { croppedSize ->
+            outputWidth = croppedSize.width
+            outputHeight = croppedSize.height
+        }
+        calcVideoSize(outputWidth, outputHeight, sizeCriteria).also { limitedSize->
+            outputWidth = limitedSize.width
+            outputHeight = limitedSize.height
         }
         val pl = supportedProfileByEncoder(encoder) ?: throw IllegalStateException("no supported profile.")
         val brm = if(bitRateMode!=null && isBitrateModeSupported(encoder, bitRateMode)) bitRateMode else null
@@ -143,9 +141,9 @@ open class VideoStrategy(
         logger.info("- Profile         ${inputProfile?:"n/a"} --> ${Profile.fromValue(codec, pl.profile)?:"n/a"}")
         logger.info("- Level           ${Level.fromFormat(inputFormat)} --> ${Level.fromValue(codec,pl.level)?:"n/a"}")
         logger.info("- Width           ${inputFormat.width?:"n/a"}")
-        logger.info("- Width(Meta)     ${metaData.width?:"n/a"} --> $width")
+        logger.info("- Width(Meta)     ${metaData.width?:"n/a"} --> $outputWidth")
         logger.info("- Height          ${inputFormat.height?:"n/a"}")
-        logger.info("- Height(Meta)    ${metaData.height?:"n/a"} --> $height")
+        logger.info("- Height(Meta)    ${metaData.height?:"n/a"} --> $outputHeight")
         logger.info("- BitRate         ${inputFormat.bitRate?:"n/a"}")
         logger.info("- BitRate(Meta)   ${metaData.bitRate?:"n/a"} --> $bitRate")
         logger.info("- BitRateMode     ${inputFormat.bitRateMode?:"n/a"} --> ${brm?:"n/a"}")
@@ -163,7 +161,7 @@ open class VideoStrategy(
         }
         logger.info("-------------------------------------------------------------------")
 
-        return MediaFormat.createVideoFormat(codec.mime, width, height).apply {
+        return MediaFormat.createVideoFormat(codec.mime, outputWidth, outputHeight).apply {
             setInteger(MediaFormat.KEY_BIT_RATE, bitRate)
             setInteger(MediaFormat.KEY_FRAME_RATE, frameRate)
             setInteger(MediaFormat.KEY_I_FRAME_INTERVAL, iFrameInterval)
@@ -285,7 +283,7 @@ open class VideoStrategy(
         return calcVideoSize(width, height, sizeCriteria ?: throw IllegalStateException("sizeCriteria is null."))
     }
 
-    data class SizeCriteria(val shortSize:Int, val longSide:Int)
+    data class SizeCriteria(val shortSide:Int, val longSide:Int)
 
     protected fun getCapabilitiesOf(info: MediaCodecInfo): CodecCapabilities? {
         return capabilities(info, codec.mime)
@@ -349,12 +347,15 @@ open class VideoStrategy(
         const val HD720_L_SIZE = 1280
         const val FHD1080_S_SIZE = 1080
         const val FHD1080_L_SIZE = 1920
+        const val UHD2160_S_SIZE = 2160
+        const val UHD2160_L_SIZE = 3840
+
 
         fun calcVideoSize(width:Int, height:Int, criteria:SizeCriteria) : Size {
             var r = if (width > height) { // 横長
-                min(criteria.longSide.toFloat() / width, criteria.shortSize.toFloat() / height)
+                min(criteria.longSide.toFloat() / width, criteria.shortSide.toFloat() / height)
             } else { // 縦長
-                min(criteria.shortSize.toFloat() / width, criteria.longSide.toFloat() / height)
+                min(criteria.shortSide.toFloat() / width, criteria.longSide.toFloat() / height)
             }
             if (r > 1) { // 拡大はしない
                 r = 1f
