@@ -1,5 +1,7 @@
 package io.github.toyota32k.media.lib.converter
 
+import io.github.toyota32k.media.lib.converter.Converter.Factory.RangeMs
+import kotlin.collections.get
 import kotlin.math.min
 
 class TrimmingRangeListImpl : ITrimmingRangeList {
@@ -19,6 +21,9 @@ class TrimmingRangeListImpl : ITrimmingRangeList {
         }
     }
 
+    override fun clear() {
+        list.clear()
+    }
     override fun addRange(startUs:Long, endUs:Long) {
         val s =  list.firstOrNull()?.startUs ?: 0L
         val e =  list.lastOrNull()?.endUs ?: 0L
@@ -55,6 +60,23 @@ class TrimmingRangeListImpl : ITrimmingRangeList {
 class TrimmingRangeKeeperImpl(val trimmingRangeList: ITrimmingRangeList = TrimmingRangeListImpl()): ITrimmingRangeKeeper, ITrimmingRangeList by trimmingRangeList {
     // limit duration
     override var limitDurationUs: Long = 0L    // 0: no limit
+    private val actualSoughtMap: Map<Long, Long> = mutableMapOf()
+    override fun correctPositionUs(timeUs:Long):Long {
+        return actualSoughtMap[timeUs] ?: timeUs
+    }
+    override fun exportToMap(map: MutableMap<Long, Long>) {
+        map.putAll(actualSoughtMap)
+    }
+    override fun adjustedRangeList(ranges:Array<RangeMs>) : ITrimmingRangeList {
+        if (naturalDurationUs<0) throw IllegalStateException("call closeBy() in advance.")
+        return super.adjustedRangeList(naturalDurationUs/1000L, ranges)
+    }
+
+    fun putSoughtPosition(req:Long, act:Long) {
+        (actualSoughtMap as MutableMap)[req] = act
+    }
+
+
 
     private val rawTrimmedDuration: Long
         get() = trimmingRangeList.trimmedDurationUs

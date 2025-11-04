@@ -34,6 +34,8 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.time.Duration
 
+typealias RangeMs = Converter.Factory.RangeMs
+
 /**
  * 動画ファイルのトランスコード/トリミングを行うコンバータークラス
  */
@@ -234,6 +236,10 @@ class Converter(
             trimmingRangeList.addRange(startMs*1000, endMs*1000)
         }
 
+        fun resetTrimmingRangeList() = apply {
+            trimmingRangeList.clear()
+        }
+
         /**
          * トリミング範囲を追加
          * @param start 開始位置 (Duration) nullなら先頭から
@@ -387,14 +393,17 @@ class Converter(
             if(mInPath==null) throw IllegalStateException("input file is not specified.")
             if(mOutPath==null) throw IllegalStateException("output file is not specified.")
 
-            if (mKeepProfile || mKeepHDR) {
-                mVideoStrategy =  adjustVideoStrategy(mVideoStrategy)
+            val videoStrategy = if (mKeepProfile || mKeepHDR) {
+                adjustVideoStrategy(mVideoStrategy)
+            } else {
+                mVideoStrategy
             }
+
 
             logger.info("### media converter information ###")
             logger.info("input : ${mInPath}")
             logger.info("output: ${mOutPath}")
-            logger.info("video strategy: ${mVideoStrategy.javaClass.name}")
+            logger.info("video strategy: ${videoStrategy.javaClass.name}")
             logger.info("audio strategy: ${mAudioStrategy.javaClass.name}")
 
             if(trimmingRangeList.isEmpty && (trimStart>0 || trimEnd>0)) {
@@ -426,7 +435,7 @@ class Converter(
             return Converter(
                 mInPath!!,
                 mOutPath!!,
-                mVideoStrategy,
+                videoStrategy,
                 mAudioStrategy,
                 trimmingRangeKeeper,
                 mDeleteOutputOnError,

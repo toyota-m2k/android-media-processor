@@ -107,7 +107,9 @@ class Extractor private constructor(
             } else {
                 extractor.seekTo(range.startUs, SEEK_TO_CLOSEST_SYNC)
                 logger.debug { "actually sought to: ${extractor.sampleTime.toUsTimeString()} (req: ${range.startUs.toUsTimeString()})" }
-                newList.addRange(extractor.sampleTime, range.endUs)
+                val sampleTime = extractor.sampleTime
+                newList.addRange(sampleTime, range.endUs)
+                newList.putSoughtPosition(range.startUs, extractor.sampleTime)
             }
         }
         // extractor.seekTo(0, SEEK_TO_CLOSEST_SYNC)

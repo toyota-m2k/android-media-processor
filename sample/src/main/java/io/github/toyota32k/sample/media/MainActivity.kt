@@ -447,7 +447,6 @@ class MainActivity : UtMortalActivity() {
                         sink.message = "Trimming Now"
                         val rotation = if (playerModel.rotation.value != 0) Rotation(playerModel.rotation.value, relative = true) else Rotation.nop
                         val splitter = Splitter.Factory()
-                            .input(srcFile)
                             .rotate(rotation)
                             .setProgressHandler {
                                 sink.progress = it.percentage
@@ -460,7 +459,7 @@ class MainActivity : UtMortalActivity() {
                             }
                         }.use {
                             try {
-                                splitter.trim(trimFile, *ranges.map { Converter.Factory.RangeMs(it.start, it.end) }.toTypedArray()).also { result ->
+                                splitter.trim(srcFile,trimFile, *ranges.map { Converter.Factory.RangeMs(it.start, it.end) }.toTypedArray()).also { result ->
                                     if (result.succeeded) {
                                         sink.message = "Optimizing Now..."
                                         if (!FastStart.process(inFile = trimFile, outFile = optFile, removeFree=true) {
@@ -509,7 +508,6 @@ class MainActivity : UtMortalActivity() {
                         sink.message = "Splitting Now"
                         val rotation = if (playerModel.rotation.value != 0) Rotation(playerModel.rotation.value, relative = true) else Rotation.nop
                         val splitter = Splitter.Factory()
-                            .input(srcFile)
                             .rotate(rotation)
                             .setProgressHandler {
                                 sink.progress = it.percentage
@@ -522,7 +520,7 @@ class MainActivity : UtMortalActivity() {
                             }
                         }.use {
                             try {
-                                splitter.chop(trim1File, trim2File, position).also { result ->
+                                splitter.chop(srcFile, trim1File, trim2File, position)[0].also { result ->
                                     if (result.succeeded) {
                                         sink.message = "Optimizing First File..."
                                         if (!FastStart.process(inFile = trim1File, outFile = opt1File, removeFree=true) {

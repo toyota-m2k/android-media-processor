@@ -18,6 +18,9 @@ data class ConvertResult(val succeeded:Boolean, val adjustedTrimmingRangeList: I
             return if(exception is CancellationException) cancelled else ConvertResult(false, null, null, false, errorMessage ?: exception.message, exception)
         }
     }
+    val actualSoughtMap : IActualSoughtMap?
+        get() = adjustedTrimmingRangeList as? IActualSoughtMap
+
 
     // for debug log
     override fun toString(): String {
