@@ -26,7 +26,7 @@ import java.nio.file.Files
  * ただし、Uriによる指定は、 android.provider.DocumentsProvider ベースのuri、すなわち、
  * Intent.ACTION_OPEN_DOCUMENTなどによって、取得されたuriであることを前提としている。
  */
-class AndroidFile : IInputMediaFile, IOutputMediaFile {
+class AndroidFile : IInputMediaFile, IOutputMediaFile, Comparable<AndroidFile> {
     val uri:Uri?
     val context:Context?
     val path: File?
@@ -76,24 +76,26 @@ class AndroidFile : IInputMediaFile, IOutputMediaFile {
         return -1L
     }
     override fun getLength():Long {
-        return if(hasPath) {
-            path!!.length()
-        } else if(hasUri){
-            getFileSizeFromUri(uri!!)
+        return if(path!=null) {
+            path.length()
+        } else if(uri!=null){
+            getFileSizeFromUri(uri)
         } else {
             -1L
         }
     }
 
     private fun <T> withFileDescriptor(mode:String, fn:(FileDescriptor)->T):T {
-        return if(hasUri) {
-            context!!.contentResolver.openAssetFileDescriptor(uri!!, mode)!!.use {
+        return if(uri!=null) {
+            context!!.contentResolver.openAssetFileDescriptor(uri, mode)!!.use {
+                fn(it.fileDescriptor)
+            }
+        } else if (path!=null){
+            ParcelFileDescriptor.open(path, ParcelFileDescriptor.parseMode(mode)).use {
                 fn(it.fileDescriptor)
             }
         } else {
-            ParcelFileDescriptor.open(path!!, ParcelFileDescriptor.parseMode(mode)).use {
-                fn(it.fileDescriptor)
-            }
+            throw IllegalStateException("no path or uri")
         }
     }
 
@@ -113,10 +115,12 @@ class AndroidFile : IInputMediaFile, IOutputMediaFile {
     }
 
     private fun openParcelFileDescriptor(mode:String):ParcelFileDescriptor {
-        return if(hasUri) {
-            context!!.contentResolver.openFileDescriptor(uri!!, mode )!!
-        } else { // Use RandomAccessFile so we can open the file with RW access;
-            ParcelFileDescriptor.open(path!!, ParcelFileDescriptor.parseMode(mode))
+        return if(uri!=null) {
+            context!!.contentResolver.openFileDescriptor(uri, mode )!!
+        } else if(path!=null) { // Use RandomAccessFile so we can open the file with RW access;
+            ParcelFileDescriptor.open(path, ParcelFileDescriptor.parseMode(mode))
+        } else {
+            throw IllegalStateException("no path or uri")
         }
     }
 
@@ -147,10 +151,20 @@ class AndroidFile : IInputMediaFile, IOutputMediaFile {
     }
 
     override fun delete() {
-        if (hasPath) {
-            path!!.delete()
-        } else if (hasUri) {
-            DocumentFile.fromSingleUri(context!!, uri!!)?.delete()
+        if (path!=null) {
+            path.delete()
+        } else if (uri!=null) {
+            DocumentFile.fromSingleUri(context!!, uri)?.delete()
+        }
+    }
+
+    fun canWrite():Boolean {
+        return if (path!=null) {
+            path.canWrite()
+        } else if (uri!=null) {
+            DocumentFile.fromSingleUri(context!!, uri)?.canWrite() == true
+        } else {
+            false
         }
     }
 
@@ -165,8 +179,8 @@ class AndroidFile : IInputMediaFile, IOutputMediaFile {
     }
 
     fun getFileName() : String? {
-        return if(hasPath) {
-            path?.name
+        return if(path!=null) {
+            path.name
         } else {
             when(uri?.scheme) {
                 "content"-> {
@@ -194,22 +208,20 @@ class AndroidFile : IInputMediaFile, IOutputMediaFile {
 
     @Suppress("unused")
     fun exists(): Boolean {
-        return (if(hasPath) {
-            path?.exists()
+        return if (path!=null) {
+            path.exists()
         } else {
             when(uri?.scheme) {
                 "content"-> {
                     val cursor: Cursor? = context?.contentResolver?.query(uri, null, null, null, null)
                     cursor?.use {
                         it.count > 0
-                    }
+                    } ?: false
                 }
-
-                "file"-> uri.path?.let { File(it).exists() }
+                "file"-> uri.path?.let { File(it).exists() } ?: false
                 else -> false
             }
-        }) == true
-
+        }
     }
 
 
@@ -222,6 +234,25 @@ class AndroidFile : IInputMediaFile, IOutputMediaFile {
                 input.channel.transferTo(0, input.channel.size(), output.channel)
             }
         }
+    }
+
+    override fun compareTo(other: AndroidFile): Int {
+        return when {
+            uri != null && other.uri != null -> uri.compareTo(other.uri)
+            path != null && other.path != null -> path.compareTo(other.path)
+            uri != null -> -1
+            other.uri != null -> 1
+            path != null -> -1
+            other.path != null -> 1
+            else -> 0
+        }
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (other !is AndroidFile) {
+            return false
+        }
+        return compareTo(other) == 0
     }
 
 //

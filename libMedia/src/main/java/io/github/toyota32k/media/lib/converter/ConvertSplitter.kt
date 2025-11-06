@@ -17,7 +17,7 @@ import kotlin.math.min
 import kotlin.math.roundToLong
 
 fun interface IOutputFileSelector {
-    fun selectOutputFile(index:Int, totalCount:Int, position:Long): IOutputMediaFile?
+    suspend fun selectOutputFile(index:Int, totalCount:Int, position:Long): IOutputMediaFile?
 }
 
 class ConvertSplitter(
