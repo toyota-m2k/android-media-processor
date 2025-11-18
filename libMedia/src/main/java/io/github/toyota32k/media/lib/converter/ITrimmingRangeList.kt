@@ -1,6 +1,5 @@
 package io.github.toyota32k.media.lib.converter
 
-import io.github.toyota32k.media.lib.converter.Converter.Factory.RangeMs
 
 /**
  * トリミング範囲のリスト
@@ -51,13 +50,14 @@ interface IActualSoughtMap {
     }
 
     fun exportToMap(map: MutableMap<Long, Long>)
+    val entries: Set<Map.Entry<Long, Long>>
 
     /**
      * trim() に使った Array<RangeMs> を一括補正する。
      * trim()後の位置ではなく、元動画のどこで実際に分割したかを示す値を返す。
      * ConvertResult#adjustedTrimmingRangeList と型互換
      */
-    fun adjustedRangeList(durationMs:Long, ranges:Array<RangeMs>) : ITrimmingRangeList {
+    fun adjustedRangeList(durationMs:Long, ranges:List<RangeMs>) : ITrimmingRangeList {
         return TrimmingRangeListImpl().apply {
             for (range in ranges) {
                 if (range.endMs > 0) {
@@ -69,7 +69,7 @@ interface IActualSoughtMap {
         }
     }
 
-    fun adjustedRangeList(ranges:Array<RangeMs>) : ITrimmingRangeList
+    fun adjustedRangeList(ranges:List<RangeMs>) : ITrimmingRangeList
 }
 
 /**

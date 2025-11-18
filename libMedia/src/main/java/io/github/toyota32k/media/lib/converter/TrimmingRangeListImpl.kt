@@ -1,7 +1,5 @@
 package io.github.toyota32k.media.lib.converter
 
-import io.github.toyota32k.media.lib.converter.Converter.Factory.RangeMs
-import kotlin.collections.get
 import kotlin.math.min
 
 class TrimmingRangeListImpl : ITrimmingRangeList {
@@ -67,7 +65,9 @@ class TrimmingRangeKeeperImpl(val trimmingRangeList: ITrimmingRangeList = Trimmi
     override fun exportToMap(map: MutableMap<Long, Long>) {
         map.putAll(actualSoughtMap)
     }
-    override fun adjustedRangeList(ranges:Array<RangeMs>) : ITrimmingRangeList {
+    override val entries: Set<Map.Entry<Long, Long>> get() = actualSoughtMap.entries
+
+    override fun adjustedRangeList(ranges:List<RangeMs>) : ITrimmingRangeList {
         if (naturalDurationUs<0) throw IllegalStateException("call closeBy() in advance.")
         return super.adjustedRangeList(naturalDurationUs/1000L, ranges)
     }

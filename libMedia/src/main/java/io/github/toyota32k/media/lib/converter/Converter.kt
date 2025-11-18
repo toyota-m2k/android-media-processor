@@ -4,6 +4,7 @@ import android.content.Context
 import android.graphics.Rect
 import android.net.Uri
 import io.github.toyota32k.logger.UtLog
+import io.github.toyota32k.media.lib.converter.RangeMs.Companion.outlineRange
 import io.github.toyota32k.media.lib.format.ContainerFormat
 import io.github.toyota32k.media.lib.format.isHDR
 import io.github.toyota32k.media.lib.misc.ICancellation
@@ -34,7 +35,41 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.time.Duration
 
-typealias RangeMs = Converter.Factory.RangeMs
+/**
+ * トリミング範囲 (開始位置、終了位置) クラス (ms)
+ */
+data class RangeMs(val startMs:Long, val endMs:Long) {
+    constructor(start: Duration?, end: Duration?) : this(
+        startMs = start?.inWholeMilliseconds ?: 0L,
+        endMs = end?.inWholeMilliseconds ?: 0L
+    )
+
+    fun lengthMs(durationMs: Long): Long {
+        return (if (endMs !in 1..durationMs) durationMs else endMs) - startMs
+    }
+
+    val isEmpty:Boolean get() = endMs < 0
+
+    companion object {
+        val empty = RangeMs(0L, -1L)
+
+        /**
+         * 無効化領域を除く再生時間を取得
+         */
+        fun List<RangeMs>.totalLengthMs(durationMs: Long): Long {
+            return this.fold(0L) { acc, range ->
+                acc + range.lengthMs(durationMs)
+            }
+        }
+
+        fun List<RangeMs>.outlineRange(durationMs: Long): RangeMs {
+            if (this.isEmpty()) return RangeMs(0L, 0L)
+            val start = this.minOf { it.startMs }
+            val end = this.maxOf { it.startMs + it.lengthMs(durationMs) }
+            return RangeMs(start, end)
+        }
+    }
+}
 
 /**
  * 動画ファイルのトランスコード/トリミングを行うコンバータークラス
@@ -54,9 +89,9 @@ class Converter(
 ) {
     companion object {
         val logger = UtLog("AMP", null, "io.github.toyota32k.media.lib.")
-        @Suppress("unused")
-        val factory
-            get() = Factory()
+        val builder
+            get() = Builder()
+
         // 片方のトラックがN回以上、応答なしになったとき、もう片方のトラックに処理をまわす、そのNの定義（数は適当）
         private const val MAX_NO_EFFECTED_COUNT = 20
         // 両方のトラックが、デコーダーまでEOSになった後、NOPのまま待たされる時間の限界値
@@ -95,8 +130,7 @@ class Converter(
     /**
      * Converterのファクトリクラス
      */
-    @Suppress("unused", "MemberVisibilityCanBePrivate")
-    class Factory {
+    class Builder {
         companion object {
             val logger = UtLog("Factory", Converter.logger)
         }
@@ -218,16 +252,6 @@ class Converter(
         }
 
         /**
-         * トリミング範囲 (開始位置、終了位置) クラス (ms)
-         */
-        data class RangeMs(val startMs:Long, val endMs:Long) {
-            constructor(start:Duration?, end: Duration?):this(
-                startMs = start?.inWholeMilliseconds ?: 0L,
-                endMs = end?.inWholeMilliseconds ?: 0L
-            )
-        }
-
-        /**
          * トリミング範囲を追加
          * @param startMs 開始位置 (ms)
          * @param endMs 終了位置 (ms)   0なら最後まで
@@ -259,7 +283,7 @@ class Converter(
         /**
          * トリミング範囲を一括追加
          */
-        fun addTrimmingRanges(vararg ranges:RangeMs) = apply {
+        fun addTrimmingRange(ranges:List<RangeMs>) = apply {
             ranges.forEach {
                 addTrimmingRange(it.startMs, it.endMs)
             }
@@ -342,20 +366,20 @@ class Converter(
         /**
          * ソフトウェアデコーダーを優先するかどうか
          */
-        fun preferSoftwareDecoder(flag:Boolean):Factory {
+        fun preferSoftwareDecoder(flag:Boolean):Builder {
             mPreferSoftwareDecoder = flag
             return this
         }
 
-        fun brightness(brightness:Float):Factory {
+        fun brightness(brightness:Float):Builder {
             mBrightnessFactor = brightness
             return this
         }
-        fun crop(rect:Rect) : Factory {
+        fun crop(rect:Rect) : Builder {
             mCropRect = rect
             return this
         }
-        fun crop(x:Int, y:Int, cx:Int, cy:Int) : Factory {
+        fun crop(x:Int, y:Int, cx:Int, cy:Int) : Builder {
             mCropRect = Rect(x, y, x+cx, y+cy)
             return this
         }
@@ -760,7 +784,8 @@ class Converter(
                 Muxer(videoTrack.metaData, outPath, audioTrack!=null, rotation, containerFormat).use { muxer->
                     videoTrack.chain(muxer)
                     audioTrack?.chain(muxer)
-                    trimmingRangeKeeper = videoTrack.extractor.adjustAndSetTrimmingRangeList(trimmingRangeKeeper, muxer.durationUs)
+                    val requestedRangeList = trimmingRangeKeeper
+                    trimmingRangeKeeper = videoTrack.extractor.adjustAndSetTrimmingRangeList(requestedRangeList, muxer.durationUs)
                     audioTrack?.extractor?.setTrimmingRangeList(trimmingRangeKeeper)
                     report.updateInputFileInfo(inPath.getLength(), muxer.durationUs/1000L)
                     Progress.create(trimmingRangeKeeper, onProgress).use { progress ->
@@ -800,7 +825,7 @@ class Converter(
                             report.setDurationInfo(trimmingRangeKeeper.trimmedDurationUs, videoTrack.extractor.naturalDurationUs, audioTrack?.extractor?.naturalDurationUs ?: 0L, muxer.naturalDurationUs)
                             logger.info(report.toString())
                             progress?.finish()
-                            ConvertResult.succeeded(trimmingRangeKeeper, report)
+                            ConvertResult.succeeded(outPath, requestedRangeList.list.map { RangeMs(it.startUs/1000L, it.endUs/1000L) }.outlineRange(report.input.duration),trimmingRangeKeeper, report)
                         }
                     }
                 }}}
