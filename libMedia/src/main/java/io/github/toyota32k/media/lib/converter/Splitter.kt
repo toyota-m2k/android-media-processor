@@ -5,13 +5,15 @@ import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMuxer
 import io.github.toyota32k.logger.UtLog
-import io.github.toyota32k.media.lib.converter.ConvertSplitter.Companion.prepareTrimmingRangesList
+import io.github.toyota32k.media.lib.converter.ConvertSplitter.Companion.positionMsListToRangeMsList
 import io.github.toyota32k.media.lib.converter.ConvertSplitter.ConvertProgress
 import io.github.toyota32k.media.lib.converter.RangeMs.Companion.outlineRange
+import io.github.toyota32k.media.lib.converter.TrimmingRangeList.Companion.toRangeMsList
 import io.github.toyota32k.media.lib.format.ContainerFormat
 import io.github.toyota32k.media.lib.format.MetaData
 import io.github.toyota32k.media.lib.format.getDuration
 import io.github.toyota32k.media.lib.misc.ISO6709LocationParser
+import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.utils.UtLazyResetableValue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -74,15 +76,39 @@ interface IOutputFileSelector {
     suspend fun selectOutputFile(index:Int, positionMs:Long): IOutputMediaFile?
 }
 
+/**
+ * 複数範囲一括分割の結果 i/f
+ */
 interface IMultiSplitResult : IResultBase {
     val results: List<IConvertResult>
 }
 
-interface IMultiChopper {
+/**
+ * 複数の範囲を指定して、一括分割を実行するAPIの i/f 定義
+ */
+interface IMultiChopper : ICancellable{
+    /**
+     * 分割位置を指定して複数ファイルに分割
+     *
+     * @param inputFile         ソース動画ファイル
+     * @param positionMsList    分割位置(ms)のリスト
+     * @param outputFileSelector 出力ファイル選択コールバック
+     * @return IMultiSplitResult
+     */
     suspend fun chop(inputFile: IInputMediaFile, positionMsList: List<Long>, outputFileSelector: IOutputFileSelector): IMultiSplitResult
-    fun cancel()
 }
+
+/**
+ * 事前にセットされたチャプター毎に分割するAPIの i/f 定義
+ */
 interface IMultiPartitioner : IMultiChopper {
+
+    /**
+     * チャプター毎に動画を切り出す
+     * @param inputFile         ソース動画ファイル
+     * @param outputFileSelector 出力ファイル選択コールバック
+     * @return IMultiSplitResult
+     */
     suspend fun chop(inputFile: IInputMediaFile, outputFileSelector: IOutputFileSelector): IMultiSplitResult
 }
 
@@ -166,7 +192,7 @@ class Splitter private constructor(
         /**
          * 動画の向きを指定
          */
-        fun rotate(rotation: Rotation) = apply {
+        fun rotate(rotation: Rotation?) = apply {
             mRotation = rotation
         }
         /**
@@ -353,12 +379,17 @@ class Splitter private constructor(
     /**
      * 指定範囲をファイルに出力
      */
-    private fun extractRangesToFile(inPath: IInputMediaFile, inputMetaData:MetaData, outPath: IOutputMediaFile, rangesUs:List<RangeUs>) {
+    private fun extractRangesToFile(inPath: IInputMediaFile, inputMetaData:MetaData, outPath: IOutputMediaFile, rangesUs:List<RangeUs>, report:Report) {
         if (isCancelled) throw CancellationException("not started")
         Closeables().use { closer ->
             // Extractorの準備
             val videoTrack = closer.add(TrackInfo(inPath, video = true))
             val audioTrack = closer.add(TrackInfo(inPath, video = false))
+            report.apply {
+                updateInputSummary(videoTrack.extractor.getTrackFormat(videoTrack.trackIndex), inputMetaData)
+                updateInputSummary(audioTrack.extractor.getTrackFormat(audioTrack.trackIndex), inputMetaData)
+                updateInputFileInfo(inPath.getLength(), inputMetaData.duration ?: 0)
+            }
             if (!videoTrack.isAvailable || !audioTrack.isAvailable) throw IllegalStateException("no track available")
             // Muxerの準備
             val muxer = closer.add(outPath.openMuxer(ContainerFormat.MPEG_4)).obj.apply {
@@ -374,16 +405,17 @@ class Splitter private constructor(
             }
             // ファイナライズ
             muxer.stop()
+            report.updateOutputFileInfo(outPath.getLength(), progress.current)
         }
     }
 
     /**
      * 分割結果（１ファイル）
      */
-    data class Result(override val succeeded:Boolean, override val outputFile: IOutputMediaFile?, override val requestedRangeMs: RangeMs, override val actualSoughtMap: IActualSoughtMap?, override val exception:Throwable?, override val errorMessage: String?):IConvertResult {
+    data class Result(override val succeeded:Boolean, override val outputFile: IOutputMediaFile?, override val requestedRangeMs: RangeMs, override val actualSoughtMap: IActualSoughtMap?, override val exception:Throwable?, override val errorMessage: String?, override val report: Report?=null):IConvertResult {
         companion object {
             val cancelled = Result(false, null, RangeMs.empty, null,CancellationException(), null)
-            fun success(outputFile: IOutputMediaFile, requestedRangeMs: RangeMs, actualSoughtMap: IActualSoughtMap) = Result(true, outputFile, requestedRangeMs, actualSoughtMap, null, null)
+            fun success(outputFile: IOutputMediaFile, requestedRangeMs: RangeMs, actualSoughtMap: IActualSoughtMap, report:Report) = Result(true, outputFile, requestedRangeMs, actualSoughtMap, null, null, report)
             fun error(e:Throwable, msg:String?=null) = Result(false, null, RangeMs.empty, null, e, msg)
         }
     }
@@ -450,8 +482,9 @@ class Splitter private constructor(
             if (startMs<0 || actualEndMs<=startMs) return@withContext Result.error(IllegalArgumentException("invalid range: $startMs-$actualEndMs"))
             try {
                 progress.setTotalMs(if (actualEndMs==Long.MAX_VALUE) -1L else actualEndMs-startMs)
-                extractRangesToFile(inPath, metaData, outPath, listOf(RangeUs.fromMs(startMs, actualEndMs)))
-                Result.success(outPath, RangeMs(startMs, actualEndMs), detachActualSoughtMap())
+                val report = Report().apply { start() }
+                extractRangesToFile(inPath, metaData, outPath, listOf(RangeUs.fromMs(startMs, actualEndMs)), report)
+                Result.success(outPath, RangeMs(startMs, actualEndMs), detachActualSoughtMap(), report.apply { end() })
             } catch (e:Throwable) {
                 if (e !is CancellationException) {
                     logger.error(e)
@@ -488,8 +521,9 @@ class Splitter private constructor(
                 else acc + (actualEnd - range.startMs)
             })
             try {
-                extractRangesToFile(inPath, metaData, outPath, ranges.map { RangeUs.fromMs(it) })
-                Result.success(outPath, ranges.outlineRange(metaData.duration ?: Long.MAX_VALUE),detachActualSoughtMap())
+                val report = Report().apply { start() }
+                extractRangesToFile(inPath, metaData, outPath, ranges.map { RangeUs.fromMs(it) }, report)
+                Result.success(outPath, ranges.outlineRange(metaData.duration ?: Long.MAX_VALUE),detachActualSoughtMap(), report.apply { end() })
             } catch (e:Throwable) {
                 if (e !is CancellationException) {
                     logger.error(e)
@@ -521,12 +555,14 @@ class Splitter private constructor(
             actualSoughtMap.setDurationMs(metaData.duration ?: Long.MAX_VALUE)
             try {
                 progress.setTotalMs( metaData.duration?:-1L )
-                extractRangesToFile(inPath, metaData, out1Path, listOf(RangeUs.fromMs(0L,atTimeMs)))
-                extractRangesToFile(inPath, metaData, out2Path, listOf(RangeUs.fromMs(atTimeMs, Long.MAX_VALUE)))
+                val report1 = Report().apply { start() }
+                extractRangesToFile(inPath, metaData, out1Path, listOf(RangeUs.fromMs(0L,atTimeMs)), report1)
+                val report2 = Report().apply { start() }
+                extractRangesToFile(inPath, metaData, out2Path, listOf(RangeUs.fromMs(atTimeMs, Long.MAX_VALUE)), report2)
                 val map = detachActualSoughtMap()
                 listOf(
-                    Result.success(out1Path, RangeMs(0L,atTimeMs),map),
-                    Result.success(out2Path, RangeMs(atTimeMs, metaData.duration?:Long.MAX_VALUE), map))
+                    Result.success(out1Path, RangeMs(0L,atTimeMs),map, report1),
+                    Result.success(out2Path, RangeMs(atTimeMs, metaData.duration?:Long.MAX_VALUE), map, report2))
             } catch (e:Throwable) {
                 if (e !is CancellationException) {
                     logger.error(e)
@@ -570,6 +606,11 @@ class Splitter private constructor(
 
     /**
      * 分割位置を指定して複数ファイルに分割
+     *
+     * @param inputFile         ソース動画ファイル
+     * @param positionMsList    分割位置(ms)のリスト
+     * @param outputFileSelector 出力ファイル選択コールバック
+     * @return IMultiSplitResult
      */
     override suspend fun chop(inputFile: IInputMediaFile, positionMsList: List<Long>, outputFileSelector: IOutputFileSelector): IMultiSplitResult {
         val results = MultiResult()
@@ -605,8 +646,9 @@ class Splitter private constructor(
                     }
                     try {
                         progress.setTotalMs(metaData.duration ?: -1L)
-                        extractRangesToFile(inputFile,metaData, outPath, listOf(RangeUs.fromMs(fromTimeMs, toTimeMs)))
-                        results.add(Result.success(outPath, RangeMs(fromTimeMs, toTimeMs), detachActualSoughtMap()))
+                        val report = Report().apply { start() }
+                        extractRangesToFile(inputFile,metaData, outPath, listOf(RangeUs.fromMs(fromTimeMs, toTimeMs)), report)
+                        results.add(Result.success(outPath, RangeMs(fromTimeMs, toTimeMs), detachActualSoughtMap(), report.apply { end()}))
                     } catch (e: Throwable) {
                         if (deleteOutputOnError) {
                             runCatching { outPath.delete() }
@@ -654,7 +696,8 @@ class Splitter private constructor(
 class TrimSplitter(
     private val splitterBuilder: Splitter.Builder,
     private val abortOnError: Boolean,
-    private val rangeList: List<RangeMs>,   // trimming
+    private val trimmingRangeList: List<TrimmingRange>,
+//    private val rangeList: List<RangeMs>,   // trimming
     private val progressHandler: ((IProgress)->Unit)? = null
 ) : IMultiChopper, IMultiPartitioner {
     companion object {
@@ -663,22 +706,18 @@ class TrimSplitter(
     class Builder {
         private val mSplitterBuilder = Splitter.Builder()
         private var mOnProgress: ((IProgress)->Unit)? = null
-        private val mRangeList = mutableListOf<RangeMs>()
+//        private val mRangeList = mutableListOf<RangeMs>()
         private var mAbortOnError = false
-        
+        private var mTrimmingRangeListBuilder = TrimmingRangeList.Builder()
+
+        fun trimming(fn: TrimmingRangeList.Builder.()->Unit) = apply {
+            mTrimmingRangeListBuilder.fn()
+        }
+
         fun setProgressHandler(handler: (IProgress)->Unit) = apply {
             mOnProgress = handler
         }
 
-        fun addTrimmingRange(range: RangeMs) = apply {
-            mRangeList.add(range)
-        }
-
-        fun addTrimmingRange(ranges:List<RangeMs>) = apply {
-            for (range in ranges) {
-                mRangeList.add(range)
-            }
-        }
         /**
          * エラー発生時に出力ファイルを削除するかどうか
          * デフォルトは true
@@ -695,41 +734,47 @@ class TrimSplitter(
         /**
          * 動画の向きを指定
          */
-        fun rotate(rotation: Rotation) = apply {
+        fun rotate(rotation: Rotation?) = apply {
             mSplitterBuilder.rotate(rotation)
         }
 
         fun build(): TrimSplitter {
-            return TrimSplitter(mSplitterBuilder, mAbortOnError, mRangeList, mOnProgress)
+            return TrimSplitter(mSplitterBuilder, mAbortOnError, mTrimmingRangeListBuilder.build().list, mOnProgress)
         }
     }
 
     private var cancelled:Boolean = false
     private var splitter: Splitter? = null
 
+    /**
+     * 分割位置を指定して複数ファイルに分割
+     *
+     * @param inputFile         ソース動画ファイル
+     * @param positionMsList    分割位置(ms)のリスト
+     * @param outputFileSelector 出力ファイル選択コールバック
+     * @return IMultiSplitResult
+     */
     override suspend fun chop(inputFile: IInputMediaFile, positionMsList: List<Long>, outputFileSelector: IOutputFileSelector): IMultiSplitResult {
         cancelled = false
         if (positionMsList.isEmpty()) throw IllegalArgumentException("chopList is empty")
         val duration = inputFile.openMetadataRetriever().useObj { it.getDuration() } ?: throw IllegalStateException("cannot retrieve duration")
 
         val result = Splitter.MultiResult()
-        val trimmingRangesList = prepareTrimmingRangesList(rangeList,positionMsList)
-        if (trimmingRangesList.isEmpty()) {
+        val rangeMsList = positionMsListToRangeMsList(positionMsList, duration)
+        if (rangeMsList.isEmpty()) {
             return result
         }
-        if (!outputFileSelector.initializeByRanges(trimmingRangesList.map { RangeMs(it.first().startMs, it.last().endMs)})) {
+        val totalLengthMs = rangeMsList.fold(0L) { acc, range ->
+            acc + range.lengthMs(duration)
+        }
+        if (!outputFileSelector.initializeByRanges(rangeMsList)) {
             return result.cancel()
         }
-        val totalRangeMs = trimmingRangesList.fold(0L) { acc, ranges ->
-            acc + ranges.fold(0L) { acc2, range ->
-                acc2 + range.lengthMs(duration)
-            }
-        }
         var index = 0
-        val convProgress = ConvertProgress(totalRangeMs*1000)
-        for (ranges in trimmingRangesList) {
-            val output = outputFileSelector.selectOutputFile(index, ranges[0].startMs)
-            if (output==null) {
+        val convProgress = ConvertProgress(totalLengthMs*1000)
+        for (range in rangeMsList) {
+            val output = outputFileSelector.selectOutputFile(index, range.startMs)
+            if (output == null) {
                 result.cancel()
                 break
             }
@@ -749,6 +794,12 @@ class TrimSplitter(
                 result.cancel()
                 break
             }
+            val ranges = TrimmingRangeList.Builder(trimmingRangeList)
+                .startFromMs(range.startMs)
+                .endAtMs(range.endMs)
+                .build()
+                .list.toRangeMsList()
+
             val splitResult = splitter.trim(inputFile, output, ranges)
             result.add (splitResult)
             if (splitResult.cancelled) {
@@ -757,16 +808,23 @@ class TrimSplitter(
                 break
             }
             convProgress.updateDuration(ranges.fold(0L) { acc, range ->
-                acc + (range.endMs - range.startMs)
+                acc + range.lengthMs(duration)
             })
         }
         splitter = null
         return result
     }
 
+    /**
+     * チャプター毎に動画を切り出す
+     * @param inputFile         ソース動画ファイル
+     * @param outputFileSelector 出力ファイル選択コールバック
+     * @return IMultiSplitResult
+     */
     override suspend fun chop(inputFile: IInputMediaFile, outputFileSelector: IOutputFileSelector): IMultiSplitResult {
         cancelled = false
-        if (rangeList.isEmpty()) throw IllegalArgumentException("rangeList is empty")
+        val rangeList = trimmingRangeList.toRangeMsList()
+        if (trimmingRangeList.isEmpty()) throw IllegalArgumentException("rangeList is empty")
         val duration = inputFile.openMetadataRetriever().useObj { it.getDuration() } ?: throw IllegalStateException("cannot retrieve duration")
 
         val result = Splitter.MultiResult()

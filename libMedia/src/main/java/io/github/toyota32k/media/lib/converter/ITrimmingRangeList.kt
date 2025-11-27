@@ -27,7 +27,7 @@ interface ITrimmingRangeList {
 
     companion object {
         fun empty(): ITrimmingRangeList {
-            return TrimmingRangeListImpl()
+            return TrimmingRangeList()
         }
     }
 }
@@ -58,7 +58,7 @@ interface IActualSoughtMap {
      * ConvertResult#adjustedTrimmingRangeList と型互換
      */
     fun adjustedRangeList(durationMs:Long, ranges:List<RangeMs>) : ITrimmingRangeList {
-        return TrimmingRangeListImpl().apply {
+        return TrimmingRangeList().apply {
             for (range in ranges) {
                 if (range.endMs > 0) {
                     addRange(correctPositionUs(range.startMs * 1000L), correctPositionUs(range.endMs * 1000L))

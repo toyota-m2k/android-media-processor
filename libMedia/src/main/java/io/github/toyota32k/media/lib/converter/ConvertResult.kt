@@ -16,6 +16,7 @@ interface IConvertResult : IResultBase {
     val outputFile: IOutputMediaFile?
     val actualSoughtMap: IActualSoughtMap?
     val requestedRangeMs: RangeMs
+    val report:Report?
 }
 
 /**
@@ -26,7 +27,7 @@ data class ConvertResult(
     override val outputFile: IOutputMediaFile?,
     override val requestedRangeMs: RangeMs,
     val adjustedTrimmingRangeList: ITrimmingRangeList?,
-    val report:Report?,
+    override val report:Report?,
     override val cancelled:Boolean,
     override val errorMessage:String?,
     override val exception:Throwable?)

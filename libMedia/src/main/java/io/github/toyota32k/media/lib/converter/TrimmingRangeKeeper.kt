@@ -2,60 +2,7 @@ package io.github.toyota32k.media.lib.converter
 
 import kotlin.math.min
 
-class TrimmingRangeListImpl : ITrimmingRangeList {
-    override val list = mutableListOf<TrimmingRange>()
-    override val isEmpty: Boolean
-        get() = list.isEmpty()
-    override var naturalDurationUs: Long = -1L
-
-    override fun closeBy(naturalDurationUs:Long) {
-        this.naturalDurationUs = naturalDurationUs
-        val itr = list.listIterator()
-        while(itr.hasNext()) {
-            val r = itr.next()
-            if (!r.closeBy(naturalDurationUs)) {
-                itr.remove()
-            }
-        }
-    }
-
-    override fun clear() {
-        list.clear()
-    }
-    override fun addRange(startUs:Long, endUs:Long) {
-        val s =  list.firstOrNull()?.startUs ?: 0L
-        val e =  list.lastOrNull()?.endUs ?: 0L
-
-        if(list.isNotEmpty() && e==0L) {
-            throw IllegalStateException("previous range is not terminated.")
-        }
-        if(endUs!=0L && startUs>=endUs) {
-            throw IllegalArgumentException("trimming range is invalid: start=$startUs, end=$endUs")
-        }
-        if(startUs<s) {
-            throw IllegalArgumentException("trimming range must be sorted in caller.")
-        }
-        if(e!=0L && startUs<e) {
-            throw IllegalArgumentException("trimming range must not be wrapped over.")
-        }
-        list.add(TrimmingRange(startUs,endUs))
-    }
-
-    private var mTrimmedDuration = -1L
-
-    override val trimmedDurationUs: Long get() {
-        if (mTrimmedDuration<0) {
-            mTrimmedDuration = if (list.isEmpty()) {
-                naturalDurationUs
-            } else {
-                list.fold(0L) { acc, t -> acc + t.durationUs }
-            }
-        }
-        return mTrimmedDuration
-    }
-}
-
-class TrimmingRangeKeeperImpl(val trimmingRangeList: ITrimmingRangeList = TrimmingRangeListImpl()): ITrimmingRangeKeeper, ITrimmingRangeList by trimmingRangeList {
+class TrimmingRangeKeeper(val trimmingRangeList: ITrimmingRangeList = TrimmingRangeList()): ITrimmingRangeKeeper, ITrimmingRangeList by trimmingRangeList {
     // limit duration
     override var limitDurationUs: Long = 0L    // 0: no limit
     private val actualSoughtMap: Map<Long, Long> = mutableMapOf()
@@ -75,8 +22,6 @@ class TrimmingRangeKeeperImpl(val trimmingRangeList: ITrimmingRangeList = Trimmi
     fun putSoughtPosition(req:Long, act:Long) {
         (actualSoughtMap as MutableMap)[req] = act
     }
-
-
 
     private val rawTrimmedDuration: Long
         get() = trimmingRangeList.trimmedDurationUs
@@ -140,9 +85,9 @@ class TrimmingRangeKeeperImpl(val trimmingRangeList: ITrimmingRangeList = Trimmi
     }
 
     companion object {
-        val empty: ITrimmingRangeKeeper get() = TrimmingRangeKeeperImpl()
+        val empty: ITrimmingRangeKeeper get() = TrimmingRangeKeeper()
+        fun ITrimmingRangeList.toKeeper(): ITrimmingRangeKeeper {
+            return TrimmingRangeKeeper(this)
+        }
     }
 }
-
-
-

@@ -13,7 +13,7 @@ import io.github.toyota32k.media.lib.converter.Converter
 import io.github.toyota32k.media.lib.converter.IInputMediaFile
 import io.github.toyota32k.media.lib.converter.ITrimmingRangeKeeper
 import io.github.toyota32k.media.lib.converter.PositionState
-import io.github.toyota32k.media.lib.converter.TrimmingRangeKeeperImpl
+import io.github.toyota32k.media.lib.converter.TrimmingRangeKeeper
 import io.github.toyota32k.media.lib.misc.ICancellation
 import io.github.toyota32k.media.lib.track.Muxer
 import io.github.toyota32k.media.lib.utils.DurationEstimator
@@ -78,7 +78,7 @@ class Extractor private constructor(
     }
     var eos:Boolean = false
         private set
-    private var trimmingRangeList : ITrimmingRangeKeeper = TrimmingRangeKeeperImpl.empty
+    private var trimmingRangeList : ITrimmingRangeKeeper = TrimmingRangeKeeper.empty
 
     /**
      * オーディオトラックはだいたいどこへでもシーク可能なのに対して、ビデオトラックは、キーフレームにしかシークできないので、
@@ -98,7 +98,7 @@ class Extractor private constructor(
 
         // 与えられたRangeList の開始位置を、実際にビデオトラックでシーク可能な位置に調整する。
         // 終了位置は、readSampleData()が適当に刻んでくるので、そのまま使う。
-        val newList = TrimmingRangeKeeperImpl()
+        val newList = TrimmingRangeKeeper()
         val trackIdx = findTrackIdx(extractor, "video")
         extractor.selectTrack(trackIdx)
         for (range in originalList.list) {

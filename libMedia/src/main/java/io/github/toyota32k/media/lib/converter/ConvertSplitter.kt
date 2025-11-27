@@ -1,6 +1,7 @@
 package io.github.toyota32k.media.lib.converter
 
 import android.graphics.Rect
+import io.github.toyota32k.media.lib.converter.TrimmingRangeList.Companion.toRangeMsList
 import io.github.toyota32k.media.lib.format.ContainerFormat
 import io.github.toyota32k.media.lib.format.getDuration
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
@@ -12,32 +13,19 @@ import kotlin.math.roundToLong
 class ConvertSplitter(
     private val converterFactory: Converter.Builder,
     private val abortOnError: Boolean,
-    private val rangeList: List<RangeMs>,   // trimming
     private val progressHandler: ((IProgress)->Unit)? = null
 ) : IMultiChopper, IMultiPartitioner {
     class Builder {
         private val mConverterFactory = Converter.Builder()
         private var mOnProgress: ((IProgress)->Unit)? = null
-        private val mRangeList = mutableListOf<RangeMs>()
         private var mAbortOnError = false
 
-//        fun chopAt(vararg positionsMs:Long) = apply {
-//            for (position in positionsMs) {
-//                mChopList.add(position)
-//            }
-//        }
         fun setProgressHandler(handler: (IProgress)->Unit) = apply {
             mOnProgress = handler
         }
 
-        fun addTrimmingRange(range: RangeMs) = apply {
-            mRangeList.add(range)
-        }
-
-        fun addTrimmingRange(ranges:List<RangeMs>) = apply {
-            for (range in ranges) {
-                mRangeList.add(range)
-            }
+        fun trimming(fn: TrimmingRangeList.Builder.()->Unit) = apply {
+            mConverterFactory.trimming(fn)
         }
 
         /**
@@ -118,7 +106,7 @@ class ConvertSplitter(
         // endregion
 
         fun build(): ConvertSplitter {
-            return ConvertSplitter(mConverterFactory, mAbortOnError, mRangeList, mOnProgress)
+            return ConvertSplitter(mConverterFactory, mAbortOnError, mOnProgress)
         }
     }
 
@@ -156,6 +144,17 @@ class ConvertSplitter(
             }
             return result
         }
+
+        fun positionMsListToRangeMsList(positionMsList: List<Long>, duration:Long): List<RangeMs> {
+            val result = mutableListOf<RangeMs>()
+            var prev = 0L
+            for (positionMs in positionMsList) {
+                result.add(RangeMs(prev, positionMs))
+                prev = positionMs
+            }
+            result.add(RangeMs(prev, duration))
+            return result
+        }
     }
 
     class ConvertProgress(override val total: Long) : IProgress {
@@ -179,29 +178,36 @@ class ConvertSplitter(
     }
 
     private var converter: Converter? = null
+
+    /**
+     * 分割位置を指定して複数ファイルに分割
+     *
+     * @param inputFile         ソース動画ファイル
+     * @param positionMsList    分割位置(ms)のリスト
+     * @param outputFileSelector 出力ファイル選択コールバック
+     * @return IMultiSplitResult
+     */
     override suspend fun chop(inputFile: IInputMediaFile, positionMsList: List<Long>, outputFileSelector: IOutputFileSelector): IMultiSplitResult {
         if (positionMsList.isEmpty()) throw IllegalArgumentException("chopList is empty")
         val duration = inputFile.openMetadataRetriever().useObj { it.getDuration() } ?: throw IllegalStateException("cannot retrieve duration")
 
         val result = Splitter.MultiResult()
-        val trimmingRangesList = prepareTrimmingRangesList(rangeList,positionMsList)
-        if (trimmingRangesList.isEmpty()) {
+        val baseTrimmingRangeList = converterFactory.properties.trimmingRangeList
+        val rangeMsList = positionMsListToRangeMsList(positionMsList, duration)
+        if (rangeMsList.isEmpty()) {
             return result
         }
-        if (!outputFileSelector.initializeByRanges(trimmingRangesList.map { RangeMs(it.first().startMs, it.last().endMs)})) {
+        val totalLengthMs = rangeMsList.fold(0L) { acc, range ->
+            acc + range.lengthMs(duration)
+        }
+        if (!outputFileSelector.initializeByRanges(rangeMsList)) {
             return result.cancel()
         }
-
-        val totalRangeMs = trimmingRangesList.fold(0L) { acc, ranges ->
-            acc + ranges.fold(0L) { acc2, range ->
-                acc2 + range.lengthMs(duration)
-            }
-        }
         var index = 0
-        val convProgress = ConvertProgress(totalRangeMs*1000)
-        for (ranges in trimmingRangesList) {
-            val output = outputFileSelector.selectOutputFile(index, ranges[0].startMs)
-            if (output==null) {
+        val convProgress = ConvertProgress(totalLengthMs*1000)
+        for (range in rangeMsList) {
+            val output = outputFileSelector.selectOutputFile(index, range.startMs)
+            if (output == null) {
                 result.cancel()
                 break
             }
@@ -209,8 +215,11 @@ class ConvertSplitter(
             val converter = converterFactory
                 .input(inputFile)
                 .output(output)
-                .resetTrimmingRangeList()
-                .addTrimmingRange(ranges)
+                .trimming {
+                    setRangesUs(baseTrimmingRangeList.list)
+                    startFromMs(range.startMs)
+                    endAtMs(range.endMs)
+                }
                 .apply {
                     if (progressHandler!=null) {
                         setProgressHandler { progress->
@@ -220,6 +229,7 @@ class ConvertSplitter(
                     }
                 }
                 .build()
+
             this.converter = converter
             if (cancelled) {
                 result.cancel()
@@ -232,14 +242,19 @@ class ConvertSplitter(
             } else if (abortOnError && convertResult.hasError) {
                 break
             }
-            convProgress.updateDuration(ranges.fold(0L) { acc, range ->
-                acc + (range.endMs - range.startMs)
-            })
+            convProgress.updateDuration(range.lengthMs(duration))
         }
         return result
     }
 
+    /**
+     * チャプター毎に動画を切り出す
+     * @param inputFile         ソース動画ファイル
+     * @param outputFileSelector 出力ファイル選択コールバック
+     * @return IMultiSplitResult
+     */
     override suspend fun chop(inputFile: IInputMediaFile, outputFileSelector: IOutputFileSelector): IMultiSplitResult {
+        val rangeList = converterFactory.properties.trimmingRangeList.list.toRangeMsList()
         if (rangeList.isEmpty()) throw IllegalArgumentException("rangeList is empty")
         val duration = inputFile.openMetadataRetriever().useObj { it.getDuration() } ?: throw IllegalStateException("cannot retrieve duration")
 
@@ -263,8 +278,10 @@ class ConvertSplitter(
             val converter = converterFactory
                 .input(inputFile)
                 .output(output)
-                .resetTrimmingRangeList()
-                .addTrimmingRange(range)
+                .trimming {
+                    reset()
+                    addRangeMs(range)
+                }
                 .apply {
                     if (progressHandler!=null) {
                         setProgressHandler { progress->
