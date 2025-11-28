@@ -7,6 +7,15 @@ data class Rotation(val degree:Int, val relative:Boolean) {
         val left:Rotation by lazy { Rotation(270, true) }
         val upsideDown:Rotation by lazy { Rotation(180, true) }
         fun absolute(degree:Int) = Rotation(degree, false)
+        fun relative(degree:Int): Rotation {
+            return when (degree%360) {
+                0 -> nop
+                -270,90 -> right
+                -180,180 -> upsideDown
+                -90,270 -> left
+                else -> Rotation(degree, true)
+            }
+        }
 
         fun normalize(degree:Int):Int {
             val r = degree%360

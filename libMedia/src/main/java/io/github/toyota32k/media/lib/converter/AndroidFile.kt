@@ -170,14 +170,6 @@ class AndroidFile : IInputMediaFile, IOutputMediaFile, Comparable<AndroidFile> {
 
     override val seekable: Boolean = true
 
-    fun safeDelete() {
-        try {
-            delete()
-        } catch(_:Throwable) {
-
-        }
-    }
-
     fun getFileName() : String? {
         return if(path!=null) {
             path.name

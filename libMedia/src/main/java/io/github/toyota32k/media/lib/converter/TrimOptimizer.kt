@@ -1,10 +1,9 @@
 package io.github.toyota32k.media.lib.converter
 
-import android.app.Application
 import android.content.Context
 import android.graphics.Rect
 import android.net.Uri
-import io.github.toyota32k.logger.UtLog
+import io.github.toyota32k.media.lib.converter.IMultiPhaseProgress.Phase
 import io.github.toyota32k.media.lib.converter.TrimmingRangeList.Companion.toRangeMsList
 import io.github.toyota32k.media.lib.format.ContainerFormat
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
@@ -15,9 +14,14 @@ import java.io.File
 import kotlin.time.Duration
 
 interface IMultiPhaseProgress : IProgress {
-    val phase:Int
+    val phaseIndex:Int get() = phase.index
     val phaseCount:Int
-    val phaseName:String
+    val phase:Phase
+    enum class Phase(var description:String, var index:Int) {
+        CONVERTING("Converting", 0),
+        EXTRACTING("Extracting", 0),
+        OPTIMIZING("Optimizing", 1),
+    }
 }
 
 /**
@@ -26,27 +30,24 @@ interface IMultiPhaseProgress : IProgress {
  * - コンバート後に続けて、FastStart を実行可能
  */
 class TrimOptimizer(
-    private val application: Application,
+    private val applicationContext: Context,
     private val converterBuilder: Converter.Builder,
     private val fastStart:Boolean,
     private val removeFreeOnFastStart:Boolean,
     private val workDirectory:File?,
     private val forceConvert:Boolean,
-    private val progressCallback:((IMultiPhaseProgress)->Unit)?) {
+    private val progressCallback:((IMultiPhaseProgress)->Unit)?): ICancellable {
     companion object {
         val logger = Converter.logger
     }
     class MultiPhaseProgress(override val phaseCount: Int) : IMultiPhaseProgress {
-        override var phase: Int = 0
-        override var phaseName: String = ""
-
+        override var phase = IMultiPhaseProgress.Phase.CONVERTING
         override var total: Long = 0L
         override var current: Long = 0L
         override var remainingTime: Long = 0L
 
-        fun updatePhase(phase:Int, phaseName:String) = apply {
+        fun updatePhase(phase: IMultiPhaseProgress.Phase) = apply {
             this.phase = phase
-            this.phaseName = phaseName
             total = 0L
             current = 0L
             remainingTime = 0L
@@ -59,7 +60,7 @@ class TrimOptimizer(
         }
     }
 
-    class Builder(val application:Application) {
+    class Builder(val applicationContext:Context) {
         // region Builder Parameters
 
         private val mConverterBuilder: Converter.Builder = Converter.builder
@@ -243,7 +244,7 @@ class TrimOptimizer(
         /**
          * 動画の向きを指定
          */
-        fun rotate(rotation: Rotation) = apply {
+        fun rotate(rotation: Rotation?) = apply {
             mConverterBuilder.rotate(rotation)
         }
 
@@ -255,10 +256,10 @@ class TrimOptimizer(
             mConverterBuilder.containerFormat(format)
         }
 
-        fun brightness(brightness:Float) = apply {
+        fun brightness(brightness:Float?) = apply {
             mConverterBuilder.brightness(brightness)
         }
-        fun crop(rect:Rect) = apply {
+        fun crop(rect:Rect?) = apply {
             mConverterBuilder.crop(rect)
         }
         fun crop(x:Int, y:Int, cx:Int, cy:Int) = apply {
@@ -268,17 +269,23 @@ class TrimOptimizer(
         // endregion
 
         fun build() : TrimOptimizer {
-            return TrimOptimizer(application, mConverterBuilder, mFastStart,  mRemoveFreeOnFastStart, mWorkDirectory, mForceConvert, mProgressHandler)
+            return TrimOptimizer(applicationContext, mConverterBuilder, mFastStart,  mRemoveFreeOnFastStart, mWorkDirectory, mForceConvert, mProgressHandler)
         }
     }
 
     private val progress by lazy { fastStartInfo?.progress ?: MultiPhaseProgress(1) }
     private var fastStartInfo: FastStartInfo? = null
     private var cancellable: ICancellable? = null
+    private var cancelled:Boolean = false
+    override fun cancel() {
+        cancelled = true
+        cancellable?.cancel()
+    }
 
     private inner class FastStartInfo {
-        val workFile:AndroidFile = File.createTempFile("amp", ".tmp", workDirectory?:application.cacheDir).toAndroidFile()
+        val workFile:AndroidFile = File.createTempFile("amp", ".tmp", workDirectory?:applicationContext.cacheDir).toAndroidFile()
         val outputFile: AndroidFile = converterBuilder.properties.outPath as? AndroidFile ?: throw IllegalStateException("no output AndroidFile specified.")
+        val deleteOutputOnError = converterBuilder.properties.deleteOutputOnError
         val progress = MultiPhaseProgress(2)
         init {
             converterBuilder
@@ -288,13 +295,11 @@ class TrimOptimizer(
         suspend fun fastStart(prevResult: IConvertResult): IConvertResult {
             if (!prevResult.succeeded) return prevResult
 
-            progress.updatePhase(0, "Fast Start")
-            val callback = if (progressCallback!=null) { p:IProgress->
-                progressCallback.invoke(progress.updateProgress(p))
-            } else null
-
+            progressCallback?.invoke(progress.updatePhase(Phase.OPTIMIZING))
             return withContext(Dispatchers.IO) {
-                val result = FastStart.process(workFile, outputFile, removeFreeOnFastStart, callback)
+                val result = FastStart.process(workFile, outputFile, removeFreeOnFastStart) { p: IProgress ->
+                    progressCallback?.invoke(progress.updateProgress(p))
+                }
                 if (result) return@withContext prevResult
                 try {
                     outputFile.copyFrom(workFile)
@@ -311,34 +316,55 @@ class TrimOptimizer(
         }
     }
 
+    /**
+     * deleteOutputFileOnErrorオプションに従い、エラー発生時に出力ファイルを削除する。
+     */
+    private fun cleanOutputFileIfError(result: IConvertResult):IConvertResult {
+        if (!result.succeeded) {
+            val deleteOutputOnError = fastStartInfo?.deleteOutputOnError ?: converterBuilder.properties.deleteOutputOnError
+            if (deleteOutputOnError) {
+                val output = fastStartInfo?.outputFile ?: converterBuilder.properties.outPath
+                output?.safeDelete()
+            }
+        }
+        return result
+    }
+
+    /**
+     * 変換を実行
+     */
     suspend fun execute(): IConvertResult {
         if (fastStart) {
             fastStartInfo = FastStartInfo()
         }
-        return try {
-            val result = if (forceConvert || converterBuilder.properties.checkReEncodingNecessity()) {
+        val result = try {
+            val converted = if (forceConvert || converterBuilder.properties.checkReEncodingNecessity(true)) {
                 convert()
             } else {
                 extract()
             }
-            fastStartInfo?.fastStart(result) ?: result
+            fastStartInfo?.fastStart(converted) ?: converted
         } catch(e:Throwable) {
             ConvertResult.error(e)
         } finally {
             fastStartInfo?.dispose()
             fastStartInfo = null
         }
+        return cleanOutputFileIfError(result)
     }
 
     private suspend fun convert(): ConvertResult {
         if (progressCallback != null) {
-            progress.updatePhase(0, "Converting")
+            progressCallback(progress.updatePhase(Phase.CONVERTING))
             converterBuilder.setProgressHandler { p ->
                 progressCallback(progress.updateProgress(p))
             }
         }
         val converter = converterBuilder.build()
         cancellable = converter
+        if (cancelled) {
+            return ConvertResult.cancelled
+        }
         return try {
             converter.execute()
         } finally {
@@ -353,7 +379,7 @@ class TrimOptimizer(
             .rotate(converterBuilder.properties.rotation)
             .apply {
                 if (progressCallback!=null) {
-                    progress.updatePhase(1, "Extracting")
+                    progressCallback(progress.updatePhase(Phase.EXTRACTING))
                     setProgressHandler { p->
                         progressCallback(progress.updateProgress(p))
                     }
@@ -361,12 +387,15 @@ class TrimOptimizer(
             }
             .build()
         cancellable = splitter
+        if (cancelled) {
+            return ConvertResult.cancelled
+        }
 
-        val trimmingRangeList = converterBuilder.properties.trimmingRangeList.list.toRangeMsList()
+        val trimmingRangeList = converterBuilder.properties.trimmingRangeListBuilder.build()
         val inPath = converterBuilder.properties.inPath ?: throw IllegalStateException("no input file specified.")
         val outPath = converterBuilder.properties.outPath ?: throw IllegalStateException("no output file specified.")
         return try {
-            splitter.trim(inPath, outPath, trimmingRangeList)
+            splitter.trim(inPath, outPath, trimmingRangeList.list.toRangeMsList())
         } finally {
             cancellable = null
         }

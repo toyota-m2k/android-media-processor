@@ -15,8 +15,11 @@ import io.github.toyota32k.media.lib.report.Summary
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
 import io.github.toyota32k.media.lib.strategy.IHDRSupport
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
+import io.github.toyota32k.media.lib.strategy.MaxDefault
+import io.github.toyota32k.media.lib.strategy.MinDefault
 import io.github.toyota32k.media.lib.strategy.PresetAudioStrategies
 import io.github.toyota32k.media.lib.strategy.PresetVideoStrategies
+import io.github.toyota32k.media.lib.strategy.VideoStrategy
 import io.github.toyota32k.media.lib.surface.RenderOption
 import io.github.toyota32k.media.lib.track.AudioTrack
 import io.github.toyota32k.media.lib.track.Muxer
@@ -168,7 +171,9 @@ class Converter(
          */
         inner class BuilderProperties {
             val trimmingRangeListBuilder get() = mTrimmingRangeListBuilder
-            val trimmingRangeList: ITrimmingRangeList get() = mTrimmingRangeListBuilder.build()
+//            val trimmingRangeList: ITrimmingRangeList get() = mTrimmingRangeListBuilder.build()
+            fun tryGetTrimmingRangeList() = try { mTrimmingRangeListBuilder.build() } catch(_: EmptyRangeException) { null }
+
             val limitDurationUs: Long get() = mLimitDurationUs
             val inPath: IInputMediaFile? get() = mInPath
             val outPath: IOutputMediaFile? get() = mOutPath
@@ -190,19 +195,58 @@ class Converter(
             val brightnessFactor get() = mBrightnessFactor
             val cropRect: Rect? get() = mCropRect
 
-            fun checkReEncodingNecessity() : Boolean {
+            /**
+             * 現在のパラメータについて、再エンコードが必要かどうかをチェックする。
+             * @param adjustStrategyIfNeed InvalidStrategyで再エンコードが必要な場合は、trueなら、できるだけソースに近い Strategy を再設定、false なら例外をスローする。
+             * @return true: エンコードが必要 / false:不要(Splitterで十分
+             */
+            fun checkReEncodingNecessity(adjustStrategyIfNeed:Boolean) : Boolean {
                 val file = inPath ?: throw IllegalStateException("input file is not specified.")
+                val summary = analyze(file).videoSummary ?: return true // ソース情報が不明
                 if (mCropRect!=null || mBrightnessFactor!=1f) {
                     // crop や brightness変更はコンバートが必要
-                    if (videoStrategy== PresetVideoStrategies.InvalidStrategy) throw IllegalStateException("video strategy is invalid.")
+                    if (videoStrategy== PresetVideoStrategies.InvalidStrategy) {
+                        if(!adjustStrategyIfNeed) {
+                            throw IllegalStateException("video strategy is invalid.")
+                        }
+                        // Sourceに近いStrategyを作成して設定
+                        videoStrategy(VideoStrategy(
+                            summary.codec ?: throw IllegalStateException("unknown video codec."),
+                            summary.profile ?: throw IllegalStateException("unknown video codec profile"),
+                            summary.level,
+                            null,
+                            VideoStrategy.SizeCriteria(Int.MAX_VALUE, Int.MAX_VALUE),
+                            MaxDefault(Int.MAX_VALUE,max(summary.bitRate, 768*1000)),
+                                    MaxDefault(30, max(summary.frameRate, 24)),
+                            MinDefault(1, summary.iFrameInterval.takeIf { it > 0 } ?: 30),
+                            null,
+                            null,))
+                        keepHDR(true)
+                        keepVideoProfile(true)
+                    }
                     return true
                 }
                 if (videoStrategy == PresetVideoStrategies.InvalidStrategy) {
                     // 明示的に再エンコード不要が指定されている
                     return false
                 }
-                // コーデック、映像サイズ、ビットレートなどを比較して再エンコードが必要かどうかチェック
-                return Converter.checkReEncodingNecessity(file, videoStrategy)
+
+                if (videoStrategy.codec != summary.codec) {
+                    // コーデックが違う
+                    return true
+                }
+
+                if (summary.bitRate>0 && summary.bitRate > videoStrategy.bitRate.max) {
+                    // ビットレートが、Strategy の max bitRate より大きい
+                    return true
+                }
+
+                if (max(summary.width, summary.height) > videoStrategy.sizeCriteria.longSide ||
+                    min(summary.width, summary.height) > videoStrategy.sizeCriteria.shortSide) {
+                    // 解像度が、Strategy の制限より大きい（縮小が必要）
+                    return true
+                }
+                return false
             }
         }
 
@@ -446,8 +490,8 @@ class Converter(
         /**
          * 動画の向きを指定
          */
-        fun rotate(rotation: Rotation) = apply {
-            mRotation = rotation
+        fun rotate(rotation: Rotation?) = apply {
+            mRotation = if (rotation == Rotation.nop) null else rotation
         }
 
         /**
@@ -458,17 +502,14 @@ class Converter(
             mContainerFormat = format
         }
 
-        fun brightness(brightness:Float):Builder {
-            mBrightnessFactor = brightness
-            return this
+        fun brightness(brightness:Float?) = apply {
+            mBrightnessFactor = brightness ?: 1f
         }
-        fun crop(rect:Rect) : Builder {
+        fun crop(rect:Rect?) = apply {
             mCropRect = rect
-            return this
         }
-        fun crop(x:Int, y:Int, cx:Int, cy:Int) : Builder {
+        fun crop(x:Int, y:Int, cx:Int, cy:Int) = apply {
             mCropRect = Rect(x, y, x+cx, y+cy)
-            return this
         }
 
         // endregion
@@ -521,36 +562,45 @@ class Converter(
             logger.info("video strategy: ${videoStrategy.javaClass.name}")
             logger.info("audio strategy: ${mAudioStrategy.javaClass.name}")
 
-            val trimmingRangeKeeper = mTrimmingRangeListBuilder.build().toKeeper()
-            if(mLimitDurationUs>0) {
-                trimmingRangeKeeper.limitDurationUs = mLimitDurationUs
-                logger.info("limit duration: ${mLimitDurationUs / 1000} ms")
-            }
+            try {
+                val trimmingRangeKeeper = mTrimmingRangeListBuilder.build().toKeeper()
+                if (mLimitDurationUs > 0) {
+                    trimmingRangeKeeper.limitDurationUs = mLimitDurationUs
+                    logger.info("limit duration: ${mLimitDurationUs / 1000} ms")
+                }
 
-            logger.info("delete output on error = ${mDeleteOutputOnError}")
-            if(mOnProgress==null) {
-                logger.info("no progress handler")
+                logger.info("delete output on error = ${mDeleteOutputOnError}")
+                if (mOnProgress == null) {
+                    logger.info("no progress handler")
+                }
+                val renderOption = if (mCropRect != null) {
+                    val summary = inputSummary.videoSummary ?: throw IllegalStateException("no video information, cannot crop.")
+                    RenderOption.create(summary.width, summary.height, mCropRect!!, mBrightnessFactor)
+                } else if (mBrightnessFactor != 1f) {
+                    RenderOption.create(mBrightnessFactor)
+                } else {
+                    RenderOption.DEFAULT
+                }
+                return Converter(
+                    mInPath!!,
+                    mOutPath!!,
+                    videoStrategy,
+                    mAudioStrategy,
+                    trimmingRangeKeeper,
+                    mDeleteOutputOnError,
+                    mRotation,
+                    mContainerFormat,
+                    mPreferSoftwareDecoder,
+                    renderOption,
+                    mOnProgress
+                )
+            } catch(e:Throwable) {
+                logger.error(e)
+                if (mDeleteOutputOnError) {
+                    mOutPath?.safeDelete()
+                }
+                throw e
             }
-            val renderOption = if (mCropRect!=null) {
-                val summary = inputSummary.videoSummary ?: throw IllegalStateException("no video information, cannot crop.")
-                RenderOption.create(summary.width, summary.height, mCropRect!!, mBrightnessFactor)
-            } else if (mBrightnessFactor!=1f) {
-                RenderOption.create(mBrightnessFactor)
-            } else {
-                RenderOption.DEFAULT
-            }
-            return Converter(
-                mInPath!!,
-                mOutPath!!,
-                videoStrategy,
-                mAudioStrategy,
-                trimmingRangeKeeper,
-                mDeleteOutputOnError,
-                mRotation,
-                mContainerFormat,
-                mPreferSoftwareDecoder,
-                renderOption,
-                mOnProgress)
         }
 
         // endregion
@@ -913,11 +963,7 @@ class Converter(
                 ConvertResult.error(e)
             }
             if(!result.succeeded && deleteOutputOnError) {
-                try {
-                    outPath.delete()
-                } catch(ef:Throwable) {
-                    logger.stackTrace(ef,"cannot delete output file: $outPath")
-                }
+                outPath.safeDelete()
             }
             result
         }

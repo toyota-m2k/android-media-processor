@@ -254,4 +254,6 @@ object PresetVideoStrategies {
         null,
         EncoderType.DEFAULT,
     )
+
+    val IVideoStrategy.isValid get() = codec!=Codec.Invalid
 }

@@ -4,6 +4,8 @@ import kotlin.math.max
 import kotlin.math.min
 import kotlin.time.Duration
 
+class EmptyRangeException : IllegalStateException("no range")
+
 class TrimmingRangeList(originalList:List<TrimmingRange>?=null) : ITrimmingRangeList {
     override val list: MutableList<TrimmingRange> = originalList?.toMutableList() ?: mutableListOf()
     override val isEmpty: Boolean
@@ -162,7 +164,7 @@ class TrimmingRangeList(originalList:List<TrimmingRange>?=null) : ITrimmingRange
         fun endTo(time: Duration)
                 = endAtMs(time.inWholeMilliseconds)
 
-        private fun prepareTrimmingRanges(rangeList: List<TrimmingRange>, startUs: Long, endUs: Long) : List<TrimmingRange>{
+        private fun prepareTrimmingRanges(rangeList: List<TrimmingRange>, startUs: Long, endUs: Long) : List<TrimmingRange> {
             return mutableListOf<TrimmingRange>().also { ranges ->
                 if (rangeList.isEmpty()) {
                     ranges.add(TrimmingRange(startUs, endUs))
@@ -179,20 +181,34 @@ class TrimmingRangeList(originalList:List<TrimmingRange>?=null) : ITrimmingRange
             }
         }
 
+        @Throws(EmptyRangeException::class)
         fun build(): ITrimmingRangeList {
             val ranges = if (mTrimStartUs==0L && mTrimEndUs==0L) {
                 // trimStart/trimEndが設定されていない
                 mTrimmingRangeList.list
             } else if (mTrimmingRangeList.isEmpty) {
                 // trimStart/trimEnd のみが設定されている
-                mTrimmingRangeList.apply {
-                    addRange(mTrimStartUs, mTrimEndUs)
-                }.list
+                mTrimmingRangeList.list.toMutableList().apply {
+                    add(TrimmingRange(mTrimStartUs, mTrimEndUs))
+                }
             } else {
-                // trimStartとtrimEndが、trimmingRanges とともに指定されている --> マージする
-                prepareTrimmingRanges(mTrimmingRangeList.list, mTrimStartUs, mTrimEndUs)
+                // trimStartとtrimEndが、trimmingRanges とともに指定されている --> マージ（intersect)
+                // マージした結果が空になる可能性がある --> 空なら null を返す
+                prepareTrimmingRanges(mTrimmingRangeList.list, mTrimStartUs, mTrimEndUs).takeIf { it.isNotEmpty() } ?: throw EmptyRangeException()
             }
             return TrimmingRangeList(ranges)
+        }
+
+        fun tryBuild(): ITrimmingRangeList? {
+            return try {
+                build()
+            } catch(_:EmptyRangeException) {
+                null
+            }
+        }
+
+        fun canBuild():Boolean {
+            return tryBuild() != null
         }
     }
 

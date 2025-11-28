@@ -192,7 +192,7 @@ class ConvertSplitter(
         val duration = inputFile.openMetadataRetriever().useObj { it.getDuration() } ?: throw IllegalStateException("cannot retrieve duration")
 
         val result = Splitter.MultiResult()
-        val baseTrimmingRangeList = converterFactory.properties.trimmingRangeList
+        val baseTrimmingRangeList = converterFactory.properties.tryGetTrimmingRangeList() ?: return result
         val rangeMsList = positionMsListToRangeMsList(positionMsList, duration)
         if (rangeMsList.isEmpty()) {
             return result
@@ -200,7 +200,7 @@ class ConvertSplitter(
         val totalLengthMs = rangeMsList.fold(0L) { acc, range ->
             acc + range.lengthMs(duration)
         }
-        if (!outputFileSelector.initializeByRanges(rangeMsList)) {
+        if (!outputFileSelector.initialize(rangeMsList)) {
             return result.cancel()
         }
         var index = 0
@@ -244,6 +244,7 @@ class ConvertSplitter(
             }
             convProgress.updateDuration(range.lengthMs(duration))
         }
+        outputFileSelector.terminate()
         return result
     }
 
@@ -254,12 +255,14 @@ class ConvertSplitter(
      * @return IMultiSplitResult
      */
     override suspend fun chop(inputFile: IInputMediaFile, outputFileSelector: IOutputFileSelector): IMultiSplitResult {
-        val rangeList = converterFactory.properties.trimmingRangeList.list.toRangeMsList()
-        if (rangeList.isEmpty()) throw IllegalArgumentException("rangeList is empty")
+        val result = Splitter.MultiResult()
+        val rangeList = converterFactory.properties.tryGetTrimmingRangeList()?.list?.toRangeMsList()
+        if (rangeList == null || rangeList.isEmpty()) {
+            throw IllegalStateException("no trimming range list")
+        }
         val duration = inputFile.openMetadataRetriever().useObj { it.getDuration() } ?: throw IllegalStateException("cannot retrieve duration")
 
-        val result = Splitter.MultiResult()
-        if (!outputFileSelector.initializeByRanges(rangeList)) {
+        if (!outputFileSelector.initialize(rangeList)) {
             return result.cancel()
         }
 
@@ -305,6 +308,7 @@ class ConvertSplitter(
             }
             convProgress.updateDuration(range.lengthMs(duration))
         }
+        outputFileSelector.terminate()
         return result
     }
 

@@ -72,8 +72,9 @@ class ActualSoughtMapImpl : IActualSoughtMap {
 }
 
 interface IOutputFileSelector {
-    suspend fun initializeByRanges(trimmedRangeMsList:List<RangeMs>):Boolean
+    suspend fun initialize(trimmedRangeMsList:List<RangeMs>):Boolean
     suspend fun selectOutputFile(index:Int, positionMs:Long): IOutputMediaFile?
+    suspend fun terminate()
 }
 
 /**
@@ -490,7 +491,7 @@ class Splitter private constructor(
                     logger.error(e)
                 }
                 if (deleteOutputOnError) {
-                    runCatching { outPath.delete() }
+                    outPath.safeDelete()
                 }
                 Result.error(e)
             } finally {
@@ -529,7 +530,7 @@ class Splitter private constructor(
                     logger.error(e)
                 }
                 if (deleteOutputOnError) {
-                    runCatching { outPath.delete() }
+                    outPath.safeDelete()
                 }
                 Result.error(e)
             } finally {
@@ -568,10 +569,8 @@ class Splitter private constructor(
                     logger.error(e)
                 }
                 if (deleteOutputOnError) {
-                    runCatching {
-                        out1Path.delete()
-                        out2Path.delete()
-                    }
+                    out1Path.safeDelete()
+                    out2Path.safeDelete()
                 }
                 return@withContext listOf(Result.error(e), Result.error(e))
             } finally {
@@ -590,8 +589,7 @@ class Splitter private constructor(
         override val exception: Throwable? get() = results.firstOrNull { !it.cancelled && it.exception!=null }?.exception
         override val errorMessage: String? get() = results.firstOrNull { !it.cancelled && it.errorMessage!=null }?.errorMessage
 
-
-        fun add(result: IConvertResult) {
+        fun add(result: IConvertResult) = apply {
             results.add(result)
         }
 
@@ -626,7 +624,7 @@ class Splitter private constructor(
             start = pos
         }
         rangeMsList.add(RangeMs(start, 0))
-        if (!outputFileSelector.initializeByRanges(rangeMsList)) {
+        if (!outputFileSelector.initialize(rangeMsList)) {
             return results.cancel()
         }
 
@@ -651,7 +649,7 @@ class Splitter private constructor(
                         results.add(Result.success(outPath, RangeMs(fromTimeMs, toTimeMs), detachActualSoughtMap(), report.apply { end()}))
                     } catch (e: Throwable) {
                         if (deleteOutputOnError) {
-                            runCatching { outPath.delete() }
+                            outPath.safeDelete()
                         }
                         if (e is CancellationException) {
                             results.cancel()
@@ -671,6 +669,7 @@ class Splitter private constructor(
                 results.error(e)
             } finally {
                 resetBuffer()
+                outputFileSelector.terminate()
             }
         }
     }
@@ -738,8 +737,9 @@ class TrimSplitter(
             mSplitterBuilder.rotate(rotation)
         }
 
-        fun build(): TrimSplitter {
-            return TrimSplitter(mSplitterBuilder, mAbortOnError, mTrimmingRangeListBuilder.build().list, mOnProgress)
+        fun build(): TrimSplitter? {
+            val trimmingRangeList = mTrimmingRangeListBuilder.build()?.list ?: return null
+            return TrimSplitter(mSplitterBuilder, mAbortOnError, trimmingRangeList, mOnProgress)
         }
     }
 
@@ -767,7 +767,7 @@ class TrimSplitter(
         val totalLengthMs = rangeMsList.fold(0L) { acc, range ->
             acc + range.lengthMs(duration)
         }
-        if (!outputFileSelector.initializeByRanges(rangeMsList)) {
+        if (!outputFileSelector.initialize(rangeMsList)) {
             return result.cancel()
         }
         var index = 0
@@ -794,12 +794,12 @@ class TrimSplitter(
                 result.cancel()
                 break
             }
-            val ranges = TrimmingRangeList.Builder(trimmingRangeList)
+            val trimmingRangeList = TrimmingRangeList.Builder(trimmingRangeList)
                 .startFromMs(range.startMs)
                 .endAtMs(range.endMs)
-                .build()
-                .list.toRangeMsList()
-
+                .build() ?: continue
+//                .list.toRangeMsList()
+            val ranges = trimmingRangeList.list.toRangeMsList()
             val splitResult = splitter.trim(inputFile, output, ranges)
             result.add (splitResult)
             if (splitResult.cancelled) {
@@ -812,6 +812,7 @@ class TrimSplitter(
             })
         }
         splitter = null
+        outputFileSelector.terminate()
         return result
     }
 
@@ -828,7 +829,7 @@ class TrimSplitter(
         val duration = inputFile.openMetadataRetriever().useObj { it.getDuration() } ?: throw IllegalStateException("cannot retrieve duration")
 
         val result = Splitter.MultiResult()
-        if (!outputFileSelector.initializeByRanges(rangeList)) {
+        if (!outputFileSelector.initialize(rangeList)) {
             return result.cancel()
         }
         val totalRangeMs = rangeList.fold(0L) { acc, range ->
@@ -868,6 +869,7 @@ class TrimSplitter(
             convProgress.updateDuration(range.lengthMs(duration))
         }
         splitter = null
+        outputFileSelector.terminate()
         return result
     }
 
