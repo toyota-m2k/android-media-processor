@@ -76,12 +76,34 @@ class AndroidFile : IInputMediaFile, IOutputMediaFile, Comparable<AndroidFile> {
         return -1L
     }
     override fun getLength():Long {
-        return if(path!=null) {
+        return if (path!=null) {
             path.length()
         } else if(uri!=null){
             getFileSizeFromUri(uri)
         } else {
             -1L
+        }
+    }
+
+    fun getLastModifiedTime():Long? {
+        return try {
+            if (path!=null) {
+                path.lastModified()
+            } else if (uri!=null && context!=null) {
+                when (uri.scheme) {
+                    "content"-> {
+                        DocumentFile.fromSingleUri(context, uri)?.lastModified()
+                    }
+                    "file"-> {
+                        uri.path?.run { File(this).lastModified() }
+                    }
+                    else -> null
+                }
+            } else {
+                null
+            }
+        } catch (e:Throwable) {
+            return null
         }
     }
 
