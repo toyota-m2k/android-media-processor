@@ -277,6 +277,12 @@ class AndroidFile : IInputMediaFile, IOutputMediaFile, Comparable<AndroidFile> {
 //            MediaMuxer(path!!.toString(), format)
 //        }
 //    }
+    override fun hashCode(): Int {
+        var result = uri?.hashCode() ?: 0
+        result = 31 * result + (context?.hashCode() ?: 0)
+        result = 31 * result + (path?.hashCode() ?: 0)
+        return result
+    }
 }
 
 // use openExtractor() instead.
