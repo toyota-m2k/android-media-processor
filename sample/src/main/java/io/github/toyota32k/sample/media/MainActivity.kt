@@ -380,7 +380,9 @@ class MainActivity : UtMortalActivity() {
                             .rotate(rotation)
                             .crop(crop)
                             .brightness(1.3f)
-                            .addTrimmingRange(ranges.map { RangeMs(it.start, it.end) })
+                            .trimming {
+                                addRangesMs(ranges.map { RangeMs(it.start, it.end) })
+                            }
                             .setProgressHandler {
                                 sink.progress = it.percentage
                                 sink.progressText = it.format()
