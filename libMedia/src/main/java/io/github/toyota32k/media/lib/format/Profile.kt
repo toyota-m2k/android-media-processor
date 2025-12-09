@@ -12,6 +12,8 @@ import io.github.toyota32k.media.lib.format.Profile.VP9Profile3HDR
 import io.github.toyota32k.media.lib.format.Profile.VP9Profile3HDR10Plus
 
 enum class Profile(val codec: Codec, val value:Int) {
+    Invalid(Codec.Invalid, 0),
+
     /**
      * AVC Baseline profile.
      * See definition in

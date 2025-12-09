@@ -12,6 +12,7 @@ import io.github.toyota32k.media.lib.format.MetaData
 import io.github.toyota32k.media.lib.format.Profile
 import io.github.toyota32k.media.lib.strategy.VideoStrategy.EncoderType
 import io.github.toyota32k.media.lib.strategy.VideoStrategy.SizeCriteria
+import io.github.toyota32k.media.lib.surface.RenderOption
 
 interface IStrategy {
     val name:String
@@ -45,7 +46,7 @@ interface IAudioStrategy : IStrategy {
 }
 
 interface IVideoStrategy : IStrategy {
-    val sizeCriteria: SizeCriteria?
+    val sizeCriteria: SizeCriteria
     val bitRate: MaxDefault // = Int.MAX_VALUE,
     val frameRate: MaxDefault // = Int.MAX_VALUE,
     val iFrameInterval:MinDefault // = DEFAULT_IFRAME_INTERVAL,
@@ -53,14 +54,14 @@ interface IVideoStrategy : IStrategy {
     val bitRateMode: BitRateMode?
     val encoderType: EncoderType
 
-    fun createOutputFormat(inputFormat: MediaFormat, metaData: MetaData, encoder:MediaCodec): MediaFormat
+    fun createOutputFormat(inputFormat: MediaFormat, metaData: MetaData, encoder:MediaCodec, renderOption: RenderOption): MediaFormat
 
     fun derived(
         codec: Codec = this.codec,
         profile: Profile = this.profile,
         level: Level? = this.maxLevel,
         fallbackProfiles:Array<ProfileLv>? = this.fallbackProfiles,
-        sizeCriteria: SizeCriteria? = this.sizeCriteria,
+        sizeCriteria: SizeCriteria = this.sizeCriteria,
         bitRate: MaxDefault = this.bitRate, // = Int.MAX_VALUE,
         frameRate: MaxDefault = this.frameRate, // = Int.MAX_VALUE,
         iFrameInterval:MinDefault = this.iFrameInterval, // = DEFAULT_IFRAME_INTERVAL,

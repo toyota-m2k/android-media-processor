@@ -16,6 +16,7 @@ import java.io.File
 import java.io.FileDescriptor
 import java.io.FileInputStream
 import java.io.FileOutputStream
+import java.nio.file.Files
 
 /**
  * Converterの入・出力に利用できるファイルクラス
@@ -25,7 +26,7 @@ import java.io.FileOutputStream
  * ただし、Uriによる指定は、 android.provider.DocumentsProvider ベースのuri、すなわち、
  * Intent.ACTION_OPEN_DOCUMENTなどによって、取得されたuriであることを前提としている。
  */
-class AndroidFile : IInputMediaFile, IOutputMediaFile {
+class AndroidFile : IInputMediaFile, IOutputMediaFile, Comparable<AndroidFile> {
     val uri:Uri?
     val context:Context?
     val path: File?
@@ -55,7 +56,6 @@ class AndroidFile : IInputMediaFile, IOutputMediaFile {
 //        }
 
     private fun getFileSizeFromUri(uri: Uri): Long {
-
         val contentResolver = context?.contentResolver ?: return -1L
         val mimeType = contentResolver.getType(uri) ?: return -1L
 
@@ -76,24 +76,48 @@ class AndroidFile : IInputMediaFile, IOutputMediaFile {
         return -1L
     }
     override fun getLength():Long {
-        return if(hasPath) {
-            path!!.length()
-        } else if(hasUri){
-            getFileSizeFromUri(uri!!)
+        return if (path!=null) {
+            path.length()
+        } else if(uri!=null){
+            getFileSizeFromUri(uri)
         } else {
             -1L
         }
     }
 
+    fun getLastModifiedTime():Long? {
+        return try {
+            if (path!=null) {
+                path.lastModified()
+            } else if (uri!=null && context!=null) {
+                when (uri.scheme) {
+                    "content"-> {
+                        DocumentFile.fromSingleUri(context, uri)?.lastModified()
+                    }
+                    "file"-> {
+                        uri.path?.run { File(this).lastModified() }
+                    }
+                    else -> null
+                }
+            } else {
+                null
+            }
+        } catch (e:Throwable) {
+            return null
+        }
+    }
+
     private fun <T> withFileDescriptor(mode:String, fn:(FileDescriptor)->T):T {
-        return if(hasUri) {
-            context!!.contentResolver.openAssetFileDescriptor(uri!!, mode)!!.use {
+        return if(uri!=null) {
+            context!!.contentResolver.openAssetFileDescriptor(uri, mode)!!.use {
+                fn(it.fileDescriptor)
+            }
+        } else if (path!=null){
+            ParcelFileDescriptor.open(path, ParcelFileDescriptor.parseMode(mode)).use {
                 fn(it.fileDescriptor)
             }
         } else {
-            ParcelFileDescriptor.open(path!!, ParcelFileDescriptor.parseMode(mode)).use {
-                fn(it.fileDescriptor)
-            }
+            throw IllegalStateException("no path or uri")
         }
     }
 
@@ -113,10 +137,12 @@ class AndroidFile : IInputMediaFile, IOutputMediaFile {
     }
 
     private fun openParcelFileDescriptor(mode:String):ParcelFileDescriptor {
-        return if(hasUri) {
-            context!!.contentResolver.openFileDescriptor(uri!!, mode )!!
-        } else { // Use RandomAccessFile so we can open the file with RW access;
-            ParcelFileDescriptor.open(path!!, ParcelFileDescriptor.parseMode(mode))
+        return if(uri!=null) {
+            context!!.contentResolver.openFileDescriptor(uri, mode )!!
+        } else if(path!=null) { // Use RandomAccessFile so we can open the file with RW access;
+            ParcelFileDescriptor.open(path, ParcelFileDescriptor.parseMode(mode))
+        } else {
+            throw IllegalStateException("no path or uri")
         }
     }
 
@@ -147,26 +173,28 @@ class AndroidFile : IInputMediaFile, IOutputMediaFile {
     }
 
     override fun delete() {
-        if (hasPath) {
-            path!!.delete()
-        } else if (hasUri) {
-            DocumentFile.fromSingleUri(context!!, uri!!)?.delete()
+        if (path!=null) {
+            path.delete()
+        } else if (uri!=null) {
+            DocumentFile.fromSingleUri(context!!, uri)?.delete()
+        }
+    }
+
+    fun canWrite():Boolean {
+        return if (path!=null) {
+            path.canWrite()
+        } else if (uri!=null) {
+            DocumentFile.fromSingleUri(context!!, uri)?.canWrite() == true
+        } else {
+            false
         }
     }
 
     override val seekable: Boolean = true
 
-    fun safeDelete() {
-        try {
-            delete()
-        } catch(_:Throwable) {
-
-        }
-    }
-
     fun getFileName() : String? {
-        return if(hasPath) {
-            path?.name
+        return if(path!=null) {
+            path.name
         } else {
             when(uri?.scheme) {
                 "content"-> {
@@ -184,24 +212,30 @@ class AndroidFile : IInputMediaFile, IOutputMediaFile {
         }
     }
 
+    fun getContentType() : String? {
+        return when {
+            path != null -> Files.probeContentType(path.toPath())
+            uri != null && context != null -> context.contentResolver.getType(uri)
+            else -> null
+        }
+    }
+
     @Suppress("unused")
     fun exists(): Boolean {
-        return (if(hasPath) {
-            path?.exists()
+        return if (path!=null) {
+            path.exists()
         } else {
             when(uri?.scheme) {
                 "content"-> {
                     val cursor: Cursor? = context?.contentResolver?.query(uri, null, null, null, null)
                     cursor?.use {
                         it.count > 0
-                    }
+                    } ?: false
                 }
-
-                "file"-> uri.path?.let { File(it).exists() }
+                "file"-> uri.path?.let { File(it).exists() } ?: false
                 else -> false
             }
-        }) == true
-
+        }
     }
 
 
@@ -216,6 +250,25 @@ class AndroidFile : IInputMediaFile, IOutputMediaFile {
         }
     }
 
+    override fun compareTo(other: AndroidFile): Int {
+        return when {
+            uri != null && other.uri != null -> uri.compareTo(other.uri)
+            path != null && other.path != null -> path.compareTo(other.path)
+            uri != null -> -1
+            other.uri != null -> 1
+            path != null -> -1
+            other.path != null -> 1
+            else -> 0
+        }
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (other !is AndroidFile) {
+            return false
+        }
+        return compareTo(other) == 0
+    }
+
 //
 //    fun mediaMuxer(format:Int=MediaMuxer.OutputFormat.MUXER_OUTPUT_MPEG_4): MediaMuxer {
 //        return if(hasUri) {
@@ -224,6 +277,12 @@ class AndroidFile : IInputMediaFile, IOutputMediaFile {
 //            MediaMuxer(path!!.toString(), format)
 //        }
 //    }
+    override fun hashCode(): Int {
+        var result = uri?.hashCode() ?: 0
+        result = 31 * result + (context?.hashCode() ?: 0)
+        result = 31 * result + (path?.hashCode() ?: 0)
+        return result
+    }
 }
 
 // use openExtractor() instead.

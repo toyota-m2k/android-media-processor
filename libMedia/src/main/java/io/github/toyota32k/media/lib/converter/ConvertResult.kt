@@ -4,20 +4,48 @@ import io.github.toyota32k.media.lib.report.Report
 import kotlinx.coroutines.CancellationException
 import kotlin.text.appendLine
 
+interface IResultBase {
+    val succeeded:Boolean
+    val exception:Throwable?
+    val errorMessage: String?
+    val cancelled : Boolean get() = exception is kotlin.coroutines.cancellation.CancellationException || (!succeeded && exception==null)
+    val hasError: Boolean get() = exception != null && !cancelled
+}
+
+interface IConvertResult : IResultBase {
+    val outputFile: IOutputMediaFile?
+    val actualSoughtMap: IActualSoughtMap?
+    val requestedRangeMs: RangeMs
+    val report:Report?
+}
+
 /**
  * Converterの結果（成功/失敗/キャンセル）を返すためのデータクラス
  */
-data class ConvertResult(val succeeded:Boolean, val adjustedTrimmingRangeList: ITrimmingRangeList?, val report:Report?, val cancelled:Boolean, val errorMessage:String?, val exception:Throwable?) {
+data class ConvertResult(
+    override val succeeded:Boolean,
+    override val outputFile: IOutputMediaFile?,
+    override val requestedRangeMs: RangeMs,
+    val adjustedTrimmingRangeList: ITrimmingRangeList?,
+    override val report:Report?,
+    override val cancelled:Boolean,
+    override val errorMessage:String?,
+    override val exception:Throwable?)
+    : IConvertResult {
+
     companion object {
-        fun succeeded(adjustedTrimmingRangeList: ITrimmingRangeList, report:Report):ConvertResult {
-            return ConvertResult(true, adjustedTrimmingRangeList, report, false, null, null)
+        fun succeeded(outputFile:IOutputMediaFile, requestedRangeMs:RangeMs, adjustedTrimmingRangeList: ITrimmingRangeList, report:Report):ConvertResult {
+            return ConvertResult(true, outputFile, requestedRangeMs, adjustedTrimmingRangeList, report, false, null, null)
         }
         val cancelled:ConvertResult
-            get() = ConvertResult(false, null, null, true, null, null)
-        fun error(exception:Throwable):ConvertResult {
-            return if(exception is CancellationException) cancelled else ConvertResult(false, null, null, false, exception.message,exception)
+            get() = ConvertResult(false, null,RangeMs.empty, null, null,true, null, null)
+        fun error(exception:Throwable, errorMessage:String?=null):ConvertResult {
+            return if(exception is CancellationException) cancelled else ConvertResult(false, null, RangeMs.empty, null, null, false, errorMessage ?: exception.message, exception)
         }
     }
+    override val actualSoughtMap : IActualSoughtMap?
+        get() = adjustedTrimmingRangeList as? IActualSoughtMap
+
 
     // for debug log
     override fun toString(): String {

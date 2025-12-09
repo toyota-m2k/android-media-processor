@@ -19,11 +19,6 @@ package io.github.toyota32k.media.lib.surface;
  * limitations under the License.
  */
 import android.graphics.SurfaceTexture;
-import android.opengl.EGL14;
-import android.opengl.EGLConfig;
-import android.opengl.EGLContext;
-import android.opengl.EGLDisplay;
-import android.opengl.EGLSurface;
 import android.util.Log;
 import android.view.Surface;
 /**
@@ -44,47 +39,30 @@ import android.view.Surface;
 public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
     private static final String TAG = OutputSurface.class.getSimpleName();
     private static final boolean VERBOSE = false;
-    private EGLDisplay mEGLDisplay = EGL14.EGL_NO_DISPLAY;
-    private EGLContext mEGLContext = EGL14.EGL_NO_CONTEXT;
-    private EGLSurface mEGLSurface = EGL14.EGL_NO_SURFACE;
     private SurfaceTexture mSurfaceTexture;
     private Surface mSurface;
     private Object mFrameSyncObject = new Object();     // guards mFrameAvailable
     private boolean mFrameAvailable;
     private TextureRender mTextureRender;
-    /**
-     * Creates an OutputSurface backed by a pbuffer with the specified dimensions.  The new
-     * EGL context and surface will be made current.  Creates a Surface that can be passed
-     * to MediaCodec.configure().
-     */
-    public OutputSurface(int width, int height) {
-        if (width <= 0 || height <= 0) {
-            throw new IllegalArgumentException();
-        }
-        eglSetup(width, height);
-        makeCurrent();
-        setup(this);
-    }
+
     /**
      * Creates an OutputSurface using the current EGL context (rather than establishing a
      * new one).  Creates a Surface that can be passed to MediaCodec.configure().
      */
-    public OutputSurface() {
-        setup(this);
+    public OutputSurface(RenderOption renderOption) {
+        setup(renderOption, this);
     }
-    public OutputSurface(final SurfaceTexture.OnFrameAvailableListener listener) {
-        setup(listener);
-    }
+
     /**
      * Creates instances of TextureRender and SurfaceTexture, and a Surface associated
      * with the SurfaceTexture.
      */
-    private void setup(SurfaceTexture.OnFrameAvailableListener listener) {
+    private void setup(RenderOption renderOption, SurfaceTexture.OnFrameAvailableListener listener) {
 //        assertTrue(EGL14.eglGetCurrentContext() != EGL14.EGL_NO_CONTEXT);
 //        assertTrue(EGL14.eglGetCurrentDisplay() != EGL14.EGL_NO_DISPLAY);
 //        assertTrue(EGL14.eglGetCurrentSurface(EGL14.EGL_DRAW) != EGL14.EGL_NO_SURFACE);
 //        assertTrue(EGL14.eglGetCurrentSurface(EGL14.EGL_READ) != EGL14.EGL_NO_SURFACE);
-        mTextureRender = new TextureRender();
+        mTextureRender = new TextureRender(renderOption);
         mTextureRender.surfaceCreated();
         // Even if we don't access the SurfaceTexture after the constructor returns, we
         // still need to keep a reference to it.  The Surface doesn't retain a reference
@@ -106,86 +84,18 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
         mSurfaceTexture.setOnFrameAvailableListener(listener);
         mSurface = new Surface(mSurfaceTexture);
     }
-    /**
-     * Prepares EGL.  We want a GLES 2.0 context and a surface that supports pbuffer.
-     */
-    private void eglSetup(int width, int height) {
-        mEGLDisplay = EGL14.eglGetDisplay(EGL14.EGL_DEFAULT_DISPLAY);
-        if (mEGLDisplay == EGL14.EGL_NO_DISPLAY) {
-            throw new RuntimeException("unable to get EGL14 display");
-        }
-        int[] version = new int[2];
-        if (!EGL14.eglInitialize(mEGLDisplay, version, 0, version, 1)) {
-            mEGLDisplay = null;
-            throw new RuntimeException("unable to initialize EGL14");
-        }
-        // Configure EGL for pbuffer and OpenGL ES 2.0.  We want enough RGB bits
-        // to be able to tell if the frame is reasonable.
-        int[] attribList = {
-                EGL14.EGL_RED_SIZE, 8,
-                EGL14.EGL_GREEN_SIZE, 8,
-                EGL14.EGL_BLUE_SIZE, 8,
-                EGL14.EGL_RENDERABLE_TYPE, EGL14.EGL_OPENGL_ES2_BIT,
-                EGL14.EGL_SURFACE_TYPE, EGL14.EGL_PBUFFER_BIT,
-                EGL14.EGL_NONE
-        };
-        EGLConfig[] configs = new EGLConfig[1];
-        int[] numConfigs = new int[1];
-        if (!EGL14.eglChooseConfig(mEGLDisplay, attribList, 0, configs, 0, configs.length,
-                numConfigs, 0)) {
-            throw new RuntimeException("unable to find RGB888+recordable ES2 EGL config");
-        }
-        // Configure context for OpenGL ES 2.0.
-        int[] attrib_list = {
-                EGL14.EGL_CONTEXT_CLIENT_VERSION, 2,
-                EGL14.EGL_NONE
-        };
-        mEGLContext = EGL14.eglCreateContext(mEGLDisplay, configs[0], EGL14.EGL_NO_CONTEXT,
-                attrib_list, 0);
-        checkEglError("eglCreateContext");
-        if (mEGLContext == null) {
-            throw new RuntimeException("null context");
-        }
-        // Create a pbuffer surface.  By using this for output, we can use glReadPixels
-        // to test values in the output.
-        int[] surfaceAttribs = {
-                EGL14.EGL_WIDTH, width,
-                EGL14.EGL_HEIGHT, height,
-                EGL14.EGL_NONE
-        };
-        mEGLSurface = EGL14.eglCreatePbufferSurface(mEGLDisplay, configs[0], surfaceAttribs, 0);
-        checkEglError("eglCreatePbufferSurface");
-        if (mEGLSurface == null) {
-            throw new RuntimeException("surface was null");
-        }
-    }
+
     /**
      * Discard all resources held by this class, notably the EGL context.
      */
     public void release() {
-        if (mEGLDisplay != EGL14.EGL_NO_DISPLAY) {
-            EGL14.eglDestroySurface(mEGLDisplay, mEGLSurface);
-            EGL14.eglDestroyContext(mEGLDisplay, mEGLContext);
-            EGL14.eglReleaseThread();
-            EGL14.eglTerminate(mEGLDisplay);
-        }
         mSurface.release();
         mSurfaceTexture.release();
-        mEGLDisplay = EGL14.EGL_NO_DISPLAY;
-        mEGLContext = EGL14.EGL_NO_CONTEXT;
-        mEGLSurface = EGL14.EGL_NO_SURFACE;
         mTextureRender = null;
         mSurface = null;
         mSurfaceTexture = null;
     }
-    /**
-     * Makes our EGL context and surface current.
-     */
-    public void makeCurrent() {
-        if (!EGL14.eglMakeCurrent(mEGLDisplay, mEGLSurface, mEGLSurface, mEGLContext)) {
-            throw new RuntimeException("eglMakeCurrent failed");
-        }
-    }
+
     /**
      * Returns the Surface that we draw onto.
      */
@@ -226,43 +136,14 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
         mTextureRender.checkGlError("before updateTexImage");
         mSurfaceTexture.updateTexImage();
     }
-    /**
-     * Wait for new image to become available or until timeout, whichever comes first.
-     * @param timeoutMs
-     * @return true if new image is available. false for no new image until timeout.
-     */
-    public boolean checkForNewImage(int timeoutMs) {
-        synchronized (mFrameSyncObject) {
-            while (!mFrameAvailable) {
-                try {
-                    // Wait for onFrameAvailable() to signal us.  Use a timeout to avoid
-                    // stalling the test if it doesn't arrive.
-                    mFrameSyncObject.wait(timeoutMs);
-                    if (!mFrameAvailable) {
-                        return false;
-                    }
-                } catch (InterruptedException ie) {
-                    // shouldn't happen
-                    throw new RuntimeException(ie);
-                }
-            }
-            mFrameAvailable = false;
-        }
-        // Latch the data.
-        mTextureRender.checkGlError("before updateTexImage");
-        mSurfaceTexture.updateTexImage();
-        return true;
-    }
+
     /**
      * Draws the data from SurfaceTexture onto the current EGL surface.
      */
     public void drawImage() {
         mTextureRender.drawFrame(mSurfaceTexture);
     }
-    public void latchImage() {
-        mTextureRender.checkGlError("before updateTexImage");
-        mSurfaceTexture.updateTexImage();
-    }
+
     @Override
     public void onFrameAvailable(SurfaceTexture st) {
         if (VERBOSE) Log.d(TAG, "new frame available");
@@ -272,15 +153,6 @@ public class OutputSurface implements SurfaceTexture.OnFrameAvailableListener {
             }
             mFrameAvailable = true;
             mFrameSyncObject.notifyAll();
-        }
-    }
-    /**
-     * Checks for EGL errors.
-     */
-    private void checkEglError(String msg) {
-        int error = EGL14.eglGetError();
-        if (error != EGL14.EGL_SUCCESS) {
-            throw new RuntimeException(msg + ": EGL error: 0x" + Integer.toHexString(error));
         }
     }
 }

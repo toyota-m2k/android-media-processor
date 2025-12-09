@@ -1,5 +1,6 @@
 package io.github.toyota32k.media.lib.converter
 
+
 /**
  * トリミング範囲のリスト
  */
@@ -11,6 +12,8 @@ interface ITrimmingRangeList {
     val naturalDurationUs: Long
 
     fun addRange(startUs:Long, endUs:Long)
+
+    fun clear()
 
     /**
      * 開区間を naturalDurationで閉じる
@@ -24,7 +27,7 @@ interface ITrimmingRangeList {
 
     companion object {
         fun empty(): ITrimmingRangeList {
-            return TrimmingRangeListImpl()
+            return TrimmingRangeList()
         }
     }
 }
@@ -35,11 +38,46 @@ enum class PositionState {
     END,
 }
 
+interface IActualSoughtMap {
+    /**
+     * 切り取り位置の補正
+     * splitAtMs や startMs で指定した位置と実際に切り取られた位置（キーフレーム位置）は異なる可能性がある。
+     */
+    fun correctPositionUs(timeUs:Long):Long
+
+    fun correctPositionMs(timeMs:Long):Long {
+        return correctPositionUs(timeMs * 1000L) / 1000L
+    }
+
+    fun exportToMap(map: MutableMap<Long, Long>)
+    val entries: Set<Map.Entry<Long, Long>>
+
+    /**
+     * trim() に使った Array<RangeMs> を一括補正する。
+     * trim()後の位置ではなく、元動画のどこで実際に分割したかを示す値を返す。
+     * ConvertResult#adjustedTrimmingRangeList と型互換
+     */
+    fun adjustedRangeList(durationMs:Long, ranges:List<RangeMs>) : ITrimmingRangeList {
+        return TrimmingRangeList().apply {
+            for (range in ranges) {
+                if (range.endMs > 0) {
+                    addRange(correctPositionUs(range.startMs * 1000L), correctPositionUs(range.endMs * 1000L))
+                } else {
+                    addRange(correctPositionUs(range.startMs * 1000L), correctPositionUs(durationMs * 1000L))
+                }
+            }
+        }
+    }
+
+    fun adjustedRangeList(ranges:List<RangeMs>) : ITrimmingRangeList
+}
+
 /**
  * トリミング範囲を管理するインターフェース
  */
-interface ITrimmingRangeKeeper : ITrimmingRangeList {
+interface ITrimmingRangeKeeper : ITrimmingRangeList, IActualSoughtMap {
     var limitDurationUs: Long
+
     /**
      * トリミング前のポジションをトリミング後のポジションに変換
      */

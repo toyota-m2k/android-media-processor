@@ -1,9 +1,11 @@
 package io.github.toyota32k.sample.media
 
 import android.app.Application
+import android.graphics.Rect
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
+import android.util.Size
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import androidx.core.view.ViewCompat
@@ -43,11 +45,15 @@ import io.github.toyota32k.media.lib.converter.AndroidFile
 import io.github.toyota32k.media.lib.converter.ConvertResult
 import io.github.toyota32k.media.lib.converter.Converter
 import io.github.toyota32k.media.lib.converter.FastStart
+import io.github.toyota32k.media.lib.converter.IConvertResult
+import io.github.toyota32k.media.lib.converter.RangeMs
 import io.github.toyota32k.media.lib.converter.Rotation
 import io.github.toyota32k.media.lib.converter.Splitter
 import io.github.toyota32k.media.lib.converter.format
 import io.github.toyota32k.media.lib.converter.toAndroidFile
 import io.github.toyota32k.media.lib.format.Codec
+import io.github.toyota32k.media.lib.format.getHeight
+import io.github.toyota32k.media.lib.format.getWidth
 import io.github.toyota32k.media.lib.strategy.DeviceCapabilities
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
@@ -351,14 +357,32 @@ class MainActivity : UtMortalActivity() {
                 converted.value = false
                 val result = ProgressDialog.withProgressDialog<ConvertResult> { sink ->
                     withContext(Dispatchers.IO) {
+                        val videoSize = srcFile.openMetadataRetriever().use {
+                            Size(it.obj.getWidth()?:0, it.obj.getHeight()?:0)
+                        }
+                        val subWidth = (videoSize.width*0.5).toInt()
+                        val subHeight = (videoSize.height*0.5).toInt()
+                        val sx = videoSize.width-subWidth
+                        val sy = videoSize.height-subHeight
+                        val crop = Rect(sx, sy, sx+subWidth, sy+subHeight)
+//                        val crop = Rect(
+//                            532,
+//                             203,
+//                             1663,
+//                             1052)
+
                         sink.message = "Trimming Now"
                         val rotation = if (playerModel.rotation.value != 0) Rotation(playerModel.rotation.value, relative = true) else Rotation.nop
-                        val converter = Converter.Factory()
+                        val converter = Converter.Builder()
                             .input(srcFile)
                             .output(trimFile)
                             .audioStrategy(namedAudioStrategy.value.strategy)
                             .rotate(rotation)
-                            .addTrimmingRanges(*ranges.map { Converter.Factory.RangeMs(it.start, it.end) }.toTypedArray())
+                            .crop(crop)
+                            .brightness(1.3f)
+                            .trimming {
+                                addRangesMs(ranges.map { RangeMs(it.start, it.end) })
+                            }
                             .setProgressHandler {
                                 sink.progress = it.percentage
                                 sink.progressText = it.format()
@@ -426,8 +450,7 @@ class MainActivity : UtMortalActivity() {
                     withContext(Dispatchers.IO) {
                         sink.message = "Trimming Now"
                         val rotation = if (playerModel.rotation.value != 0) Rotation(playerModel.rotation.value, relative = true) else Rotation.nop
-                        val splitter = Splitter.Factory()
-                            .input(srcFile)
+                        val splitter = Splitter.Builder()
                             .rotate(rotation)
                             .setProgressHandler {
                                 sink.progress = it.percentage
@@ -440,7 +463,7 @@ class MainActivity : UtMortalActivity() {
                             }
                         }.use {
                             try {
-                                splitter.trim(trimFile, *ranges.map { Converter.Factory.RangeMs(it.start, it.end) }.toTypedArray()).also { result ->
+                                splitter.trim(srcFile,trimFile, ranges.map { RangeMs(it.start, it.end) }).also { result ->
                                     if (result.succeeded) {
                                         sink.message = "Optimizing Now..."
                                         if (!FastStart.process(inFile = trimFile, outFile = optFile, removeFree=true) {
@@ -467,7 +490,7 @@ class MainActivity : UtMortalActivity() {
                     val dstLen = optFile.getLength()
                     showConfirmMessageBox("Trimming without ReEncoding", "Completed")
                 } else if (!result.cancelled) {
-                    showConfirmMessageBox("Error.", result.error?.message ?: "unknown")
+                    showConfirmMessageBox("Error.", result.exception?.message ?: "unknown")
                 }
             }
 
@@ -484,12 +507,11 @@ class MainActivity : UtMortalActivity() {
             UtImmortalTask.launchTask("chopping") {
                 splitted.value = false
                 converted.value = false
-                val result = ProgressDialog.withProgressDialog<Splitter.Result> { sink ->
+                val result = ProgressDialog.withProgressDialog<IConvertResult> { sink ->
                     withContext(Dispatchers.IO) {
                         sink.message = "Splitting Now"
                         val rotation = if (playerModel.rotation.value != 0) Rotation(playerModel.rotation.value, relative = true) else Rotation.nop
-                        val splitter = Splitter.Factory()
-                            .input(srcFile)
+                        val splitter = Splitter.Builder()
                             .rotate(rotation)
                             .setProgressHandler {
                                 sink.progress = it.percentage
@@ -502,7 +524,7 @@ class MainActivity : UtMortalActivity() {
                             }
                         }.use {
                             try {
-                                splitter.chop(trim1File, trim2File, position).also { result ->
+                                splitter.chop(srcFile, trim1File, trim2File, position)[0].also { result ->
                                     if (result.succeeded) {
                                         sink.message = "Optimizing First File..."
                                         if (!FastStart.process(inFile = trim1File, outFile = opt1File, removeFree=true) {
@@ -537,7 +559,7 @@ class MainActivity : UtMortalActivity() {
                     // 変換成功
                     showConfirmMessageBox("Split media file", "Completed.")
                 } else if (!result.cancelled) {
-                    showConfirmMessageBox("Error.", result.error?.message ?: "unknown")
+                    showConfirmMessageBox("Error.", result.exception?.message ?: "unknown")
                 }
             }
         }

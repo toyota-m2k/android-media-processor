@@ -1,8 +1,11 @@
 package io.github.toyota32k.media.lib.converter
 
 import android.content.Context
+import android.graphics.Rect
 import android.net.Uri
 import io.github.toyota32k.logger.UtLog
+import io.github.toyota32k.media.lib.converter.RangeMs.Companion.outlineRange
+import io.github.toyota32k.media.lib.converter.TrimmingRangeKeeper.Companion.toKeeper
 import io.github.toyota32k.media.lib.format.ContainerFormat
 import io.github.toyota32k.media.lib.format.isHDR
 import io.github.toyota32k.media.lib.misc.ICancellation
@@ -12,8 +15,12 @@ import io.github.toyota32k.media.lib.report.Summary
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
 import io.github.toyota32k.media.lib.strategy.IHDRSupport
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
+import io.github.toyota32k.media.lib.strategy.MaxDefault
+import io.github.toyota32k.media.lib.strategy.MinDefault
 import io.github.toyota32k.media.lib.strategy.PresetAudioStrategies
 import io.github.toyota32k.media.lib.strategy.PresetVideoStrategies
+import io.github.toyota32k.media.lib.strategy.VideoStrategy
+import io.github.toyota32k.media.lib.surface.RenderOption
 import io.github.toyota32k.media.lib.track.AudioTrack
 import io.github.toyota32k.media.lib.track.Muxer
 import io.github.toyota32k.media.lib.track.Track
@@ -28,18 +35,70 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import java.io.File
+import kotlin.math.max
 import kotlin.math.min
 import kotlin.time.Duration
 
 /**
+ * トリミング範囲 (開始位置、終了位置) クラス (ms)
+ */
+data class RangeMs(val startMs:Long, val endMs:Long) {
+    constructor(start: Duration?, end: Duration?) : this(
+        startMs = start?.inWholeMilliseconds ?: 0L,
+        endMs = end?.inWholeMilliseconds ?: 0L
+    )
+
+    fun lengthMs(durationMs: Long): Long {
+        return (if (endMs !in 1..durationMs) durationMs else endMs) - startMs
+    }
+
+    val isEmpty:Boolean get() = endMs < 0
+
+    companion object {
+        val empty = RangeMs(0L, -1L)
+
+        /**
+         * 無効化領域を除く再生時間を取得
+         */
+        fun List<RangeMs>.totalLengthMs(durationMs: Long): Long {
+            return this.fold(0L) { acc, range ->
+                acc + range.lengthMs(durationMs)
+            }
+        }
+
+        fun List<RangeMs>.outlineRange(durationMs: Long): RangeMs {
+            if (this.isEmpty()) return RangeMs(0L, 0L)
+            val start = this.minOf { it.startMs }
+            val end = this.maxOf { it.startMs + it.lengthMs(durationMs) }
+            return RangeMs(start, end)
+        }
+    }
+}
+
+interface ICancellable {
+    fun cancel()
+}
+/**
  * 動画ファイルのトランスコード/トリミングを行うコンバータークラス
  */
-class Converter {
+class Converter(
+    private val inPath:IInputMediaFile,
+    private val outPath: IOutputMediaFile,
+    private val videoStrategy: IVideoStrategy = PresetVideoStrategies.AVC720Profile,
+    private val audioStrategy:IAudioStrategy=PresetAudioStrategies.AACDefault,
+    private var trimmingRangeKeeper : ITrimmingRangeKeeper = TrimmingRangeKeeper.empty,
+    private val deleteOutputOnError:Boolean = true,
+    private val rotation: Rotation? = null,
+    private val containerFormat: ContainerFormat = ContainerFormat.MPEG_4,
+    private val preferSoftwareDecoder: Boolean = false,  // 　HWデコーダーで読めない動画も、SWデコーダーなら読めるかもしれない。（Videoのみ）
+    private val renderOption: RenderOption = RenderOption.DEFAULT,
+    private val onProgress : ((IProgress)->Unit)? = null,
+) : ICancellable {
     companion object {
         val logger = UtLog("AMP", null, "io.github.toyota32k.media.lib.")
-        @Suppress("unused")
-        val factory
-            get() = Factory()
+        val builder
+            get() = Builder()
+
         // 片方のトラックがN回以上、応答なしになったとき、もう片方のトラックに処理をまわす、そのNの定義（数は適当）
         private const val MAX_NO_EFFECTED_COUNT = 20
         // 両方のトラックが、デコーダーまでEOSになった後、NOPのまま待たされる時間の限界値
@@ -53,44 +112,149 @@ class Converter {
                 Summary()
             }
         }
+
+        fun checkReEncodingNecessity(file: IInputMediaFile, strategy: IVideoStrategy) : Boolean {
+            val summary = analyze(file).videoSummary ?: return true // ソース情報が不明
+            if (strategy.codec != summary.codec) {
+                // コーデックが違う
+                return true
+            }
+            if (summary.bitRate>0 && summary.bitRate > strategy.bitRate.max) {
+                // ビットレートが、Strategy の max bitRate より大きい
+                return true
+            }
+            if (max(summary.width, summary.height) > strategy.sizeCriteria.longSide ||
+                min(summary.width, summary.height) > strategy.sizeCriteria.shortSide) {
+                // 解像度が、Strategy の制限より大きい（縮小が必要）
+                return true
+            }
+            return false
+        }
     }
 
-    lateinit var inPath:IInputMediaFile
-    lateinit var outPath: IOutputMediaFile
-
-    var videoStrategy: IVideoStrategy = PresetVideoStrategies.AVC720Profile
-    var audioStrategy:IAudioStrategy=PresetAudioStrategies.AACDefault
-    private var trimmingRangeKeeper : ITrimmingRangeKeeper = TrimmingRangeKeeperImpl.empty
-    var trimmingRangeList: ITrimmingRangeList
-        get() = trimmingRangeKeeper
-        set(value) {
-            trimmingRangeKeeper = value as? ITrimmingRangeKeeper ?: TrimmingRangeKeeperImpl(value)
-        }
-    var deleteOutputOnError:Boolean = true
-    var rotation: Rotation? = null
-    var containerFormat: ContainerFormat = ContainerFormat.MPEG_4
-    var preferSoftwareDecoder: Boolean = false  // 　HWデコーダーで読めない動画も、SWデコーダーなら読めるかもしれない。（Videoのみ）
-    var onProgress : ((IProgress)->Unit)? = null
     lateinit var report :Report
 
     /**
      * Converterのファクトリクラス
      */
-    @Suppress("unused", "MemberVisibilityCanBePrivate")
-    class Factory {
+    class Builder {
         companion object {
             val logger = UtLog("Factory", Converter.logger)
         }
-        private val converter = Converter()
-        private val trimmingRangeList = TrimmingRangeListImpl()
+
+        // region Builder properties
+
+//        private val mTrimmingRangeList = TrimmingRangeList()
+        private val mTrimmingRangeListBuilder: TrimmingRangeList.Builder = TrimmingRangeList.Builder()
+        private var mLimitDurationUs: Long = 0L
+        private var mInPath:IInputMediaFile? = null
+        private var mOutPath: IOutputMediaFile? = null
+        private var mVideoStrategy: IVideoStrategy = PresetVideoStrategies.AVC720Profile
+        private var mAudioStrategy: IAudioStrategy = PresetAudioStrategies.AACDefault
+        private var mOnProgress:((IProgress)->Unit)? = null
+        private var mDeleteOutputOnError = true
+        private var mRotation: Rotation? = null
+        private var mContainerFormat: ContainerFormat = ContainerFormat.MPEG_4
+        private var mPreferSoftwareDecoder = false
 
         // for backward compatibility only
-        private var trimStart:Long = 0L
-        private var trimEnd:Long = 0L
-        private var limitDurationUs: Long = 0L
+        private var mTrimStart:Long = 0L
+        private var mTrimEnd:Long = 0L
 
         private var mKeepProfile:Boolean = false
         private var mKeepHDR: Boolean = false
+        private var mBrightnessFactor = 1f
+        private var mCropRect: Rect? = null
+
+        /**
+         * Builder のプロパティアクセス用クラス
+         */
+        inner class BuilderProperties {
+            val trimmingRangeListBuilder get() = mTrimmingRangeListBuilder
+//            val trimmingRangeList: ITrimmingRangeList get() = mTrimmingRangeListBuilder.build()
+            fun tryGetTrimmingRangeList() = try { mTrimmingRangeListBuilder.build() } catch(_: EmptyRangeException) { null }
+
+            val limitDurationUs: Long get() = mLimitDurationUs
+            val inPath: IInputMediaFile? get() = mInPath
+            val outPath: IOutputMediaFile? get() = mOutPath
+            val videoStrategy: IVideoStrategy get() = mVideoStrategy
+
+            val audioStrategy: IAudioStrategy get() = mAudioStrategy
+            val onProgress:((IProgress)->Unit)? get() = mOnProgress
+            val deleteOutputOnError get() = mDeleteOutputOnError
+            val rotation: Rotation? get() = mRotation
+            val containerFormat: ContainerFormat get() = mContainerFormat
+            val preferSoftwareDecoder get() = mPreferSoftwareDecoder
+
+            // for backward compatibility only
+//            val trimStart:Long get() = trimStart
+//            val trimEnd:Long get() = trimEnd
+
+            val keepProfile:Boolean get() = mKeepProfile
+            val keepHDR: Boolean get() = mKeepHDR
+            val brightnessFactor get() = mBrightnessFactor
+            val cropRect: Rect? get() = mCropRect
+
+            /**
+             * 現在のパラメータについて、再エンコードが必要かどうかをチェックする。
+             * @param adjustStrategyIfNeed InvalidStrategyで再エンコードが必要な場合は、trueなら、できるだけソースに近い Strategy を再設定、false なら例外をスローする。
+             * @return true: エンコードが必要 / false:不要(Splitterで十分
+             */
+            fun checkReEncodingNecessity(adjustStrategyIfNeed:Boolean) : Boolean {
+                val file = inPath ?: throw IllegalStateException("input file is not specified.")
+                val summary = analyze(file).videoSummary ?: return true // ソース情報が不明
+                if (mCropRect!=null || mBrightnessFactor!=1f) {
+                    // crop や brightness変更はコンバートが必要
+                    if (videoStrategy== PresetVideoStrategies.InvalidStrategy) {
+                        if(!adjustStrategyIfNeed) {
+                            throw IllegalStateException("video strategy is invalid.")
+                        }
+                        // Sourceに近いStrategyを作成して設定
+                        videoStrategy(VideoStrategy(
+                            summary.codec ?: throw IllegalStateException("unknown video codec."),
+                            summary.profile ?: throw IllegalStateException("unknown video codec profile"),
+                            summary.level,
+                            null,
+                            VideoStrategy.SizeCriteria(Int.MAX_VALUE, Int.MAX_VALUE),
+                            MaxDefault(Int.MAX_VALUE,max(summary.bitRate, 768*1000)),
+                                    MaxDefault(30, max(summary.frameRate, 24)),
+                            MinDefault(1, summary.iFrameInterval.takeIf { it > 0 } ?: 30),
+                            null,
+                            null,))
+                        keepHDR(true)
+                        keepVideoProfile(true)
+                    }
+                    return true
+                }
+                if (videoStrategy == PresetVideoStrategies.InvalidStrategy) {
+                    // 明示的に再エンコード不要が指定されている
+                    return false
+                }
+
+                if (videoStrategy.codec != summary.codec) {
+                    // コーデックが違う
+                    return true
+                }
+
+                if (summary.bitRate>0 && summary.bitRate > videoStrategy.bitRate.max) {
+                    // ビットレートが、Strategy の max bitRate より大きい
+                    return true
+                }
+
+                if (max(summary.width, summary.height) > videoStrategy.sizeCriteria.longSide ||
+                    min(summary.width, summary.height) > videoStrategy.sizeCriteria.shortSide) {
+                    // 解像度が、Strategy の制限より大きい（縮小が必要）
+                    return true
+                }
+                return false
+            }
+        }
+
+        val properties by lazy { BuilderProperties() }
+
+        // endregion
+
+        // region Setter: I/O files
 
         /**
          * 入力ファイルを設定（必須）
@@ -98,7 +262,7 @@ class Converter {
          * @param IInputMediaFile
          */
         fun input(src:IInputMediaFile) = apply {
-            converter.inPath = src
+            mInPath = src
         }
 
         /**
@@ -141,7 +305,7 @@ class Converter {
          * @param IOutputMediaFile
          */
         fun output(dst:IOutputMediaFile) = apply {
-            converter.outPath = dst
+            mOutPath = dst
         }
 
         /**
@@ -159,19 +323,22 @@ class Converter {
         fun output(uri: Uri, context: Context)
             = output(AndroidFile(uri, context))
 
+        // endregion
+
+        // region Setter: Strategies
 
         /**
          * VideoStrategyを設定
          */
         fun videoStrategy(s:IVideoStrategy) = apply {
-            converter.videoStrategy = s
+            mVideoStrategy = s
         }
 
         /**
          * AudioStrategyを設定
          */
         fun audioStrategy(s: IAudioStrategy) = apply {
-            converter.audioStrategy = s
+            mAudioStrategy = s
         }
 
         /**
@@ -188,84 +355,106 @@ class Converter {
         }
 
         /**
-         * トリミング範囲 (開始位置、終了位置) クラス (ms)
+         * ソフトウェアデコーダーを優先するかどうか
          */
-        data class RangeMs(val startMs:Long, val endMs:Long) {
-            constructor(start:Duration?, end: Duration?):this(
-                startMs = start?.inWholeMilliseconds ?: 0L,
-                endMs = end?.inWholeMilliseconds ?: 0L
-            )
+        fun preferSoftwareDecoder(flag:Boolean):Builder {
+            mPreferSoftwareDecoder = flag
+            return this
         }
 
-        /**
-         * トリミング範囲を追加
-         * @param startMs 開始位置 (ms)
-         * @param endMs 終了位置 (ms)   0なら最後まで
-         */
-        fun addTrimmingRange(startMs:Long, endMs:Long) = apply {
-            trimmingRangeList.addRange(startMs*1000, endMs*1000)
+        // endregion
+
+        // region Setter: Trimming
+//        val mTrimmingRangeList get() = mTrimmingRangeListBuilder
+
+        fun trimming(fn: TrimmingRangeList.Builder.()->Unit) = apply {
+            mTrimmingRangeListBuilder.fn()
         }
 
-        /**
-         * トリミング範囲を追加
-         * @param start 開始位置 (Duration) nullなら先頭から
-         * @param end 終了位置 (Duration) nullなら最後まで
-         */
-        fun addTrimmingRange(start:Duration?, end:Duration?)
-            = addTrimmingRange(start?.inWholeMilliseconds ?: 0L, end?.inWholeMilliseconds ?: 0L)
-
-        /**
-         * トリミング範囲を追加
-         * @param range トリミング範囲 (ms)
-         */
-        fun addTrimmingRange(range: RangeMs) = apply {
-            return addTrimmingRange(range.startMs, range.endMs)
-        }
-
-        /**
-         * トリミング範囲を一括追加
-         */
-        fun addTrimmingRanges(vararg ranges:RangeMs) = apply {
-            ranges.forEach {
-                addTrimmingRange(it.startMs, it.endMs)
-            }
-        }
-
-        /**
-         * 指定された位置より前をトリミング
-         */
-        fun trimmingStartFrom(timeMs:Long) = apply {
-            if(timeMs>0) {
-                trimStart = timeMs * 1000L
-            }
-        }
-
-        /**
-         * 指定された位置より前をトリミング
-         */
-        fun trimmingStartFrom(time: Duration)
-            = trimmingStartFrom(time.inWholeMilliseconds)
-
-        /**
-         * 指定された位置より後をトリミング
-         */
-        fun trimmingEndTo(timeMs:Long) = apply {
-            if(timeMs>0) {
-                trimEnd = timeMs * 1000L
-            }
-        }
-        /**
-         * 指定された位置より後をトリミング
-         */
-        fun trimmingEndTo(time: Duration)
-            = trimmingEndTo(time.inWholeMilliseconds)
+//        /**
+//         * トリミング範囲を追加
+//         * @param startMs 開始位置 (ms)
+//         * @param endMs 終了位置 (ms)   0なら最後まで
+//         */
+//        fun addTrimmingRange(startMs:Long, endMs:Long) = apply {
+//            mTrimmingRangeList.addRange(startMs*1000, endMs*1000)
+//        }
+//
+//        /**
+//         * トリミング範囲を追加
+//         * @param start 開始位置 (Duration) nullなら先頭から
+//         * @param end 終了位置 (Duration) nullなら最後まで
+//         */
+//        fun addTrimmingRange(start:Duration?, end:Duration?)
+//            = addTrimmingRange(start?.inWholeMilliseconds ?: 0L, end?.inWholeMilliseconds ?: 0L)
+//
+//        /**
+//         * トリミング範囲を追加
+//         * @param range トリミング範囲 (ms)
+//         */
+//        fun addTrimmingRange(range: RangeMs) = apply {
+//            return addTrimmingRange(range.startMs, range.endMs)
+//        }
+//
+//        /**
+//         * トリミング範囲を一括追加
+//         */
+//        fun addTrimmingRange(ranges:List<RangeMs>) = apply {
+//            ranges.forEach {
+//                addTrimmingRange(it.startMs, it.endMs)
+//            }
+//        }
+//
+//        /**
+//         * トリミング範囲をクリアして一括設定
+//         */
+//        fun setTrimmingRange(ranges:List<RangeMs>) = apply {
+//            mTrimmingRangeList.clear()
+//            addTrimmingRange(ranges)
+//        }
+//
+//        /**
+//         * トリミング範囲をクリア
+//         */
+//        fun resetTrimmingRangeList() = apply {
+//            mTrimmingRangeList.clear()
+//        }
+//
+//        /**
+//         * 指定された位置より前をカット
+//         */
+//        fun trimmingStartFrom(timeMs:Long) = apply {
+//            if(timeMs>0) {
+//                mTrimStart = timeMs * 1000L
+//            }
+//        }
+//
+//        /**
+//         * 指定された位置より前をカット
+//         */
+//        fun trimmingStartFrom(time: Duration)
+//            = trimmingStartFrom(time.inWholeMilliseconds)
+//
+//        /**
+//         * 指定された位置より後をカット
+//         */
+//        fun trimmingEndTo(timeMs:Long) = apply {
+//            if(timeMs>0) {
+//                mTrimEnd = timeMs * 1000L
+//            }
+//        }
+//        /**
+//         * 指定された位置より後をカット
+//         */
+//        fun trimmingEndTo(time: Duration)
+//            = trimmingEndTo(time.inWholeMilliseconds)
 
         /**
          * 最大動画長を指定 (ms)
          * 0以下なら制限なし
          */
         fun limitDuration(durationMs:Long) = apply {
-            limitDurationUs = durationMs * 1000L
+            mLimitDurationUs = durationMs * 1000L
         }
 
         /**
@@ -275,11 +464,15 @@ class Converter {
         fun limitDuration(duration: Duration?)
             = limitDuration(duration?.inWholeMilliseconds ?: 0L)
 
+        // endregion
+
+        // region Setter: Conversion Behavior
+
         /**
          * 進捗報告ハンドラを設定
          */
         fun setProgressHandler(proc:(IProgress)->Unit) = apply {
-            converter.onProgress = proc
+            mOnProgress = proc
         }
 
         /**
@@ -287,14 +480,18 @@ class Converter {
          * デフォルトは true
          */
         fun deleteOutputOnError(flag:Boolean) = apply {
-            converter.deleteOutputOnError = flag
+            mDeleteOutputOnError = flag
         }
+
+        // endregion
+
+        // region Setter: Conversion Instruction
 
         /**
          * 動画の向きを指定
          */
-        fun rotate(rotation: Rotation) = apply {
-            converter.rotation = rotation
+        fun rotate(rotation: Rotation?) = apply {
+            mRotation = if (rotation == Rotation.nop) null else rotation
         }
 
         /**
@@ -302,15 +499,26 @@ class Converter {
          * MPEG_4 以外はテストしていません。
          */
         fun containerFormat(format: ContainerFormat) = apply {
-            converter.containerFormat = format
+            mContainerFormat = format
         }
 
-        /**
-         * ソフトウェアデコーダーを優先するかどうか
-         */
-        fun preferSoftwareDecoder(flag:Boolean):Factory {
-            converter.preferSoftwareDecoder = flag
-            return this
+        fun brightness(brightness:Float?) = apply {
+            mBrightnessFactor = brightness ?: 1f
+        }
+        fun crop(rect:Rect?) = apply {
+            mCropRect = rect
+        }
+        fun crop(x:Int, y:Int, cx:Int, cy:Int) = apply {
+            mCropRect = Rect(x, y, x+cx, y+cy)
+        }
+
+        // endregion
+
+        // region Building Converter
+
+        private val inputSummary: Summary by lazy {
+            val inPath = mInPath ?: throw IllegalStateException("no input path.")
+            analyze(inPath)
         }
 
         /**
@@ -319,7 +527,7 @@ class Converter {
          */
         private fun adjustVideoStrategy(strategy:IVideoStrategy):IVideoStrategy {
             if (!mKeepHDR && !mKeepProfile) return strategy
-            val summary = analyze(converter.inPath)
+            val summary = inputSummary
             val srcCodec = summary.videoSummary?.codec ?: return strategy
             val srcProfile = summary.videoSummary?.profile ?: return strategy
             val srcLevel = summary.videoSummary?.level ?: strategy.maxLevel
@@ -338,47 +546,64 @@ class Converter {
         }
 
         fun build():Converter {
-            if(!converter::inPath.isInitialized) throw IllegalStateException("input file is not specified.")
-            if(!converter::outPath.isInitialized) throw IllegalStateException("output file is not specified.")
+            if(mInPath==null) throw IllegalStateException("input file is not specified.")
+            if(mOutPath==null) throw IllegalStateException("output file is not specified.")
 
-            if (mKeepProfile || mKeepHDR) {
-                converter.videoStrategy =  adjustVideoStrategy(converter.videoStrategy)
+            val videoStrategy = if (mKeepProfile || mKeepHDR) {
+                adjustVideoStrategy(mVideoStrategy)
+            } else {
+                mVideoStrategy
             }
+
 
             logger.info("### media converter information ###")
-            logger.info("input : ${converter.inPath}")
-            logger.info("output: ${converter.outPath}")
-            logger.info("video strategy: ${converter.videoStrategy.javaClass.name}")
-            logger.info("audio strategy: ${converter.audioStrategy.javaClass.name}")
+            logger.info("input : ${mInPath}")
+            logger.info("output: ${mOutPath}")
+            logger.info("video strategy: ${videoStrategy.javaClass.name}")
+            logger.info("audio strategy: ${mAudioStrategy.javaClass.name}")
 
-            if(trimmingRangeList.isEmpty && (trimStart>0 || trimEnd>0)) {
-                trimmingRangeList.addRange(trimStart, trimEnd)
-            }
+            try {
+                val trimmingRangeKeeper = mTrimmingRangeListBuilder.build().toKeeper()
+                if (mLimitDurationUs > 0) {
+                    trimmingRangeKeeper.limitDurationUs = mLimitDurationUs
+                    logger.info("limit duration: ${mLimitDurationUs / 1000} ms")
+                }
 
-            if(trimmingRangeList.isNotEmpty) {
-//                logger.info("trimming start: ${trimStart / 1000} ms")
-//                logger.info("trimming end  : ${trimEnd / 1000} ms")
-                converter.trimmingRangeKeeper = TrimmingRangeKeeperImpl(trimmingRangeList)
+                logger.info("delete output on error = ${mDeleteOutputOnError}")
+                if (mOnProgress == null) {
+                    logger.info("no progress handler")
+                }
+                val renderOption = if (mCropRect != null) {
+                    val summary = inputSummary.videoSummary ?: throw IllegalStateException("no video information, cannot crop.")
+                    RenderOption.create(summary.width, summary.height, mCropRect!!, mBrightnessFactor)
+                } else if (mBrightnessFactor != 1f) {
+                    RenderOption.create(mBrightnessFactor)
+                } else {
+                    RenderOption.DEFAULT
+                }
+                return Converter(
+                    mInPath!!,
+                    mOutPath!!,
+                    videoStrategy,
+                    mAudioStrategy,
+                    trimmingRangeKeeper,
+                    mDeleteOutputOnError,
+                    mRotation,
+                    mContainerFormat,
+                    mPreferSoftwareDecoder,
+                    renderOption,
+                    mOnProgress
+                )
+            } catch(e:Throwable) {
+                logger.error(e)
+                if (mDeleteOutputOnError) {
+                    mOutPath?.safeDelete()
+                }
+                throw e
             }
-            if(limitDurationUs>0) {
-                converter.trimmingRangeKeeper.limitDurationUs = limitDurationUs
-                logger.info("limit duration: ${limitDurationUs / 1000} ms")
-            }
-
-            logger.info("delete output on error = ${converter.deleteOutputOnError}")
-            if(converter.onProgress==null) {
-                logger.info("no progress handler")
-            }
-            return converter
         }
 
-//        suspend fun execute() : ConvertResult {
-//            return build().execute()
-//        }
-//
-//        fun executeAsync(coroutineScope: CoroutineScope?=null):IAwaiter<ConvertResult> {
-//            return build().executeAsync(coroutineScope)
-//        }
+        // endregion
     }
 
     /**
@@ -644,8 +869,9 @@ class Converter {
 
     /**
      * コンバート (execute) のキャンセル
+     * ICancellable
      */
-    fun cancel() {
+    override fun cancel() {
         cancellation?.cancel()
     }
 
@@ -682,11 +908,12 @@ class Converter {
             val result = try {
                 report = Report().apply { start() }
                 AudioTrack.create(inPath, audioStrategy, report, cancellation).use { audioTrack->
-                VideoTrack.create(inPath, videoStrategy, report, cancellation, preferSoftwareDecoder).use { videoTrack->
+                VideoTrack.create(inPath, videoStrategy, report, cancellation, preferSoftwareDecoder, renderOption).use { videoTrack->
                 Muxer(videoTrack.metaData, outPath, audioTrack!=null, rotation, containerFormat).use { muxer->
                     videoTrack.chain(muxer)
                     audioTrack?.chain(muxer)
-                    trimmingRangeKeeper = videoTrack.extractor.adjustAndSetTrimmingRangeList(trimmingRangeKeeper, muxer.durationUs)
+                    val requestedRangeList = trimmingRangeKeeper
+                    trimmingRangeKeeper = videoTrack.extractor.adjustAndSetTrimmingRangeList(requestedRangeList, muxer.durationUs)
                     audioTrack?.extractor?.setTrimmingRangeList(trimmingRangeKeeper)
                     report.updateInputFileInfo(inPath.getLength(), muxer.durationUs/1000L)
                     Progress.create(trimmingRangeKeeper, onProgress).use { progress ->
@@ -726,7 +953,7 @@ class Converter {
                             report.setDurationInfo(trimmingRangeKeeper.trimmedDurationUs, videoTrack.extractor.naturalDurationUs, audioTrack?.extractor?.naturalDurationUs ?: 0L, muxer.naturalDurationUs)
                             logger.info(report.toString())
                             progress?.finish()
-                            ConvertResult.succeeded(trimmingRangeKeeper, report)
+                            ConvertResult.succeeded(outPath, requestedRangeList.list.map { RangeMs(it.startUs/1000L, it.endUs/1000L) }.outlineRange(report.input.duration),trimmingRangeKeeper, report)
                         }
                     }
                 }}}
@@ -736,11 +963,7 @@ class Converter {
                 ConvertResult.error(e)
             }
             if(!result.succeeded && deleteOutputOnError) {
-                try {
-                    outPath.delete()
-                } catch(ef:Throwable) {
-                    logger.stackTrace(ef,"cannot delete output file: $outPath")
-                }
+                outPath.safeDelete()
             }
             result
         }
