@@ -13,6 +13,8 @@ import io.github.toyota32k.media.lib.format.ContainerFormat
 import io.github.toyota32k.media.lib.format.MetaData
 import io.github.toyota32k.media.lib.format.getDuration
 import io.github.toyota32k.media.lib.misc.ISO6709LocationParser
+import io.github.toyota32k.media.lib.processor.ICancellable
+import io.github.toyota32k.media.lib.processor.misc.RangeUs.Companion.ms2us
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.utils.UtLazyResetableValue
 import kotlinx.coroutines.Dispatchers
@@ -87,7 +89,7 @@ interface IMultiSplitResult : IResultBase {
 /**
  * 複数の範囲を指定して、一括分割を実行するAPIの i/f 定義
  */
-interface IMultiChopper : ICancellable{
+interface IMultiChopper : ICancellable {
     /**
      * 分割位置を指定して複数ファイルに分割
      *
@@ -238,11 +240,11 @@ class Splitter private constructor(
     /**
      * US単位の時間範囲を保持するクラス
      */
-    class RangeUs(val start:Long, val end:Long) {
+    class RangeUs(val startUs:Long, val endUs:Long) {
         companion object {
             fun fromMs(startMs:Long, endMs:Long) : RangeUs =
-                if (endMs<=0 || endMs==Long.MAX_VALUE) RangeUs(startMs*1000L, Long.MAX_VALUE)
-                else RangeUs(startMs*1000L, endMs*1000L)
+                if (endMs<=0 || endMs==Long.MAX_VALUE) RangeUs(startMs.ms2us(), Long.MAX_VALUE)
+                else RangeUs(startMs.ms2us(), endMs.ms2us())
             fun fromMs(rangeMs:RangeMs) : RangeUs =
                 fromMs(rangeMs.startMs, rangeMs.endMs)
         }
@@ -304,7 +306,7 @@ class Splitter private constructor(
             if (!isAvailable) return 0L   // トラックが存在しない場合は常にEOSとして扱う
             val startTime = sampleTimeUs
             var consumed = 0L
-            if (sampleTimeUs == -1L || (rangeUs.end in 1..<sampleTimeUs)) {
+            if (sampleTimeUs == -1L || (rangeUs.endUs in 1..<sampleTimeUs)) {
                 done = true
             } else {
                 bufferInfo.offset = 0
@@ -357,8 +359,8 @@ class Splitter private constructor(
      * 指定範囲をextractorから読み出してmuxerに書き込む
      */
     private fun extractRange(videoTrack:TrackInfo, audioTrack:TrackInfo, rangeUs:RangeUs) {
-        val posVideo = videoTrack.initialSeek(rangeUs.start)
-        audioTrack.initialSeek(if(posVideo>=0) posVideo else rangeUs.start)
+        val posVideo = videoTrack.initialSeek(rangeUs.startUs)
+        audioTrack.initialSeek(if(posVideo>=0) posVideo else rangeUs.startUs)
         while (!videoTrack.done || !audioTrack.done) {
             if (isCancelled) {
                 throw CancellationException()
@@ -373,7 +375,7 @@ class Splitter private constructor(
                 progress.updateAudioUs(dealt)
             }
         }
-        actualSoughtMap.addPosition(rangeUs.start, posVideo) // [rangeUs.start] = if(posVideo>=0) posVideo else rangeUs.start
+        actualSoughtMap.addPosition(rangeUs.startUs, posVideo) // [rangeUs.start] = if(posVideo>=0) posVideo else rangeUs.start
     }
 
 
@@ -391,7 +393,7 @@ class Splitter private constructor(
                 updateInputSummary(audioTrack.extractor.getTrackFormat(audioTrack.trackIndex), inputMetaData)
                 updateInputFileInfo(inPath.getLength(), inputMetaData.duration ?: 0)
             }
-            if (!videoTrack.isAvailable || !audioTrack.isAvailable) throw IllegalStateException("no track available")
+            if (!videoTrack.isAvailable && !audioTrack.isAvailable) throw IllegalStateException("no track available")
             // Muxerの準備
             val muxer = closer.add(outPath.openMuxer(ContainerFormat.MPEG_4)).obj.apply {
                 setupMuxer(this, inputMetaData, rotation)
@@ -447,8 +449,9 @@ class Splitter private constructor(
         }
 
         fun updateVideoUs(videoUs:Long) {
+            if (videoUs==Long.MAX_VALUE) return
             val prev = current
-            videoLength += videoUs/1000L
+            videoLength += videoUs.ms2us()
             if (prev!=current && total>0) {
                 updateRemainingTime()
                 onProgress?.invoke(this)
@@ -456,8 +459,9 @@ class Splitter private constructor(
         }
 
         fun updateAudioUs(audioUs:Long) {
+            if (audioUs==Long.MAX_VALUE) return
             val prev = current
-            audioLength += audioUs/1000L
+            audioLength += audioUs.ms2us()
             if (prev!=current) {
                 updateRemainingTime()
                 onProgress?.invoke(this)

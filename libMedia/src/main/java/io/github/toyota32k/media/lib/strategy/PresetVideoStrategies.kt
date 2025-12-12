@@ -193,7 +193,7 @@ object PresetVideoStrategies {
         level = Level.HEVCMainTierLevel4,
         fallbackProfiles = null,
         sizeCriteria = HD720SizeCriteria,
-        bitRate = MaxDefault(1500*1000, 1000*1000),
+        bitRate = MaxDefault(1000*1000, 768*1000),
         frameRate = MaxDefault(30),
         iFrameInterval = MinDefault(1),
         colorFormat = ColorFormat.COLOR_FormatSurface,

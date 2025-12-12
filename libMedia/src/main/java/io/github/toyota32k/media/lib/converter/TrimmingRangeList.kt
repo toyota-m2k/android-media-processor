@@ -1,5 +1,7 @@
 package io.github.toyota32k.media.lib.converter
 
+import io.github.toyota32k.media.lib.processor.misc.RangeUs.Companion.ms2us
+import io.github.toyota32k.media.lib.processor.misc.RangeUs.Companion.us2ms
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.time.Duration
@@ -70,7 +72,7 @@ class TrimmingRangeList(originalList:List<TrimmingRange>?=null) : ITrimmingRange
          * @param endMs 終了位置 (ms)   0なら最後まで
          */
         fun addRangeMs(startMs:Long, endMs:Long) = apply {
-            mTrimmingRangeList.addRange(startMs*1000, endMs*1000)
+            mTrimmingRangeList.addRange(startMs.ms2us(), endMs.ms2us())
         }
 
         /**
@@ -137,7 +139,7 @@ class TrimmingRangeList(originalList:List<TrimmingRange>?=null) : ITrimmingRange
          * 指定された位置より前をカット
          */
         fun startFromMs(timeMs:Long) = apply {
-            mTrimStartUs = timeMs * 1000L
+            mTrimStartUs = timeMs.ms2us()
         }
         fun startFromUs(timeUs:Long) = apply {
             mTrimStartUs = timeUs
@@ -153,7 +155,7 @@ class TrimmingRangeList(originalList:List<TrimmingRange>?=null) : ITrimmingRange
          * 指定された位置より後をカット
          */
         fun endAtMs(timeMs:Long) = apply {
-            mTrimEndUs = timeMs * 1000L
+            mTrimEndUs = timeMs.ms2us()
         }
         fun endAtUs(timeUs:Long) = apply {
             mTrimEndUs = timeUs
@@ -182,7 +184,7 @@ class TrimmingRangeList(originalList:List<TrimmingRange>?=null) : ITrimmingRange
         }
 
         @Throws(EmptyRangeException::class)
-        fun build(): ITrimmingRangeList {
+        fun build(): TrimmingRangeList {
             val ranges = if (mTrimStartUs==0L && mTrimEndUs==0L) {
                 // trimStart/trimEndが設定されていない
                 mTrimmingRangeList.list
@@ -215,12 +217,12 @@ class TrimmingRangeList(originalList:List<TrimmingRange>?=null) : ITrimmingRange
     companion object {
         fun List<TrimmingRange>.toRangeMsList(): List<RangeMs> {
             return this.map { range ->
-                RangeMs(range.startUs / 1000, range.endUs / 1000)
+                RangeMs(range.startUs.us2ms(), range.endUs.us2ms())
             }
         }
         fun List<RangeMs>.toRangeUsList(): List<TrimmingRange> {
             return this.map { range ->
-                TrimmingRange(range.startMs * 1000, range.endMs * 1000)
+                TrimmingRange(range.startMs.ms2us(), range.endMs.us2ms())
             }
         }
         fun List<RangeMs>.toTrimmingRangeList(): TrimmingRangeList {

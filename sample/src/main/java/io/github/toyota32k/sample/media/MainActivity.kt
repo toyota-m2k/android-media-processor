@@ -54,6 +54,8 @@ import io.github.toyota32k.media.lib.converter.toAndroidFile
 import io.github.toyota32k.media.lib.format.Codec
 import io.github.toyota32k.media.lib.format.getHeight
 import io.github.toyota32k.media.lib.format.getWidth
+import io.github.toyota32k.media.lib.processor.IExecutor
+import io.github.toyota32k.media.lib.processor.TrimmingExecutor
 import io.github.toyota32k.media.lib.strategy.DeviceCapabilities
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
@@ -345,6 +347,8 @@ class MainActivity : UtMortalActivity() {
             return String.format(Locale.US, "%,d KB", size / 1000L)
         }
 
+        val useNewProcessor = MutableStateFlow(true)
+
         val commandConvert = LiteUnitCommand() {
             val srcFile = AndroidFile(inputFile.value ?: return@LiteUnitCommand, application)
             val optFile = AndroidFile(outputFile.value ?: return@LiteUnitCommand, application)
@@ -355,7 +359,7 @@ class MainActivity : UtMortalActivity() {
             UtImmortalTask.launchTask("trimming") {
                 splitted.value = false
                 converted.value = false
-                val result = ProgressDialog.withProgressDialog<ConvertResult> { sink ->
+                val result = ProgressDialog.withProgressDialog<IConvertResult> { sink ->
                     withContext(Dispatchers.IO) {
                         val videoSize = srcFile.openMetadataRetriever().use {
                             Size(it.obj.getWidth()?:0, it.obj.getHeight()?:0)
@@ -373,30 +377,59 @@ class MainActivity : UtMortalActivity() {
 
                         sink.message = "Trimming Now"
                         val rotation = if (playerModel.rotation.value != 0) Rotation(playerModel.rotation.value, relative = true) else Rotation.nop
-                        val converter = Converter.Builder()
-                            .input(srcFile)
-                            .output(trimFile)
-                            .audioStrategy(namedAudioStrategy.value.strategy)
-                            .rotate(rotation)
-                            .crop(crop)
-                            .brightness(1.3f)
-                            .trimming {
-                                addRangesMs(ranges.map { RangeMs(it.start, it.end) })
-                            }
-                            .setProgressHandler {
-                                sink.progress = it.percentage
-                                sink.progressText = it.format()
-                            }
-                            .preferSoftwareDecoder(softwareDecode.value)
-                            .apply {
-                                val s = namedVideoStrategy.value.strategy as VideoStrategy
-                                if (softwareEncode.value) {
-                                    videoStrategy(s.preferSoftwareEncoder())
-                                } else {
-                                    videoStrategy(s)
+                        val converter = if (!useNewProcessor.value) {
+                            Converter.Builder()
+                                .input(srcFile)
+                                .output(trimFile)
+                                .audioStrategy(namedAudioStrategy.value.strategy)
+                                .rotate(rotation)
+                                .crop(crop)
+                                .brightness(1.3f)
+                                .trimming {
+                                    addRangesMs(ranges.map { RangeMs(it.start, it.end) })
                                 }
-                            }
-                            .build()
+                                .setProgressHandler {
+                                    sink.progress = it.percentage
+                                    sink.progressText = it.format()
+                                }
+                                .preferSoftwareDecoder(softwareDecode.value)
+                                .apply {
+                                    val s = namedVideoStrategy.value.strategy as VideoStrategy
+                                    if (softwareEncode.value) {
+                                        videoStrategy(s.preferSoftwareEncoder())
+                                    } else {
+                                        videoStrategy(s)
+                                    }
+                                }
+                                .build()
+                        } else {
+                            TrimmingExecutor.Builder()
+                                .input(srcFile)
+                                .output(trimFile)
+//                                .audioStrategy(namedAudioStrategy.value.strategy)
+                                .audioStrategy(PresetAudioStrategies.NoAudio)
+                                .rotate(rotation)
+//                                .crop(crop)
+//                                .brightness(1.3f)
+                                .trimming {
+                                    addRangesMs(ranges.map { RangeMs(it.start, it.end) })
+                                }
+                                .setProgressHandler {
+                                    sink.progress = it.percentage
+                                    sink.progressText = it.format()
+                                }
+                                .preferSoftwareDecoder(softwareDecode.value)
+                                .apply {
+                                    val s = namedVideoStrategy.value.strategy as VideoStrategy
+                                    if (softwareEncode.value) {
+                                        videoStrategy(s.preferSoftwareEncoder())
+                                    } else {
+                                        videoStrategy(s)
+                                    }
+                                }
+                                .build()
+                        }
+
                         sink.cancelled.disposableObserve { cancelled ->
                             if (cancelled) {
                                 converter.cancel()
@@ -642,6 +675,7 @@ class MainActivity : UtMortalActivity() {
             }
             .checkBinding(controls.useSoftwareDecoder, viewModel.softwareDecode)
             .checkBinding(controls.useSoftwareEncoder, viewModel.softwareEncode)
+            .checkBinding(controls.useProcessor, viewModel.useNewProcessor)
             .spinnerBinding(controls.videoStrategy, viewModel.namedVideoStrategy, videoStrategies)
             .spinnerBinding(controls.audioStrategy, viewModel.namedAudioStrategy, audioStrategies)
             .bindCommand(viewModel.videoDeviceCapabilitiesCommand, controls.videoCapabilityButton)

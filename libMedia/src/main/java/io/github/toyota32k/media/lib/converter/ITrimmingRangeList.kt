@@ -1,5 +1,8 @@
 package io.github.toyota32k.media.lib.converter
 
+import io.github.toyota32k.media.lib.processor.misc.RangeUs.Companion.ms2us
+import io.github.toyota32k.media.lib.processor.misc.RangeUs.Companion.us2ms
+
 
 /**
  * トリミング範囲のリスト
@@ -46,7 +49,7 @@ interface IActualSoughtMap {
     fun correctPositionUs(timeUs:Long):Long
 
     fun correctPositionMs(timeMs:Long):Long {
-        return correctPositionUs(timeMs * 1000L) / 1000L
+        return correctPositionUs(timeMs.ms2us()).us2ms()
     }
 
     fun exportToMap(map: MutableMap<Long, Long>)
@@ -61,9 +64,9 @@ interface IActualSoughtMap {
         return TrimmingRangeList().apply {
             for (range in ranges) {
                 if (range.endMs > 0) {
-                    addRange(correctPositionUs(range.startMs * 1000L), correctPositionUs(range.endMs * 1000L))
+                    addRange(correctPositionUs(range.startMs.ms2us()), correctPositionUs(range.endMs.ms2us()))
                 } else {
-                    addRange(correctPositionUs(range.startMs * 1000L), correctPositionUs(durationMs * 1000L))
+                    addRange(correctPositionUs(range.startMs.ms2us()), correctPositionUs(durationMs.ms2us()))
                 }
             }
         }

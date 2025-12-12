@@ -19,6 +19,7 @@ package io.github.toyota32k.media.lib.surface;
  */
 import android.graphics.Bitmap;
 import android.graphics.SurfaceTexture;
+import android.opengl.EGL14;
 import android.opengl.GLES11Ext;
 import android.opengl.GLES20;
 import android.opengl.Matrix;

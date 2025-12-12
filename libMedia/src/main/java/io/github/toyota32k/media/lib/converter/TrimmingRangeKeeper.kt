@@ -1,5 +1,6 @@
 package io.github.toyota32k.media.lib.converter
 
+import io.github.toyota32k.media.lib.processor.misc.RangeUs.Companion.us2ms
 import kotlin.math.min
 
 class TrimmingRangeKeeper(val trimmingRangeList: ITrimmingRangeList = TrimmingRangeList()): ITrimmingRangeKeeper, ITrimmingRangeList by trimmingRangeList {
@@ -16,7 +17,7 @@ class TrimmingRangeKeeper(val trimmingRangeList: ITrimmingRangeList = TrimmingRa
 
     override fun adjustedRangeList(ranges:List<RangeMs>) : ITrimmingRangeList {
         if (naturalDurationUs<0) throw IllegalStateException("call closeBy() in advance.")
-        return super.adjustedRangeList(naturalDurationUs/1000L, ranges)
+        return super.adjustedRangeList(naturalDurationUs.us2ms(), ranges)
     }
 
     fun putSoughtPosition(req:Long, act:Long) {

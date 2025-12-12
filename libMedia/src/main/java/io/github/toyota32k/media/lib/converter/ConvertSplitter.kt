@@ -4,6 +4,7 @@ import android.graphics.Rect
 import io.github.toyota32k.media.lib.converter.TrimmingRangeList.Companion.toRangeMsList
 import io.github.toyota32k.media.lib.format.ContainerFormat
 import io.github.toyota32k.media.lib.format.getDuration
+import io.github.toyota32k.media.lib.processor.misc.RangeUs.Companion.ms2us
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
 import kotlin.math.max
@@ -204,7 +205,7 @@ class ConvertSplitter(
             return result.cancel()
         }
         var index = 0
-        val convProgress = ConvertProgress(totalLengthMs*1000)
+        val convProgress = ConvertProgress(totalLengthMs.ms2us())
         for (range in rangeMsList) {
             val output = outputFileSelector.selectOutputFile(index, range.startMs)
             if (output == null) {
@@ -270,7 +271,7 @@ class ConvertSplitter(
             acc + range.lengthMs(duration)
         }
         var index = 0
-        val convProgress = ConvertProgress(totalRangeMs*1000)
+        val convProgress = ConvertProgress(totalRangeMs.ms2us())
         for (range in rangeList) {
             val output = outputFileSelector.selectOutputFile(index, range.startMs)
             if (output==null) {

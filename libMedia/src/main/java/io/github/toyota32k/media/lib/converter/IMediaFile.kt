@@ -14,10 +14,13 @@ open class CloseableObject<T>(
     private val closeable: Closeable?,
     private val releaseObj: (T) -> Unit
     ) : Closeable {
-
+    var closed:Boolean = false
     override fun close() {
-        closeable?.close()
-        releaseObj(obj)
+        if (!closed) {
+            closed = true
+            closeable?.close()
+            releaseObj(obj)
+        }
     }
 
     inline fun <R> useObj(block: (T) -> R):R {

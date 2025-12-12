@@ -37,4 +37,5 @@
     <string name="label_params"><![CDATA[Source & Destination]]></string>
     <string name="label_execute">Execution</string>
     <string name="execute_chop">Chop</string>
+    <string name="use_processor">Use Processor</string>
 </resources>

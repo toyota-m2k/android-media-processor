@@ -15,6 +15,7 @@ import io.github.toyota32k.media.lib.converter.ITrimmingRangeKeeper
 import io.github.toyota32k.media.lib.converter.PositionState
 import io.github.toyota32k.media.lib.converter.TrimmingRangeKeeper
 import io.github.toyota32k.media.lib.misc.ICancellation
+import io.github.toyota32k.media.lib.processor.misc.RangeUs.Companion.formatAsUs
 import io.github.toyota32k.media.lib.track.Muxer
 import io.github.toyota32k.media.lib.utils.DurationEstimator
 import io.github.toyota32k.media.lib.utils.TimeSpan
@@ -73,9 +74,9 @@ class Extractor private constructor(
         extractor.selectTrack(trackIdx)
     }
 
-    private fun Long.toUsTimeString():String {
-        return TimeSpan.formatAutoM(this/1000L)
-    }
+//    private fun Long.toUsTimeString():String {
+//        return TimeSpan.formatAutoM(this/1000L)
+//    }
     var eos:Boolean = false
         private set
     private var trimmingRangeList : ITrimmingRangeKeeper = TrimmingRangeKeeper.empty
@@ -106,7 +107,7 @@ class Extractor private constructor(
                 newList.addRange(0, range.endUs)
             } else {
                 extractor.seekTo(range.startUs, SEEK_TO_CLOSEST_SYNC)
-                logger.debug { "actually sought to: ${extractor.sampleTime.toUsTimeString()} (req: ${range.startUs.toUsTimeString()})" }
+                logger.debug { "actually sought to: ${extractor.sampleTime.formatAsUs()} (req: ${range.startUs.formatAsUs()})" }
                 val sampleTime = extractor.sampleTime
                 newList.addRange(sampleTime, range.endUs)
                 newList.putSoughtPosition(range.startUs, extractor.sampleTime)
@@ -123,7 +124,7 @@ class Extractor private constructor(
         this.trimmingRangeList = newList
         logger.verbose("adjusted trimming ranges:")
         trimmingRangeList.list.forEach {
-            logger.verbose {"  ${it.startUs.toUsTimeString()} - ${it.endUs.toUsTimeString()}"}
+            logger.verbose {"  ${it.startUs.formatAsUs()} - ${it.endUs.formatAsUs()}"}
         }
         return newList
     }
@@ -165,7 +166,7 @@ class Extractor private constructor(
             // dequeueInputBuffer すると、dequeue済みバッファーとして予約され queueInputBuffer されるまで使えなくなる。
             // これを何度も繰り返す（=トリミング区間が増える）と、使えるバッファがなくなって、"no buffer in the decoder" が発生する。
             if (positionState == PositionState.OUT_OF_RANGE) {
-                logger.debug("FOUND End Of Chapter: ${TimeSpan.formatAutoM(startPositionUs / 1000)}")
+                logger.debug("FOUND End Of Chapter: ${startPositionUs.formatAsUs()}")
                 val position = trimmingRangeList.getNextValidPosition(startPositionUs)
                 if (position != null) {
                     logger.chronos(msg = "extractor.seekTo", level = Log.INFO) {
@@ -177,7 +178,7 @@ class Extractor private constructor(
                         }
                     }
                     currentPositionUs = extractor.sampleTime    // カレント位置をシーク後の位置に更新
-                    logger.info("SKIPPED from ${startPositionUs.toUsTimeString()} to ${currentPositionUs.toUsTimeString()} (req:${position.startUs.toUsTimeString()} Δ=${abs(position.startUs - currentPositionUs).toUsTimeString()})")
+                    logger.info("SKIPPED from ${startPositionUs.formatAsUs()} to ${currentPositionUs.formatAsUs()} (req:${position.startUs.formatAsUs()} Δ=${abs(position.startUs - currentPositionUs).formatAsUs()})")
                     val skippedTime = currentPositionUs - startPositionUs
                     totalSkippedTime += skippedTime     // スキップした時間を積算
                 }

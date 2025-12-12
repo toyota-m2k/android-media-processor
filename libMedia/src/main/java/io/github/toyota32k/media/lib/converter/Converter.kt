@@ -10,6 +10,7 @@ import io.github.toyota32k.media.lib.format.ContainerFormat
 import io.github.toyota32k.media.lib.format.isHDR
 import io.github.toyota32k.media.lib.misc.ICancellation
 import io.github.toyota32k.media.lib.misc.RingBuffer
+import io.github.toyota32k.media.lib.processor.IExecutor
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.report.Summary
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
@@ -75,9 +76,6 @@ data class RangeMs(val startMs:Long, val endMs:Long) {
     }
 }
 
-interface ICancellable {
-    fun cancel()
-}
 /**
  * 動画ファイルのトランスコード/トリミングを行うコンバータークラス
  */
@@ -93,7 +91,7 @@ class Converter(
     private val preferSoftwareDecoder: Boolean = false,  // 　HWデコーダーで読めない動画も、SWデコーダーなら読めるかもしれない。（Videoのみ）
     private val renderOption: RenderOption = RenderOption.DEFAULT,
     private val onProgress : ((IProgress)->Unit)? = null,
-) : ICancellable {
+) : IExecutor {
     companion object {
         val logger = UtLog("AMP", null, "io.github.toyota32k.media.lib.")
         val builder
@@ -880,7 +878,7 @@ class Converter(
      *
      * @return  ConvertResult
      */
-    suspend fun execute() : ConvertResult {
+    override suspend fun execute() : IConvertResult {
         return try {
             withContext(Dispatchers.IO) {
                 Cancellation().apply {
