@@ -6,7 +6,7 @@ import io.github.toyota32k.logger.UtLog
 import io.github.toyota32k.media.lib.converter.IInputMediaFile
 import io.github.toyota32k.media.lib.format.MetaData
 import io.github.toyota32k.media.lib.processor.Processor
-import io.github.toyota32k.media.lib.processor.misc.RangeUs.Companion.formatAsUs
+import io.github.toyota32k.media.lib.utils.RangeUs.Companion.formatAsUs
 import io.github.toyota32k.media.lib.report.Report
 
 abstract class AbstractBaseTrack(inPath:IInputMediaFile, val inputMetaData: MetaData, val maxDurationUs:Long, val bufferSource: IBufferSource, val video:Boolean) : ITrack {

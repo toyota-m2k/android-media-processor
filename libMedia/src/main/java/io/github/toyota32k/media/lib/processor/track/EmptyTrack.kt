@@ -1,7 +1,7 @@
 package io.github.toyota32k.media.lib.processor.track
 
 import io.github.toyota32k.media.lib.format.MetaData
-import io.github.toyota32k.media.lib.processor.misc.RangeUs
+import io.github.toyota32k.media.lib.utils.RangeUs
 import io.github.toyota32k.media.lib.report.Report
 
 object EmptyTrack : ITrack {

@@ -14,12 +14,9 @@ import io.github.toyota32k.media.lib.converter.IInputMediaFile
 import io.github.toyota32k.media.lib.converter.IOutputMediaFile
 import io.github.toyota32k.media.lib.converter.IProgress
 import io.github.toyota32k.media.lib.converter.Rotation
-import io.github.toyota32k.media.lib.converter.TrimmingRangeList
 import io.github.toyota32k.media.lib.format.ContainerFormat
 import io.github.toyota32k.media.lib.format.isHDR
-import io.github.toyota32k.media.lib.processor.misc.RangeUs
-import io.github.toyota32k.media.lib.processor.misc.RangeUs.Companion.ms2us
-import io.github.toyota32k.media.lib.processor.misc.RangeUs.Companion.outlineRangeUs
+import io.github.toyota32k.media.lib.processor.misc.RangeUsListBuilder
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.report.Summary
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
@@ -31,6 +28,9 @@ import io.github.toyota32k.media.lib.strategy.PresetAudioStrategies
 import io.github.toyota32k.media.lib.strategy.PresetVideoStrategies
 import io.github.toyota32k.media.lib.strategy.VideoStrategy
 import io.github.toyota32k.media.lib.surface.RenderOption
+import io.github.toyota32k.media.lib.utils.RangeUs
+import io.github.toyota32k.media.lib.utils.RangeUs.Companion.ms2us
+import io.github.toyota32k.media.lib.utils.RangeUs.Companion.outlineRangeUs
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -120,13 +120,14 @@ class TrimmingExecutor(
 
         // endregion
 
-        private val mTrimmingRangeListBuilder: TrimmingRangeList.Builder = TrimmingRangeList.Builder()
+        private val mTrimmingRangeListBuilder: RangeUsListBuilder = RangeUsListBuilder()
+        private var mClipStartUs:Long = 0L
+        private var mClipEndUs:Long = 0L
         private var mLimitDurationUs: Long = 0L
         private var mInPath:IInputMediaFile? = null
         private var mOutPath: IOutputMediaFile? = null
         private var mVideoStrategy: IVideoStrategy = PresetVideoStrategies.AVC720Profile
         private var mAudioStrategy: IAudioStrategy = PresetAudioStrategies.AACDefault
-//        private var mOnProgress:((IProgress)->Unit)? = null
         private var mDeleteOutputOnError = true
         private var mRotation: Rotation? = null
         private var mContainerFormat: ContainerFormat = ContainerFormat.MPEG_4
@@ -135,7 +136,7 @@ class TrimmingExecutor(
         private var mKeepHDR: Boolean = false
         private var mBrightnessFactor = 1f
         private var mCropRect: Rect? = null
-        private var mSuppressReEncodeIfNotNeed:Boolean = true
+        private var mForceReEncodeDespiteOfNecessity:Boolean = false
 
 
         // region Setter: I/O files
@@ -232,20 +233,44 @@ class TrimmingExecutor(
         }
 
         /**
-         * 必要がなければ再エンコードしない（デフォルト： true）
+         * 必要性がなくても VideoStrategyにしたがって再エンコードするなら true
+         * デフォルトは false (不必要な再エンコードは抑制する)
          */
-        fun suppressReEncodeIfNotNeed(flag:Boolean) = apply {
-            mSuppressReEncodeIfNotNeed = flag
+        fun forceReEncodeDespiteOfNecessity(flag:Boolean) = apply {
+            mForceReEncodeDespiteOfNecessity = flag
         }
 
 
         // endregion
 
         // region Setter: Trimming
-//        val mTrimmingRangeList get() = mTrimmingRangeListBuilder
 
-        fun trimming(fn: TrimmingRangeList.Builder.()->Unit) = apply {
+        fun trimming(fn: RangeUsListBuilder.()->Unit) = apply {
             mTrimmingRangeListBuilder.fn()
+        }
+
+        // trimming に被せて、切り取る範囲を指定。
+        // trimming + splitting に利用する想定
+
+        fun clipStartUs(us:Long) = apply {
+            mClipStartUs = us
+        }
+        fun clipEndUs(us:Long) = apply {
+            mClipEndUs = us
+        }
+        fun clipStartMs(ms:Long) = apply {
+            mClipStartUs = ms.ms2us()
+        }
+        fun clipEndMs(ms:Long) = apply {
+            mClipEndUs = ms.ms2us()
+        }
+        fun clipRangeUs(rangeUs: RangeUs) = apply {
+            mClipStartUs = rangeUs.startUs
+            mClipEndUs = rangeUs.endUs
+        }
+        fun clipReset() {
+            mClipStartUs = 0L
+            mClipEndUs = 0L
         }
 
         /**
@@ -362,7 +387,7 @@ class TrimmingExecutor(
                 return true
             }
             // 再エンコード不要
-            if (mSuppressReEncodeIfNotNeed) {
+            if (!mForceReEncodeDespiteOfNecessity) {
                 videoStrategy(PresetVideoStrategies.InvalidStrategy)
             }
             return false
@@ -409,7 +434,7 @@ class TrimmingExecutor(
             logger.info("audio strategy: ${mAudioStrategy.javaClass.name}")
 
             try {
-                val trimmingRangeList = mTrimmingRangeListBuilder.build()
+                val rangeListUs = mTrimmingRangeListBuilder.toRangeUsListWithClipUs(mClipStartUs, mClipEndUs)
                 logger.info("delete output on error = ${mDeleteOutputOnError}")
                 val renderOption = if (mCropRect != null) {
                     val summary = inputSummary.videoSummary ?: throw IllegalStateException("no video information, cannot crop.")
@@ -427,7 +452,7 @@ class TrimmingExecutor(
                     processor,
                     inPath,
                     outPath,
-                    ranges = trimmingRangeList.list.map { RangeUs(it.startUs, it.endUs) },
+                    ranges = rangeListUs,
                     limitDurationUs = mLimitDurationUs,
                     deleteOutputOnError = mDeleteOutputOnError,
                     rotation = mRotation,

@@ -1,6 +1,7 @@
 package io.github.toyota32k.media.lib.converter
 
 import io.github.toyota32k.media.lib.report.Report
+import io.github.toyota32k.media.lib.utils.RangeMs
 import kotlinx.coroutines.CancellationException
 import kotlin.text.appendLine
 
@@ -34,11 +35,11 @@ data class ConvertResult(
     : IConvertResult {
 
     companion object {
-        fun succeeded(outputFile:IOutputMediaFile, requestedRangeMs:RangeMs, adjustedTrimmingRangeList: ITrimmingRangeList, report:Report):ConvertResult {
+        fun succeeded(outputFile:IOutputMediaFile, requestedRangeMs: RangeMs, adjustedTrimmingRangeList: ITrimmingRangeList, report:Report):ConvertResult {
             return ConvertResult(true, outputFile, requestedRangeMs, adjustedTrimmingRangeList, report, false, null, null)
         }
         val cancelled:ConvertResult
-            get() = ConvertResult(false, null,RangeMs.empty, null, null,true, null, null)
+            get() = ConvertResult(false, null, RangeMs.empty, null, null,true, null, null)
         fun error(exception:Throwable, errorMessage:String?=null):ConvertResult {
             return if(exception is CancellationException) cancelled else ConvertResult(false, null, RangeMs.empty, null, null, false, errorMessage ?: exception.message, exception)
         }

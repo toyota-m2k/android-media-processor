@@ -4,7 +4,7 @@ import android.media.MediaCodec
 import android.media.MediaExtractor
 import io.github.toyota32k.media.lib.converter.IInputMediaFile
 import io.github.toyota32k.media.lib.format.MetaData
-import io.github.toyota32k.media.lib.processor.misc.RangeUs
+import io.github.toyota32k.media.lib.utils.RangeUs
 
 class NoReEncodeTrack(inPath:IInputMediaFile, inputMetaData:MetaData, maxDurationUs:Long, bufferSource: IBufferSource, video:Boolean)
     : AbstractBaseTrack(inPath, inputMetaData, maxDurationUs, bufferSource, video) {

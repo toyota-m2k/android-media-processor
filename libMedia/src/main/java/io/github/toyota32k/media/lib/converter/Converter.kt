@@ -4,7 +4,7 @@ import android.content.Context
 import android.graphics.Rect
 import android.net.Uri
 import io.github.toyota32k.logger.UtLog
-import io.github.toyota32k.media.lib.converter.RangeMs.Companion.outlineRange
+import io.github.toyota32k.media.lib.utils.RangeMs.Companion.outlineRange
 import io.github.toyota32k.media.lib.converter.TrimmingRangeKeeper.Companion.toKeeper
 import io.github.toyota32k.media.lib.format.ContainerFormat
 import io.github.toyota32k.media.lib.format.isHDR
@@ -26,6 +26,7 @@ import io.github.toyota32k.media.lib.track.AudioTrack
 import io.github.toyota32k.media.lib.track.Muxer
 import io.github.toyota32k.media.lib.track.Track
 import io.github.toyota32k.media.lib.track.VideoTrack
+import io.github.toyota32k.media.lib.utils.RangeMs
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Deferred
@@ -39,42 +40,6 @@ import java.io.File
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.time.Duration
-
-/**
- * トリミング範囲 (開始位置、終了位置) クラス (ms)
- */
-data class RangeMs(val startMs:Long, val endMs:Long) {
-    constructor(start: Duration?, end: Duration?) : this(
-        startMs = start?.inWholeMilliseconds ?: 0L,
-        endMs = end?.inWholeMilliseconds ?: 0L
-    )
-
-    fun lengthMs(durationMs: Long): Long {
-        return (if (endMs !in 1..durationMs) durationMs else endMs) - startMs
-    }
-
-    val isEmpty:Boolean get() = endMs < 0
-
-    companion object {
-        val empty = RangeMs(0L, -1L)
-
-        /**
-         * 無効化領域を除く再生時間を取得
-         */
-        fun List<RangeMs>.totalLengthMs(durationMs: Long): Long {
-            return this.fold(0L) { acc, range ->
-                acc + range.lengthMs(durationMs)
-            }
-        }
-
-        fun List<RangeMs>.outlineRange(durationMs: Long): RangeMs {
-            if (this.isEmpty()) return RangeMs(0L, 0L)
-            val start = this.minOf { it.startMs }
-            val end = this.maxOf { it.startMs + it.lengthMs(durationMs) }
-            return RangeMs(start, end)
-        }
-    }
-}
 
 /**
  * 動画ファイルのトランスコード/トリミングを行うコンバータークラス
@@ -951,7 +916,7 @@ class Converter(
                             report.setDurationInfo(trimmingRangeKeeper.trimmedDurationUs, videoTrack.extractor.naturalDurationUs, audioTrack?.extractor?.naturalDurationUs ?: 0L, muxer.naturalDurationUs)
                             logger.info(report.toString())
                             progress?.finish()
-                            ConvertResult.succeeded(outPath, requestedRangeList.list.map { RangeMs(it.startUs/1000L, it.endUs/1000L) }.outlineRange(report.input.duration),trimmingRangeKeeper, report)
+                            ConvertResult.succeeded(outPath, requestedRangeList.list.map { RangeMs(it.startUs / 1000L, it.endUs / 1000L) }.outlineRange(report.input.duration),trimmingRangeKeeper, report)
                         }
                     }
                 }}}

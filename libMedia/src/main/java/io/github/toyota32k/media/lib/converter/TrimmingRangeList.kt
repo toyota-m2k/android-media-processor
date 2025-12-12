@@ -1,7 +1,8 @@
 package io.github.toyota32k.media.lib.converter
 
-import io.github.toyota32k.media.lib.processor.misc.RangeUs.Companion.ms2us
-import io.github.toyota32k.media.lib.processor.misc.RangeUs.Companion.us2ms
+import io.github.toyota32k.media.lib.utils.RangeMs
+import io.github.toyota32k.media.lib.utils.RangeUs.Companion.ms2us
+import io.github.toyota32k.media.lib.utils.RangeUs.Companion.us2ms
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.time.Duration

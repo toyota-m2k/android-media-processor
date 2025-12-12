@@ -8,10 +8,9 @@ import io.github.toyota32k.media.lib.converter.IOutputMediaFile
 import io.github.toyota32k.media.lib.converter.IProgress
 import io.github.toyota32k.media.lib.converter.Rotation
 import io.github.toyota32k.media.lib.format.ContainerFormat
-import io.github.toyota32k.media.lib.processor.misc.RangeUs
-import io.github.toyota32k.media.lib.processor.misc.RangeUs.Companion.isValidTime
-import io.github.toyota32k.media.lib.processor.misc.RangeUs.Companion.totalLengthUs
-import io.github.toyota32k.media.lib.processor.misc.RangeUs.Companion.us2ms
+import io.github.toyota32k.media.lib.utils.RangeUs
+import io.github.toyota32k.media.lib.utils.RangeUs.Companion.totalLengthUs
+import io.github.toyota32k.media.lib.utils.RangeUs.Companion.us2ms
 import io.github.toyota32k.media.lib.processor.track.ITrack
 import io.github.toyota32k.media.lib.processor.track.SyncMuxer
 import io.github.toyota32k.media.lib.processor.track.TrackSelector

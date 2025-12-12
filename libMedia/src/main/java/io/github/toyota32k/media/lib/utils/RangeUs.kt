@@ -1,14 +1,15 @@
-package io.github.toyota32k.media.lib.processor.misc
+package io.github.toyota32k.media.lib.utils
 
-import io.github.toyota32k.media.lib.converter.RangeMs
+import io.github.toyota32k.media.lib.utils.RangeMs
 import io.github.toyota32k.utils.TimeSpan
-import kotlin.time.Duration
 
 /**
  * US単位の時間範囲を保持するクラス
  */
 class RangeUs(val startUs:Long, val endUs:Long) {
     companion object {
+        val FULL = RangeUs(0L, Long.MAX_VALUE)
+
         fun fromMs(startMs: Long, endMs: Long): RangeUs =
             if (endMs <= 0 || endMs == Long.MAX_VALUE) RangeUs(startMs.ms2us(), Long.MAX_VALUE)
             else RangeUs(startMs.ms2us(), endMs.ms2us())
@@ -95,7 +96,7 @@ class RangeUs(val startUs:Long, val endUs:Long) {
         return if (endUs<=0L || endUs==Long.MAX_VALUE) durationUs ?: Long.MAX_VALUE else endUs
     }
 
-    fun toRangeMs():RangeMs {
+    fun toRangeMs(): RangeMs {
         return RangeMs(startUs.us2ms(), endUs.us2ms())
     }
 

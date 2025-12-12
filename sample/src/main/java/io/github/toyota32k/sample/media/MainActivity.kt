@@ -46,7 +46,7 @@ import io.github.toyota32k.media.lib.converter.ConvertResult
 import io.github.toyota32k.media.lib.converter.Converter
 import io.github.toyota32k.media.lib.converter.FastStart
 import io.github.toyota32k.media.lib.converter.IConvertResult
-import io.github.toyota32k.media.lib.converter.RangeMs
+import io.github.toyota32k.media.lib.utils.RangeMs
 import io.github.toyota32k.media.lib.converter.Rotation
 import io.github.toyota32k.media.lib.converter.Splitter
 import io.github.toyota32k.media.lib.converter.format

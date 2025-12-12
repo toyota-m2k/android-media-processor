@@ -3,7 +3,7 @@ package io.github.toyota32k.media.lib.processor
 import io.github.toyota32k.media.lib.converter.IActualSoughtMap
 import io.github.toyota32k.media.lib.converter.IConvertResult
 import io.github.toyota32k.media.lib.converter.IOutputMediaFile
-import io.github.toyota32k.media.lib.converter.RangeMs
+import io.github.toyota32k.media.lib.utils.RangeMs
 import io.github.toyota32k.media.lib.report.Report
 import kotlin.coroutines.cancellation.CancellationException
 

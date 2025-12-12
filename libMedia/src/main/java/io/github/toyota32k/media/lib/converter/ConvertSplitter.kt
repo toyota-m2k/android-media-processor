@@ -4,9 +4,10 @@ import android.graphics.Rect
 import io.github.toyota32k.media.lib.converter.TrimmingRangeList.Companion.toRangeMsList
 import io.github.toyota32k.media.lib.format.ContainerFormat
 import io.github.toyota32k.media.lib.format.getDuration
-import io.github.toyota32k.media.lib.processor.misc.RangeUs.Companion.ms2us
+import io.github.toyota32k.media.lib.utils.RangeUs.Companion.ms2us
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
+import io.github.toyota32k.media.lib.utils.RangeMs
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.roundToLong
@@ -131,7 +132,7 @@ class ConvertSplitter(
             }
         }
 
-        fun prepareTrimmingRangesList(rangeList: List<RangeMs>,positionMsList: List<Long>): List<List<RangeMs>> {
+        fun prepareTrimmingRangesList(rangeList: List<RangeMs>, positionMsList: List<Long>): List<List<RangeMs>> {
             val result = mutableListOf<List<RangeMs>>()
             val count = positionMsList.size
             var prev = 0L

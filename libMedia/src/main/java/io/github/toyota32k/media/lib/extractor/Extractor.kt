@@ -15,7 +15,7 @@ import io.github.toyota32k.media.lib.converter.ITrimmingRangeKeeper
 import io.github.toyota32k.media.lib.converter.PositionState
 import io.github.toyota32k.media.lib.converter.TrimmingRangeKeeper
 import io.github.toyota32k.media.lib.misc.ICancellation
-import io.github.toyota32k.media.lib.processor.misc.RangeUs.Companion.formatAsUs
+import io.github.toyota32k.media.lib.utils.RangeUs.Companion.formatAsUs
 import io.github.toyota32k.media.lib.track.Muxer
 import io.github.toyota32k.media.lib.utils.DurationEstimator
 import io.github.toyota32k.media.lib.utils.TimeSpan

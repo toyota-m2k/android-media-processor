@@ -7,15 +7,17 @@ import android.media.MediaMuxer
 import io.github.toyota32k.logger.UtLog
 import io.github.toyota32k.media.lib.converter.ConvertSplitter.Companion.positionMsListToRangeMsList
 import io.github.toyota32k.media.lib.converter.ConvertSplitter.ConvertProgress
-import io.github.toyota32k.media.lib.converter.RangeMs.Companion.outlineRange
+import io.github.toyota32k.media.lib.utils.RangeMs.Companion.outlineRange
 import io.github.toyota32k.media.lib.converter.TrimmingRangeList.Companion.toRangeMsList
 import io.github.toyota32k.media.lib.format.ContainerFormat
 import io.github.toyota32k.media.lib.format.MetaData
 import io.github.toyota32k.media.lib.format.getDuration
 import io.github.toyota32k.media.lib.misc.ISO6709LocationParser
 import io.github.toyota32k.media.lib.processor.ICancellable
-import io.github.toyota32k.media.lib.processor.misc.RangeUs.Companion.ms2us
+import io.github.toyota32k.media.lib.utils.RangeUs.Companion.ms2us
 import io.github.toyota32k.media.lib.report.Report
+import io.github.toyota32k.media.lib.utils.RangeMs
+import io.github.toyota32k.media.lib.utils.RangeUs
 import io.github.toyota32k.utils.UtLazyResetableValue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -240,15 +242,15 @@ class Splitter private constructor(
     /**
      * US単位の時間範囲を保持するクラス
      */
-    class RangeUs(val startUs:Long, val endUs:Long) {
-        companion object {
-            fun fromMs(startMs:Long, endMs:Long) : RangeUs =
-                if (endMs<=0 || endMs==Long.MAX_VALUE) RangeUs(startMs.ms2us(), Long.MAX_VALUE)
-                else RangeUs(startMs.ms2us(), endMs.ms2us())
-            fun fromMs(rangeMs:RangeMs) : RangeUs =
-                fromMs(rangeMs.startMs, rangeMs.endMs)
-        }
-    }
+//    class RangeUs(val startUs:Long, val endUs:Long) {
+//        companion object {
+//            fun fromMs(startMs:Long, endMs:Long) : RangeUs =
+//                if (endMs<=0 || endMs==Long.MAX_VALUE) RangeUs(startMs.ms2us(), Long.MAX_VALUE)
+//                else RangeUs(startMs.ms2us(), endMs.ms2us())
+//            fun fromMs(rangeMs: RangeMs) : RangeUs =
+//                fromMs(rangeMs.startMs, rangeMs.endMs)
+//        }
+//    }
 
     /**
      * Video/Audioトラックの処理を行うクラス
@@ -302,7 +304,7 @@ class Splitter private constructor(
             } else -1
         }
 
-        fun readAndWrite(buffer: ByteBuffer, bufferInfo: MediaCodec.BufferInfo, rangeUs:RangeUs) : Long {
+        fun readAndWrite(buffer: ByteBuffer, bufferInfo: MediaCodec.BufferInfo, rangeUs: RangeUs) : Long {
             if (!isAvailable) return 0L   // トラックが存在しない場合は常にEOSとして扱う
             val startTime = sampleTimeUs
             var consumed = 0L
@@ -566,8 +568,8 @@ class Splitter private constructor(
                 extractRangesToFile(inPath, metaData, out2Path, listOf(RangeUs.fromMs(atTimeMs, Long.MAX_VALUE)), report2)
                 val map = detachActualSoughtMap()
                 listOf(
-                    Result.success(out1Path, RangeMs(0L,atTimeMs),map, report1),
-                    Result.success(out2Path, RangeMs(atTimeMs, metaData.duration?:Long.MAX_VALUE), map, report2))
+                    Result.success(out1Path, RangeMs(0L, atTimeMs),map, report1),
+                    Result.success(out2Path, RangeMs(atTimeMs, metaData.duration ?: Long.MAX_VALUE), map, report2))
             } catch (e:Throwable) {
                 if (e !is CancellationException) {
                     logger.error(e)

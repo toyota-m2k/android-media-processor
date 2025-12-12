@@ -7,8 +7,8 @@ import io.github.toyota32k.media.lib.codec.BaseCodec.Companion.TIMEOUT_IMMEDIATE
 import io.github.toyota32k.media.lib.converter.IInputMediaFile
 import io.github.toyota32k.media.lib.format.MetaData
 import io.github.toyota32k.media.lib.format.dump
-import io.github.toyota32k.media.lib.processor.misc.RangeUs
-import io.github.toyota32k.media.lib.processor.misc.RangeUs.Companion.formatAsUs
+import io.github.toyota32k.media.lib.utils.RangeUs
+import io.github.toyota32k.media.lib.utils.RangeUs.Companion.formatAsUs
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.utils.TimeSpan
 import java.nio.ByteBuffer

@@ -4,7 +4,7 @@ import android.media.MediaCodec
 import android.media.MediaExtractor
 import io.github.toyota32k.media.lib.extractor.Extractor
 import io.github.toyota32k.media.lib.format.MetaData
-import io.github.toyota32k.media.lib.processor.misc.RangeUs
+import io.github.toyota32k.media.lib.utils.RangeUs
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.track.Muxer
 import java.io.Closeable
