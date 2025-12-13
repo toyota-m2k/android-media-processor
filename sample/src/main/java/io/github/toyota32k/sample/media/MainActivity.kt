@@ -54,8 +54,7 @@ import io.github.toyota32k.media.lib.converter.toAndroidFile
 import io.github.toyota32k.media.lib.format.Codec
 import io.github.toyota32k.media.lib.format.getHeight
 import io.github.toyota32k.media.lib.format.getWidth
-import io.github.toyota32k.media.lib.processor.IExecutor
-import io.github.toyota32k.media.lib.processor.TrimmingExecutor
+import io.github.toyota32k.media.lib.processor.CompatConverter
 import io.github.toyota32k.media.lib.strategy.DeviceCapabilities
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
@@ -403,7 +402,7 @@ class MainActivity : UtMortalActivity() {
                                 }
                                 .build()
                         } else {
-                            TrimmingExecutor.Builder()
+                            CompatConverter.Builder()
                                 .input(srcFile)
                                 .output(trimFile)
 //                                .audioStrategy(namedAudioStrategy.value.strategy)

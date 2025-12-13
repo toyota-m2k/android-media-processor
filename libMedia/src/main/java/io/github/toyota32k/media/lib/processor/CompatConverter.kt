@@ -25,9 +25,9 @@ import java.io.File
 import kotlin.time.Duration
 
 /**
- * Processor を 旧Converterと（だいたい）互換APIで利用するためのラッパークラス
+ * Processor を 旧Converterと互換APIで利用するためのラッパークラス
  */
-class TrimmingExecutor(
+class CompatConverter(
     val processor: Processor,
     val options: ProcessorOptions,
     val deleteOutputOnError: Boolean = true
@@ -241,13 +241,13 @@ class TrimmingExecutor(
         // region Build TrimmingExecutor
 
 
-        fun build(): TrimmingExecutor {
+        fun build(): CompatConverter {
             try {
                 val processor = processorBuilder.build()
                 val options = optionBuilder.build()
                 logger.dump(options)
                 logger.dump(processor)
-                return TrimmingExecutor(processor, options)
+                return CompatConverter(processor, options)
             } catch(e:Throwable) {
                 logger.error(e)
                 if (mDeleteOutputOnError) {
