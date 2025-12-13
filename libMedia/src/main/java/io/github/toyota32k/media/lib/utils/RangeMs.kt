@@ -1,5 +1,7 @@
 package io.github.toyota32k.media.lib.utils
 
+import io.github.toyota32k.media.lib.utils.RangeUs.Companion.formatAsMs
+import io.github.toyota32k.media.lib.utils.RangeUs.Companion.formatAsUs
 import kotlin.time.Duration
 
 /**
@@ -13,6 +15,10 @@ data class RangeMs(val startMs:Long, val endMs:Long) {
 
     fun lengthMs(durationMs: Long): Long {
         return (if (endMs !in 1..durationMs) durationMs else endMs) - startMs
+    }
+
+    override fun toString():String {
+        return "(${startMs.formatAsMs()}-${endMs.formatAsMs()})}"
     }
 
     val isEmpty:Boolean get() = endMs < 0

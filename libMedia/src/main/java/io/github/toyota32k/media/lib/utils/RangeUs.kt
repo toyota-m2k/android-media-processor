@@ -100,4 +100,7 @@ class RangeUs(val startUs:Long, val endUs:Long) {
         return RangeMs(startUs.us2ms(), endUs.us2ms())
     }
 
+    override fun toString():String {
+        return "(${startUs.formatAsUs()}-${endUs.formatAsUs()})}"
+    }
 }

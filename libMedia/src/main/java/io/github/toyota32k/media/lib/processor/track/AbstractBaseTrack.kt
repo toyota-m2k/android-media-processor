@@ -9,6 +9,9 @@ import io.github.toyota32k.media.lib.processor.Processor
 import io.github.toyota32k.media.lib.utils.RangeUs.Companion.formatAsUs
 import io.github.toyota32k.media.lib.report.Report
 
+/**
+ * ITrack の共通・基底実装
+ */
 abstract class AbstractBaseTrack(inPath:IInputMediaFile, val inputMetaData: MetaData, val maxDurationUs:Long, val bufferSource: IBufferSource, val video:Boolean) : ITrack {
     private val rawExtractor = inPath.openExtractor()
     override var presentationTimeUs:Long = 0L
@@ -21,7 +24,7 @@ abstract class AbstractBaseTrack(inPath:IInputMediaFile, val inputMetaData: Meta
 
     override val isAvailable: Boolean get() = trackIndex>=0
     lateinit var muxer: SyncMuxer
-    val logger = UtLog("Track(${if(video) "video" else "audio"})", Processor.logger, this::class.java)
+    val logger = UtLog("T(${if(video) "V" else "A"})", Processor.logger, this::class.java)
 
     init {
         logger.info("available = $isAvailable")

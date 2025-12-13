@@ -3,39 +3,48 @@ package io.github.toyota32k.media.lib.processor
 import io.github.toyota32k.logger.UtLog
 import io.github.toyota32k.media.lib.converter.ActualSoughtMapImpl
 import io.github.toyota32k.media.lib.converter.Converter
+import io.github.toyota32k.media.lib.converter.IActualSoughtMap
+import io.github.toyota32k.media.lib.converter.IConvertResult
 import io.github.toyota32k.media.lib.converter.IInputMediaFile
 import io.github.toyota32k.media.lib.converter.IOutputMediaFile
 import io.github.toyota32k.media.lib.converter.IProgress
 import io.github.toyota32k.media.lib.converter.Rotation
 import io.github.toyota32k.media.lib.format.ContainerFormat
-import io.github.toyota32k.media.lib.utils.RangeUs
-import io.github.toyota32k.media.lib.utils.RangeUs.Companion.totalLengthUs
-import io.github.toyota32k.media.lib.utils.RangeUs.Companion.us2ms
+import io.github.toyota32k.media.lib.processor.misc.IFormattable
+import io.github.toyota32k.media.lib.processor.misc.format3digits
 import io.github.toyota32k.media.lib.processor.track.ITrack
 import io.github.toyota32k.media.lib.processor.track.SyncMuxer
 import io.github.toyota32k.media.lib.processor.track.TrackSelector
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
-import io.github.toyota32k.media.lib.strategy.PresetAudioStrategies
-import io.github.toyota32k.media.lib.strategy.PresetVideoStrategies
 import io.github.toyota32k.media.lib.surface.RenderOption
+import io.github.toyota32k.media.lib.utils.RangeUs
+import io.github.toyota32k.media.lib.utils.RangeUs.Companion.outlineRangeUs
+import io.github.toyota32k.media.lib.utils.RangeUs.Companion.totalLengthUs
+import io.github.toyota32k.media.lib.utils.RangeUs.Companion.us2ms
 import java.io.Closeable
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.min
 
+/**
+ * 第４世代 動画ファイルプロセッサークラス
+ */
 class Processor(
-//    private val rotation: Rotation?,
-//    private val renderOption: RenderOption = RenderOption.DEFAULT,
     val containerFormat: ContainerFormat = ContainerFormat.MPEG_4,
     val bufferSize:Int = DEFAULT_BUFFER_SIZE,
     val onProgress : ((IProgress)->Unit)?,
-    val videoStrategy: IVideoStrategy,
-    val audioStrategy: IAudioStrategy,
-) : ICancellable {
+) : ICancellable, IFormattable {
     companion object {
-        val logger = UtLog("Processor", Converter.logger, this::class.java)
+        val logger = UtLog("PRC", Converter.logger, this::class.java)
         const val DEFAULT_BUFFER_SIZE:Int = 8 * 1024 * 1024     // 8MB ... 1MB だと extractor.readSampleData() で InvalidArgumentException が発生
+    }
+
+    override fun format(sb: StringBuilder): StringBuilder {
+        return sb
+            .appendLine("## Processor")
+            .appendLine("container format: $containerFormat")
+            .appendLine("buffer size: ${bufferSize.format3digits()}")
     }
 
     class Builder {
@@ -44,15 +53,11 @@ class Processor(
                 mContainerFormat = instance.containerFormat
                 mBufferSize = instance.bufferSize
                 mOnProgress = instance.onProgress
-                mVideoStrategy = instance.videoStrategy
-                mAudioStrategy = instance.audioStrategy
             }
         }
         private var mContainerFormat: ContainerFormat = ContainerFormat.MPEG_4
         private var mBufferSize:Int = DEFAULT_BUFFER_SIZE
         private var mOnProgress : ((IProgress)->Unit)? = null
-        private var mVideoStrategy: IVideoStrategy = PresetVideoStrategies.InvalidStrategy
-        private var mAudioStrategy: IAudioStrategy = PresetAudioStrategies.InvalidStrategy
 
         fun containerFormat(containerFormat: ContainerFormat) = apply {
             mContainerFormat = containerFormat
@@ -63,21 +68,11 @@ class Processor(
         fun onProgress(progress:((IProgress)->Unit)?) = apply {
             mOnProgress = progress
         }
-        fun videoStrategy(strategy: IVideoStrategy) = apply {
-            mVideoStrategy = strategy
-        }
-        fun audioStrategy(strategy: IAudioStrategy) = apply {
-            mAudioStrategy = strategy
-        }
         fun build():Processor {
             return Processor(
-//                rotation = mRotation,
-//                renderOption = mRenderOption,
                 containerFormat = mContainerFormat,
                 bufferSize = mBufferSize,
                 onProgress = mOnProgress,
-                videoStrategy = mVideoStrategy,
-                audioStrategy = mAudioStrategy,
             )
         }
 
@@ -160,6 +155,7 @@ class Processor(
 
     // endregion
 
+    // region ICancellable
 
     // キャンセル
     private var isCancelled: Boolean = false
@@ -167,29 +163,9 @@ class Processor(
         isCancelled = true
     }
 
-//    /**
-//     * Muxerに付加情報（Rotation、Location)を設定する
-//     */
-//    private fun setupMuxer(muxer: MediaMuxer, metaData: MetaData, rotation: Rotation?) {
-//        val metaRotation = metaData.rotation
-//        if (metaRotation != null) {
-//            val r = rotation?.rotate(metaRotation) ?: metaRotation
-//            muxer.setOrientationHint(r)
-//            logger.info("metadata: rotation=$metaRotation --> $r")
-//        } else if(rotation!=null){
-//            muxer.setOrientationHint(rotation.rotate(0))
-//        }
-//        val locationString = metaData.location
-//        if (locationString != null) {
-//            val location: FloatArray? = ISO6709LocationParser.parse(locationString)
-//            if (location != null) {
-//                muxer.setLocation(location[0], location[1])
-//                logger.info("metadata: latitude=${location[0]}, longitude=${location[1]}")
-//            } else {
-//                Companion.logger.error("metadata: failed to parse the location metadata: $locationString")
-//            }
-//        }
-//    }
+    // endregion
+
+    // region Private Implementation
 
     /**
      * 指定範囲をextractorから読み出してmuxerに書き込む
@@ -216,7 +192,23 @@ class Processor(
         actualSoughtMap.addPosition(rangeUs.startUs, posVideo) // [rangeUs.start] = if(posVideo>=0) posVideo else rangeUs.start
     }
 
+    /**
+     *
+     */
+    data class Result(
+        val outputFile: IOutputMediaFile?,
+        val requestedRangeUs: RangeUs,
+        val actualSoughtMap: IActualSoughtMap?,
+        val report: Report) {
 
+        fun toConvertResult(): IConvertResult {
+            return ProcessorResult.success(this)
+        }
+    }
+
+    // endregion
+
+    // region Public Function
 
     /**
      * 指定範囲をファイルに出力
@@ -227,7 +219,9 @@ class Processor(
      * @param rotation 回転
      * @param renderOption RenderOption
      */
-    fun trimming(inPath: IInputMediaFile, outPath: IOutputMediaFile, rangesUs:List<RangeUs>, limitDurationUs:Long, rotation:Rotation?, renderOption:RenderOption?, actualSoughtMapImpl: ActualSoughtMapImpl, report: Report) {
+    fun process(inPath: IInputMediaFile, outPath: IOutputMediaFile, rangesUs:List<RangeUs>, limitDurationUs:Long, rotation:Rotation?, renderOption:RenderOption?, videoStrategy: IVideoStrategy, audioStrategy: IAudioStrategy):Result {
+        val actualSoughtMapImpl = ActualSoughtMapImpl()
+        val report = Report()
         isCancelled = false
         Closeables().use { closer ->
             // Extractorの準備
@@ -258,6 +252,27 @@ class Processor(
             audioTrack.finalize()
             muxer.stop()
             report.updateOutputFileInfo(outPath.getLength(), progress.current)
+
+            return Result(outPath, rangesUs.outlineRangeUs(report.sourceDurationUs), actualSoughtMapImpl, report)
         }
     }
+
+    interface  IOptions {
+        val inPath: IInputMediaFile
+        val outPath: IOutputMediaFile
+        val videoStrategy: IVideoStrategy
+        val audioStrategy: IAudioStrategy
+        val rangesUs:List<RangeUs>
+        val limitDurationUs:Long
+        val rotation:Rotation?
+        val renderOption:RenderOption?
+    }
+
+    fun process(options: IOptions):Result {
+        return process(options.inPath, options.outPath, options.rangesUs, options.limitDurationUs, options.rotation, options.renderOption, options.videoStrategy, options.audioStrategy)
+    }
+
+    // endregion
 }
+
+

@@ -7,10 +7,10 @@ import io.github.toyota32k.media.lib.codec.BaseCodec.Companion.TIMEOUT_IMMEDIATE
 import io.github.toyota32k.media.lib.converter.IInputMediaFile
 import io.github.toyota32k.media.lib.format.MetaData
 import io.github.toyota32k.media.lib.format.dump
+import io.github.toyota32k.media.lib.processor.misc.format3digits
+import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.utils.RangeUs
 import io.github.toyota32k.media.lib.utils.RangeUs.Companion.formatAsUs
-import io.github.toyota32k.media.lib.report.Report
-import io.github.toyota32k.media.lib.utils.TimeSpan
 import java.nio.ByteBuffer
 
 abstract class AbstractEncodeTrack(inPath:IInputMediaFile, inputMetaData: MetaData, maxDurationUs:Long, bufferSource: IBufferSource, val report: Report, video:Boolean): AbstractBaseTrack(inPath, inputMetaData, maxDurationUs, bufferSource, video) {
@@ -40,16 +40,13 @@ abstract class AbstractEncodeTrack(inPath:IInputMediaFile, inputMetaData: MetaDa
             currentRangeStartTimeUs = this
         }
     }
+
     /**
      * Extractorからデータを読み込んで、Decoder（の inputBuffer）に書き出す。
      * Video/Audio 共通処理
      */
     protected fun extractorToDecoder(rangeUs: RangeUs):Boolean {
         if (eosExtractor) return false
-
-        logger.debug("before: trackIndex=${findTrackIdx(video=true)} extractor=${extractor.sampleTrackIndex} size=${extractor.sampleSize} time=${extractor.sampleTime}")
-
-
         var extracted = false
         val startTime = extractor.sampleTime
         val decoder = mDecoder ?: throw IllegalStateException("decoder is already closed.")
@@ -58,30 +55,31 @@ abstract class AbstractEncodeTrack(inPath:IInputMediaFile, inputMetaData: MetaDa
         if (startTime == -1L || endUs <= startTime || presentationTimeUs >= maxDuration) {
             // 実際のEOSに達したか、要求範囲のEndに達した.
             // BUFFER_FLAG_END_OF_STREAM を書き込む
-            logger.info("extructor reached end of the range: ${startTime.formatAsUs()}")
+            logger.info("Extractor: reached end of the range: ${startTime.formatAsUs()}")
             eosExtractor = true
         } else {
             val inputBufferIdx = decoder.dequeueInputBuffer(BaseCodec.TIMEOUT_IMMEDIATE)
             if (inputBufferIdx < 0) {
                 // デコーダーがバッファフル ... デコーダーの処理に進む
-                logger.verbose("no buffer in the decoder.")
+                logger.verbose("Extractor: no buffer in the decoder.")
+                extracted = true
             } else {
                 //  Decoderからバッファが取得できたら、Encoderからバッファーに読みだす
                 val inputBuffer = decoder.getInputBuffer(inputBufferIdx) as ByteBuffer
                 val sampleSize = extractor.readSampleData(inputBuffer, 0)
                 if (sampleSize > 0) {
-                    logger.verbose { "READING: read $sampleSize bytes at ${presentationTimeUs.formatAsUs()}" }
+                    logger.verbose { "Extractor: read ${sampleSize.format3digits()} bytes at ${presentationTimeUs.formatAsUs()}" }
                     presentationTimeUs = lastRangeEndPresentationTimeUs + extractor.sampleTime - currentRangeStartTimeUs
                     bufferInfo.offset = 0
                     bufferInfo.size = sampleSize
                     decoder.queueInputBuffer(inputBufferIdx, 0, sampleSize, presentationTimeUs, extractor.sampleFlags)
                     extractor.advance()
-                    logger.debug("after : trackIndex=${findTrackIdx(video=true)} extractor=${extractor.sampleTrackIndex} size=${extractor.sampleSize} time=${extractor.sampleTime}")
+//                    logger.debug("after : trackIndex=${findTrackIdx(video=true)} extractor=${extractor.sampleTrackIndex} size=${extractor.sampleSize} time=${extractor.sampleTime}")
                     extracted = true
                 } else {
                     // 本来は、↑の idx < 0 でチェックしているので、ここには入らないはず。
                     // もし入ってきたら、dequeue した inputBufferだけは解放しておく。
-                    logger.error("zero byte read. it may be eos.")
+                    logger.error("Extractor: zero byte read. it may be eos.")
                     decoder.queueInputBuffer(inputBufferIdx, 0, 0, 0, 0)
                 }
             }
@@ -110,15 +108,12 @@ abstract class AbstractEncodeTrack(inPath:IInputMediaFile, inputMetaData: MetaDa
      */
     protected fun decoderToEncoder(bufferInfo: MediaCodec.BufferInfo):Boolean {
         val decoder = mDecoder ?: throw IllegalStateException("decoder is already closed.")
-//        val encoder = mEncoder ?: throw IllegalStateException("encoder is already closed.")
-//        val outputSurface = mOutputSurface ?: throw IllegalStateException("outputSurface is already closed.")
-//        val inputSurface = mInputSurface ?: throw IllegalStateException("inputSurface is already closed.")
         var effected: Boolean = false
         while (!eosDecoder) {
             val index = decoder.dequeueOutputBuffer(bufferInfo, TIMEOUT_IMMEDIATE)
             when {
                 index >= 0 -> {
-                    logger.verbose { "output:$index size=${bufferInfo.size}" }
+                    logger.verbose { "Decoder: output:$index size=${bufferInfo.size}" }
                     val eos = bufferInfo.flags.and(MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0
                     transformAndTransfer(index, bufferInfo,eos)
                     effected = true
@@ -126,24 +121,24 @@ abstract class AbstractEncodeTrack(inPath:IInputMediaFile, inputMetaData: MetaDa
                 }
 
                 index == MediaCodec.INFO_TRY_AGAIN_LATER -> {
-                    logger.verbose { "no sufficient data in decoder yet" }
+                    logger.verbose { "Decoder: no sufficient data in decoder yet" }
                     break
                 }
 
                 index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
-                    logger.debug("format changed")
+                    logger.debug("Decoder: output format changed")
                     val decoderOutputFormat = decoder.outputFormat
                     report.updateInputSummary(decoderOutputFormat,null)
-                    decoderOutputFormat.dump(logger, "OutputFormat Changed")
+                    decoderOutputFormat.dump(logger, "decoder outputFormat changed")
                     onDecoderOutputFormatChanged(decoderOutputFormat)
                     effected = true
                 }
 
                 else -> {
                     if (index == -3) {
-                        logger.debug("BUFFERS_CHANGED ... ignorable.")
+                        logger.debug("Decoder: BUFFERS_CHANGED ... ignorable.")
                     } else {
-                        logger.error("unknown index ($index)")
+                        logger.error("Decoder: unknown index ($index)")
                     }
                 }
             }
@@ -159,22 +154,21 @@ abstract class AbstractEncodeTrack(inPath:IInputMediaFile, inputMetaData: MetaDa
             val index: Int = encoder.dequeueOutputBuffer(bufferInfo, TIMEOUT_IMMEDIATE)
             when {
                 index == MediaCodec.INFO_TRY_AGAIN_LATER -> {
-                    logger.verbose { "no sufficient data in encoder yet." }
+                    logger.verbose { "Encoder: no sufficient data in encoder yet." }
                     return effected
                 }
                 index == MediaCodec.INFO_OUTPUT_FORMAT_CHANGED -> {
-                    logger.debug("input format changed.")
+                    logger.debug("Encoder: input format changed.")
                     effected = true
                     val actualFormat = encoder.outputFormat
                     outputTrackMediaFormat = actualFormat
                     muxer.setOutputFormat(video, actualFormat)
-                    logger.info("Actual Format: $actualFormat")
-                    actualFormat.dump(logger, "OutputFormat Changed")
+                    actualFormat.dump(logger, "Encoder: outputFormat changed")
                 }
                 index >= 0 -> {
                     effected = true
                     if (bufferInfo.flags.and(MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
-                        logger.debug("found end of stream.")
+                        logger.debug("Encoder: found end of stream.")
                         eosEncoder = true
                         // muxer.stop() で終端されるので、これは不要（むしろ不正な動画ファイルができる恐れあり）らしい。by Copilot
                         // bufferInfo.set(0, 0, 0, bufferInfo.flags)
@@ -182,11 +176,11 @@ abstract class AbstractEncodeTrack(inPath:IInputMediaFile, inputMetaData: MetaDa
                         return true
                     }
                     else if (bufferInfo.flags.and(MediaCodec.BUFFER_FLAG_CODEC_CONFIG) != 0) { // SPS or PPS, which should be passed by MediaFormat.
-                        logger.debug("codec config.")
+                        logger.debug("Encoder: codec config.")
                         encoder.releaseOutputBuffer(index, false)
                         continue
                     }
-                    logger.verbose {"output:$index size=${bufferInfo.size}"}
+                    logger.verbose {"Encoder: output:$index size=${bufferInfo.size} time=${bufferInfo.presentationTimeUs.formatAsUs()}"}
                     muxer.writeSampleData(video, encoder.getOutputBuffer(index)!!, bufferInfo)
                     if(bufferInfo.presentationTimeUs>0) {
                         writtenPresentationTimeUs = bufferInfo.presentationTimeUs

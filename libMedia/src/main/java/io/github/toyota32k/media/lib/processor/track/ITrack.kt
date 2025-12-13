@@ -51,13 +51,6 @@ interface ITrack : Closeable {
      */
     fun finalize()
 
-//    /**
-//     * 読み込み位置までシークする
-//     * @param seekToUs  シーク先 (us)
-//     * @return 実際にシークした位置 (us)
-//     */
-//    fun initialSeek(seekToUs:Long):Long
-
     /**
      * extractorから読み込んで、（decode/encodeして）muxerへ書き込む
      * @param rangeUs

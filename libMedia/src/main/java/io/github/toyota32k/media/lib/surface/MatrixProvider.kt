@@ -17,6 +17,10 @@ object IdentityMatrixProvider : IMatrixProvider {
     override fun getOutputVideoSize(inputWidth:Int, inputHeight:Int): Size {
         return Size(inputWidth, inputHeight)
     }
+
+    override fun toString(): String {
+        return "NoCrop"
+    }
 }
 
 // 動画の一部分を切り抜くためのマトリックス
@@ -57,5 +61,9 @@ class MatrixProvider(val videoWidth:Int, val videoHeight:Int, val cropX: Int, va
 //        val wo = ((w + 7) / 8) * 8
 //        h = (wo.toFloat() / w * h).toInt()
         return Size(w, h)
+    }
+
+    override fun toString(): String {
+        return "crop (${cropX},${cropY})-(${cropX+cropWidth},${cropY+cropHeight}) ${cropWidth}x$cropHeight} in ${videoWidth}x${videoHeight}"
     }
 }

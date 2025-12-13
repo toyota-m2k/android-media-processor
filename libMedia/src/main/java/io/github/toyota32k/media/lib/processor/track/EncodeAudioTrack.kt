@@ -91,7 +91,7 @@ class EncodeAudioTrack(inPath:IInputMediaFile, inputMetaData: MetaData, maxDurat
     override fun transformAndTransfer(index: Int, bufferInfo: MediaCodec.BufferInfo, eos: Boolean) {
         val decoder = mDecoder ?: throw IllegalStateException("decoder is already closed.")
         val length = bufferInfo.size
-        if (length > 0 /*&& trimmingRangeList.isValidPosition(timeUs)*/) {
+        if (length > 0) {
             if(eos) {
                 logger.info("render end of data.")
             }

@@ -1,7 +1,7 @@
 [versions]
 #plugins
 kotlin = "2.2.21"
-agp = "8.13.1"
+agp = "8.13.2"
 
 #libraries
 appcompat = "1.7.1"

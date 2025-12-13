@@ -4,6 +4,10 @@ import io.github.toyota32k.media.lib.format.MetaData
 import io.github.toyota32k.media.lib.utils.RangeUs
 import io.github.toyota32k.media.lib.report.Report
 
+/**
+ * 何もしないITrack
+ * PresetAudioStrategy.NoAudioで、音声トラックを削除するために使用。
+ */
 object EmptyTrack : ITrack {
     override val isAvailable: Boolean = false
     override val done: Boolean = true

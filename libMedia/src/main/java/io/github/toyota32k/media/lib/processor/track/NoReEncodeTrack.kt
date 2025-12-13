@@ -8,7 +8,7 @@ import io.github.toyota32k.media.lib.utils.RangeUs
 
 class NoReEncodeTrack(inPath:IInputMediaFile, inputMetaData:MetaData, maxDurationUs:Long, bufferSource: IBufferSource, video:Boolean)
     : AbstractBaseTrack(inPath, inputMetaData, maxDurationUs, bufferSource, video) {
-    override var done:Boolean = if (isAvailable) false else true
+    override var done:Boolean = !isAvailable
         private set
 
     override fun setup(muxer: SyncMuxer) {

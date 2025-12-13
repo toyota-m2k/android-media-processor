@@ -2,28 +2,24 @@ package io.github.toyota32k.media.lib.processor.track
 
 import android.media.MediaCodec
 import android.media.MediaFormat
-import android.media.MediaMuxer
 import io.github.toyota32k.logger.UtLog
-import io.github.toyota32k.media.lib.converter.Converter
 import io.github.toyota32k.media.lib.converter.IOutputMediaFile
 import io.github.toyota32k.media.lib.converter.Rotation
 import io.github.toyota32k.media.lib.format.ContainerFormat
 import io.github.toyota32k.media.lib.format.MetaData
 import io.github.toyota32k.media.lib.misc.ISO6709LocationParser
 import io.github.toyota32k.media.lib.processor.Processor
-import io.github.toyota32k.media.lib.track.Muxer.Companion.BUFFER_SIZE
-import io.github.toyota32k.media.lib.track.Muxer.Companion.logger
-import io.github.toyota32k.media.lib.track.Muxer.SampleInfo
-import io.github.toyota32k.media.lib.track.Muxer.SampleType
+import io.github.toyota32k.media.lib.processor.misc.format3digits
 import io.github.toyota32k.media.lib.utils.DurationEstimator
 import io.github.toyota32k.media.lib.utils.ExpandableByteBuffer
+import io.github.toyota32k.media.lib.utils.RangeUs.Companion.formatAsUs
 import java.io.Closeable
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
-class SyncMuxer(val outFile: IOutputMediaFile, val containerFormat: ContainerFormat, val hasVideo:Boolean, val hasAudio:Boolean): Closeable {
+class SyncMuxer(outFile: IOutputMediaFile, containerFormat: ContainerFormat, val hasVideo:Boolean, val hasAudio:Boolean): Closeable {
     companion object {
-        val logger = UtLog("Muxer", Processor.logger)
+        val logger = UtLog("Mux", Processor.logger)
         const val BUFFER_SIZE = 64 * 1024
     }
     init {
@@ -42,10 +38,6 @@ class SyncMuxer(val outFile: IOutputMediaFile, val containerFormat: ContainerFor
     private fun DurationEstimator.update(bufferInfo: MediaCodec.BufferInfo) = update(bufferInfo.presentationTimeUs, bufferInfo.size.toLong())
     private val durationEstimator = DurationEstimator()
     val naturalDurationUs:Long get() = durationEstimator.estimatedDurationUs
-
-//    val isVideoReady get() = videoFormat != null
-//    val isAudioReady get() = !hasAudio || audioFormat != null
-//    val isReady get() = videoFormat != null && (!hasAudio || audioFormat != null)
 
     private var muxerStarted = false
     private var videoEos:Boolean = false
@@ -76,7 +68,7 @@ class SyncMuxer(val outFile: IOutputMediaFile, val containerFormat: ContainerFor
         if (metaRotation != null) {
             val r = rotation?.rotate(metaRotation) ?: metaRotation
             muxer.setOrientationHint(r)
-            Processor.Companion.logger.info("metadata: rotation=$metaRotation --> $r")
+            Processor.logger.info("metadata: rotation=$metaRotation --> $r")
         } else if(rotation!=null){
             muxer.setOrientationHint(rotation.rotate(0))
         }
@@ -85,9 +77,9 @@ class SyncMuxer(val outFile: IOutputMediaFile, val containerFormat: ContainerFor
             val location: FloatArray? = ISO6709LocationParser.parse(locationString)
             if (location != null) {
                 muxer.setLocation(location[0], location[1])
-                Processor.Companion.logger.info("metadata: latitude=${location[0]}, longitude=${location[1]}")
+                Processor.logger.info("metadata: latitude=${location[0]}, longitude=${location[1]}")
             } else {
-                Companion.logger.error("metadata: failed to parse the location metadata: $locationString")
+                logger.error("metadata: failed to parse the location metadata: $locationString")
             }
         }
     }
@@ -114,11 +106,11 @@ class SyncMuxer(val outFile: IOutputMediaFile, val containerFormat: ContainerFor
             // videoFormat と audioFormat の両方が揃ったら muxer.start()
             if (hasVideo && videoFormat!=null) {
                 videoTrackIndex = muxer.addTrack(videoFormat)
-                logger.debug("Added track #$videoTrackIndex with ${videoFormat.getString(MediaFormat.KEY_MIME)} to muxer")
+                logger.debug("added video track #$videoTrackIndex with ${videoFormat.getString(MediaFormat.KEY_MIME)} to muxer")
             }
             if(hasAudio && audioFormat!=null) {
                 audioTrackIndex = muxer.addTrack(audioFormat)
-                logger.debug("Added track #$audioTrackIndex with ${audioFormat.getString(MediaFormat.KEY_MIME)} to muxer")
+                logger.debug("added audio track #$audioTrackIndex with ${audioFormat.getString(MediaFormat.KEY_MIME)} to muxer")
             }
             muxer.start()
             muxerStarted = true
@@ -126,7 +118,7 @@ class SyncMuxer(val outFile: IOutputMediaFile, val containerFormat: ContainerFor
             // フォーマット確定前に書き込まれた保留中のデータがあればmuxerに書き込む
             val byteBuffer = mExByteBuffer.bufferOrNull ?: return
             byteBuffer.flip()
-            logger.debug("Output format determined, writing ${mSampleInfoList.size} samples / ${byteBuffer.limit()} bytes to muxer.")
+            logger.debug("muxer: output format determined, writing ${mSampleInfoList.size} samples / ${byteBuffer.limit()} bytes to muxer.")
             val bufferInfo = MediaCodec.BufferInfo()
             var offset = 0
             for (sampleInfo in mSampleInfoList) {
@@ -148,17 +140,19 @@ class SyncMuxer(val outFile: IOutputMediaFile, val containerFormat: ContainerFor
         }
         if (muxerStarted) {
             if(bufferInfo.flags.and(MediaCodec.BUFFER_FLAG_END_OF_STREAM)!=0) {
-                logger.debug("${if(video)"video" else "audio"} truck -- reached to eos.")
+                logger.debug("muxer: ${if(video)"video" else "audio"} truck -- reached to eos.")
                 if (video) {
                     videoEos = true
                 } else {
                     audioEos = true
                 }
                 if (bufferInfo.size==0) {
+                    logger.debug("muxer: eos (0 byte)")
                     return
                 }
                 bufferInfo.flags = bufferInfo.flags.and(MediaCodec.BUFFER_FLAG_END_OF_STREAM.inv())
             }
+            logger.verbose { "muxer: flags=0x${bufferInfo.flags.toString(16)} size=${bufferInfo.size.format3digits()} at ${bufferInfo.presentationTimeUs.formatAsUs()}"}
             muxer.writeSampleData(trackIndexOf(video), byteBuf, bufferInfo)
             return
         }
