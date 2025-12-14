@@ -9,9 +9,10 @@ import io.github.toyota32k.media.lib.converter.IConvertResult
 import io.github.toyota32k.media.lib.converter.IHttpStreamSource
 import io.github.toyota32k.media.lib.converter.IInputMediaFile
 import io.github.toyota32k.media.lib.converter.IOutputMediaFile
-import io.github.toyota32k.media.lib.converter.IProgress
+import io.github.toyota32k.media.lib.processor.contract.IProgress
 import io.github.toyota32k.media.lib.converter.Rotation
 import io.github.toyota32k.media.lib.format.ContainerFormat
+import io.github.toyota32k.media.lib.processor.contract.IExecutor
 import io.github.toyota32k.media.lib.processor.misc.IFormattable.Companion.dump
 import io.github.toyota32k.media.lib.processor.misc.RangeUsListBuilder
 import io.github.toyota32k.media.lib.report.Report
@@ -199,7 +200,8 @@ class CompatConverter(
          * 進捗報告ハンドラを設定
          */
         fun setProgressHandler(proc:(IProgress)->Unit) = apply {
-            processorBuilder.onProgress(proc)
+            // processorBuilder.onProgress(proc)
+            optionBuilder.onProgress(proc)
         }
 
         /**

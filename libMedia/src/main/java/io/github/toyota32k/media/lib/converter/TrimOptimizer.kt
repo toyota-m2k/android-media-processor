@@ -6,7 +6,8 @@ import android.net.Uri
 import io.github.toyota32k.media.lib.converter.IMultiPhaseProgress.Phase
 import io.github.toyota32k.media.lib.converter.TrimmingRangeList.Companion.toRangeMsList
 import io.github.toyota32k.media.lib.format.ContainerFormat
-import io.github.toyota32k.media.lib.processor.ICancellable
+import io.github.toyota32k.media.lib.processor.contract.ICancellable
+import io.github.toyota32k.media.lib.processor.contract.IProgress
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
 import kotlinx.coroutines.Dispatchers
@@ -54,7 +55,7 @@ class TrimOptimizer(
             remainingTime = 0L
         }
 
-        fun updateProgress(progress:IProgress) = apply {
+        fun updateProgress(progress: IProgress) = apply {
             total = progress.total
             current = progress.current
             remainingTime = progress.remainingTime

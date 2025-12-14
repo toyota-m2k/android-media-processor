@@ -2,6 +2,7 @@ package io.github.toyota32k.media.lib.converter
 import android.content.Context
 import android.net.Uri
 import io.github.toyota32k.logger.UtLog
+import io.github.toyota32k.media.lib.processor.contract.IProgress
 import java.io.ByteArrayInputStream
 import java.io.ByteArrayOutputStream
 import java.io.FileInputStream

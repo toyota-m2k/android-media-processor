@@ -4,6 +4,7 @@ import android.graphics.Rect
 import io.github.toyota32k.media.lib.converter.TrimmingRangeList.Companion.toRangeMsList
 import io.github.toyota32k.media.lib.format.ContainerFormat
 import io.github.toyota32k.media.lib.format.getDuration
+import io.github.toyota32k.media.lib.processor.contract.IProgress
 import io.github.toyota32k.media.lib.utils.RangeUs.Companion.ms2us
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy

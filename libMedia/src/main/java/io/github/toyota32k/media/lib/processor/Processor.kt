@@ -2,16 +2,21 @@ package io.github.toyota32k.media.lib.processor
 
 import io.github.toyota32k.logger.UtLog
 import io.github.toyota32k.media.lib.converter.ActualSoughtMapImpl
+import io.github.toyota32k.media.lib.converter.ConvertResult
 import io.github.toyota32k.media.lib.converter.Converter
 import io.github.toyota32k.media.lib.converter.IActualSoughtMap
 import io.github.toyota32k.media.lib.converter.IConvertResult
 import io.github.toyota32k.media.lib.converter.IInputMediaFile
 import io.github.toyota32k.media.lib.converter.IOutputMediaFile
-import io.github.toyota32k.media.lib.converter.IProgress
+import io.github.toyota32k.media.lib.processor.contract.IProgress
 import io.github.toyota32k.media.lib.converter.Rotation
 import io.github.toyota32k.media.lib.format.ContainerFormat
+import io.github.toyota32k.media.lib.processor.contract.ICancellable
+import io.github.toyota32k.media.lib.processor.contract.IProcessorOptions
 import io.github.toyota32k.media.lib.processor.misc.IFormattable
 import io.github.toyota32k.media.lib.processor.misc.format3digits
+import io.github.toyota32k.media.lib.processor.optimizer.OptimizeOptions
+import io.github.toyota32k.media.lib.processor.optimizer.Optimizer
 import io.github.toyota32k.media.lib.processor.track.ITrack
 import io.github.toyota32k.media.lib.processor.track.SyncMuxer
 import io.github.toyota32k.media.lib.processor.track.TrackSelector
@@ -23,6 +28,8 @@ import io.github.toyota32k.media.lib.utils.RangeUs
 import io.github.toyota32k.media.lib.utils.RangeUs.Companion.outlineRangeUs
 import io.github.toyota32k.media.lib.utils.RangeUs.Companion.totalLengthUs
 import io.github.toyota32k.media.lib.utils.RangeUs.Companion.us2ms
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import java.io.Closeable
 import kotlin.coroutines.cancellation.CancellationException
 import kotlin.math.min
@@ -33,11 +40,11 @@ import kotlin.math.min
 class Processor(
     val containerFormat: ContainerFormat = ContainerFormat.MPEG_4,
     val bufferSize:Int = DEFAULT_BUFFER_SIZE,
-    val onProgress : ((IProgress)->Unit)?,
 ) : ICancellable, IFormattable {
     companion object {
         val logger = UtLog("PRC", Converter.logger, this::class.java)
         const val DEFAULT_BUFFER_SIZE:Int = 8 * 1024 * 1024     // 8MB ... 1MB だと extractor.readSampleData() で InvalidArgumentException が発生
+        val DEFAULT:Processor get() = Processor()
     }
 
     override fun format(sb: StringBuilder): StringBuilder {
@@ -52,12 +59,12 @@ class Processor(
             fun fromInstance(instance:Processor) = Builder().apply {
                 mContainerFormat = instance.containerFormat
                 mBufferSize = instance.bufferSize
-                mOnProgress = instance.onProgress
+//                mOnProgress = instance.onProgress
             }
         }
         private var mContainerFormat: ContainerFormat = ContainerFormat.MPEG_4
         private var mBufferSize:Int = DEFAULT_BUFFER_SIZE
-        private var mOnProgress : ((IProgress)->Unit)? = null
+//        private var mOnProgress : ((IProgress)->Unit)? = null
 
         fun containerFormat(containerFormat: ContainerFormat) = apply {
             mContainerFormat = containerFormat
@@ -65,14 +72,14 @@ class Processor(
         fun bufferSize(sizeInBytes:Int) = apply {
             mBufferSize = sizeInBytes.coerceAtLeast(DEFAULT_BUFFER_SIZE)
         }
-        fun onProgress(progress:((IProgress)->Unit)?) = apply {
-            mOnProgress = progress
-        }
+//        fun onProgress(progress:((IProgress)->Unit)?) = apply {
+//            mOnProgress = progress
+//        }
         fun build():Processor {
             return Processor(
                 containerFormat = mContainerFormat,
                 bufferSize = mBufferSize,
-                onProgress = mOnProgress,
+//                onProgress = mOnProgress,
             )
         }
 
@@ -151,7 +158,7 @@ class Processor(
     }
 
     // 進捗報告
-    private val progress = ProgressHandler(onProgress)
+    private lateinit var progress: ProgressHandler
 
     // endregion
 
@@ -211,7 +218,8 @@ class Processor(
     // region Public Function
 
     /**
-     * 指定範囲をファイルに出力
+     * 指定パラメータ（トランスコード、トリミング、切り抜きなど）にしたがって変換を実行
+     *
      * @param inPath 入力ファイル
      * @param outPath 出力ファイル
      * @param rangesUs 出力する範囲のリスト
@@ -219,7 +227,8 @@ class Processor(
      * @param rotation 回転
      * @param renderOption RenderOption
      */
-    fun process(inPath: IInputMediaFile, outPath: IOutputMediaFile, rangesUs:List<RangeUs>, limitDurationUs:Long, rotation:Rotation?, renderOption:RenderOption?, videoStrategy: IVideoStrategy, audioStrategy: IAudioStrategy):Result {
+    fun process(inPath: IInputMediaFile, outPath: IOutputMediaFile, rangesUs:List<RangeUs>, limitDurationUs:Long, rotation:Rotation?, renderOption:RenderOption?, videoStrategy: IVideoStrategy, audioStrategy: IAudioStrategy, onProgress:((IProgress)->Unit)?):Result {
+        progress = ProgressHandler(onProgress)
         val actualSoughtMapImpl = ActualSoughtMapImpl()
         val report = Report()
         isCancelled = false
@@ -257,19 +266,43 @@ class Processor(
         }
     }
 
-    interface  IOptions {
-        val inPath: IInputMediaFile
-        val outPath: IOutputMediaFile
-        val videoStrategy: IVideoStrategy
-        val audioStrategy: IAudioStrategy
-        val rangesUs:List<RangeUs>
-        val limitDurationUs:Long
-        val rotation:Rotation?
-        val renderOption:RenderOption?
+    /**
+     * optionsにしたがって変換を実行
+     */
+    fun process(options: IProcessorOptions):Result {
+        return process(options.inPath, options.outPath, options.rangesUs, options.limitDurationUs, options.rotation, options.renderOption, options.videoStrategy, options.audioStrategy, options.onProgress)
     }
 
-    fun process(options: IOptions):Result {
-        return process(options.inPath, options.outPath, options.rangesUs, options.limitDurationUs, options.rotation, options.renderOption, options.videoStrategy, options.audioStrategy)
+    /**
+     * Dispatchers.IO で process()を実行
+     */
+    suspend fun execute(processorOptions: IProcessorOptions, deleteOutputOnError:Boolean=true): IConvertResult {
+        return withContext(Dispatchers.IO) {
+            try {
+                process(processorOptions).toConvertResult()
+            } catch (e: Throwable) {
+                if (deleteOutputOnError) {
+                    processorOptions.outPath.safeDelete()
+                }
+                ConvertResult.error(e)
+            }
+        }
+    }
+
+    /**
+     * process()の後、fast start を実行
+     */
+    suspend fun execute(processorOptions:IProcessorOptions, optimizeOption: OptimizeOptions, deleteOutputOnError:Boolean=true): IConvertResult {
+        return withContext(Dispatchers.IO) {
+            try {
+                Optimizer.optimize(this@Processor, processorOptions, optimizeOption).toConvertResult()
+            } catch (e: Throwable) {
+                if (deleteOutputOnError) {
+                    processorOptions.outPath.safeDelete()
+                }
+                ConvertResult.error(e)
+            }
+        }
     }
 
     // endregion

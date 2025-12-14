@@ -10,7 +10,8 @@ import io.github.toyota32k.media.lib.format.ContainerFormat
 import io.github.toyota32k.media.lib.format.isHDR
 import io.github.toyota32k.media.lib.misc.ICancellation
 import io.github.toyota32k.media.lib.misc.RingBuffer
-import io.github.toyota32k.media.lib.processor.IExecutor
+import io.github.toyota32k.media.lib.processor.contract.IExecutor
+import io.github.toyota32k.media.lib.processor.contract.IProgress
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.report.Summary
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
@@ -630,7 +631,7 @@ class Converter(
             data class ProgressData(
                 override var total: Long = 0,
                 override var current: Long = 0,
-                override var remainingTime: Long = 0):IProgress {
+                override var remainingTime: Long = 0): IProgress {
                 fun update(progress: IProgress) {
                     total = progress.total
                     current = progress.current

@@ -13,7 +13,8 @@ import io.github.toyota32k.media.lib.format.ContainerFormat
 import io.github.toyota32k.media.lib.format.MetaData
 import io.github.toyota32k.media.lib.format.getDuration
 import io.github.toyota32k.media.lib.misc.ISO6709LocationParser
-import io.github.toyota32k.media.lib.processor.ICancellable
+import io.github.toyota32k.media.lib.processor.contract.ICancellable
+import io.github.toyota32k.media.lib.processor.contract.IProgress
 import io.github.toyota32k.media.lib.utils.RangeUs.Companion.ms2us
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.utils.RangeMs

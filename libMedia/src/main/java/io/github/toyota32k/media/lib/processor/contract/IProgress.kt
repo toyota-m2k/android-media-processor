@@ -1,4 +1,4 @@
-package io.github.toyota32k.media.lib.converter
+package io.github.toyota32k.media.lib.processor.contract
 
 import io.github.toyota32k.utils.TimeSpan
 

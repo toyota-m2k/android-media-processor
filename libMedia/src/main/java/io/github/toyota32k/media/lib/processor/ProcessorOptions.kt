@@ -3,8 +3,6 @@ package io.github.toyota32k.media.lib.processor
 import android.content.Context
 import android.graphics.Rect
 import android.net.Uri
-import android.util.Log
-import io.github.toyota32k.media.lib.converter.ActualSoughtMapImpl
 import io.github.toyota32k.media.lib.converter.AndroidFile
 import io.github.toyota32k.media.lib.converter.Converter.Companion.analyze
 import io.github.toyota32k.media.lib.converter.HttpInputFile
@@ -12,9 +10,10 @@ import io.github.toyota32k.media.lib.converter.IHttpStreamSource
 import io.github.toyota32k.media.lib.converter.IInputMediaFile
 import io.github.toyota32k.media.lib.converter.IOutputMediaFile
 import io.github.toyota32k.media.lib.converter.Rotation
+import io.github.toyota32k.media.lib.processor.contract.IProcessorOptions
+import io.github.toyota32k.media.lib.processor.contract.IProgress
 import io.github.toyota32k.media.lib.processor.misc.IFormattable
 import io.github.toyota32k.media.lib.processor.misc.RangeUsListBuilder
-import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.report.Summary
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
@@ -40,6 +39,7 @@ data class ProcessorOptions(
     override val limitDurationUs: Long,
     override val rotation: Rotation?,
     override val renderOption: RenderOption?,
+    override val onProgress: ((IProgress)->Unit)?
 ): Processor.IOptions, IFormattable {
     override fun toString() : String {
         return format().toString()
@@ -77,6 +77,8 @@ data class ProcessorOptions(
         private var mClipEndUs:Long = 0L
         private var mLimitDurationUs: Long = 0L
 
+        private var mOnProgress: ((IProgress)->Unit)? = null
+
         // region Computed Parameters
 
         val renderOption: RenderOption
@@ -95,8 +97,7 @@ data class ProcessorOptions(
 
         // endregion
 
-
-        // region Setter: I/O files
+        // region I/O files
 
         val input: IInputMediaFile? get() = mInPath
 
@@ -209,9 +210,14 @@ data class ProcessorOptions(
         }
         val forceReEncodeDespiteOfNecessity:Boolean get() = mForceReEncodeDespiteOfNecessity
 
+        fun onProgress(progress:((IProgress)->Unit)?) = apply {
+            mOnProgress = progress
+        }
+        val onProgress:((IProgress)->Unit)? get() = mOnProgress
+
         // endregion
 
-        // region Setter: Trimming
+        // region Trimming
 
         fun trimming(fn: RangeUsListBuilder.()->Unit) = apply {
             mTrimmingRangeListBuilder.fn()
@@ -304,9 +310,26 @@ data class ProcessorOptions(
                 rangesUs = mTrimmingRangeListBuilder.toRangeUsListWithClipUs(mClipStartUs, mClipEndUs),
                 limitDurationUs = mLimitDurationUs,
                 rotation = mRotation,
-                renderOption = renderOption
+                renderOption = renderOption,
+                onProgress = mOnProgress
             )
         }
+    }
+}
 
+class DerivedProcessorOptions(
+    val src: IProcessorOptions,
+    override var outPath: IOutputMediaFile = src.outPath,
+    override var rangesUs: List<RangeUs> = src.rangesUs,
+    override var limitDurationUs: Long = src.limitDurationUs,
+    override var onProgress: ((IProgress)->Unit)? = src.onProgress
+) : IProcessorOptions by src {
+    companion object {
+        fun IProcessorOptions.derive(
+            outPath: IOutputMediaFile = this.outPath,
+            rangesUs: List<RangeUs> = this.rangesUs,
+            limitDurationUs: Long = this.limitDurationUs,
+            onProgress: ((IProgress)->Unit)? = this.onProgress
+        ) = DerivedProcessorOptions(this, outPath, rangesUs, limitDurationUs, onProgress)
     }
 }

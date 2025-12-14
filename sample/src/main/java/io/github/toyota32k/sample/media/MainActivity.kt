@@ -49,7 +49,7 @@ import io.github.toyota32k.media.lib.converter.IConvertResult
 import io.github.toyota32k.media.lib.utils.RangeMs
 import io.github.toyota32k.media.lib.converter.Rotation
 import io.github.toyota32k.media.lib.converter.Splitter
-import io.github.toyota32k.media.lib.converter.format
+import io.github.toyota32k.media.lib.processor.contract.format
 import io.github.toyota32k.media.lib.converter.toAndroidFile
 import io.github.toyota32k.media.lib.format.Codec
 import io.github.toyota32k.media.lib.format.getHeight
