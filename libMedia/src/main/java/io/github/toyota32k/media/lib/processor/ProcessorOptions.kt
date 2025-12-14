@@ -40,7 +40,7 @@ data class ProcessorOptions(
     override val rotation: Rotation?,
     override val renderOption: RenderOption?,
     override val onProgress: ((IProgress)->Unit)?
-): Processor.IOptions, IFormattable {
+): IProcessorOptions, IFormattable {
     override fun toString() : String {
         return format().toString()
     }
