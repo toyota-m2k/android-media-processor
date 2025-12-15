@@ -15,7 +15,7 @@ import io.github.toyota32k.media.lib.processor.contract.ICancellable
 import io.github.toyota32k.media.lib.processor.contract.IProcessorOptions
 import io.github.toyota32k.media.lib.processor.misc.IFormattable
 import io.github.toyota32k.media.lib.processor.misc.format3digits
-import io.github.toyota32k.media.lib.processor.optimizer.OptimizeOptions
+import io.github.toyota32k.media.lib.processor.optimizer.OptimizerOptions
 import io.github.toyota32k.media.lib.processor.optimizer.Optimizer
 import io.github.toyota32k.media.lib.processor.track.ITrack
 import io.github.toyota32k.media.lib.processor.track.SyncMuxer
@@ -292,7 +292,7 @@ class Processor(
     /**
      * process()の後、fast start を実行
      */
-    suspend fun execute(processorOptions:IProcessorOptions, optimizeOption: OptimizeOptions, deleteOutputOnError:Boolean=true): IConvertResult {
+    suspend fun execute(processorOptions:IProcessorOptions, optimizeOption: OptimizerOptions, deleteOutputOnError:Boolean=true): IConvertResult {
         return withContext(Dispatchers.IO) {
             try {
                 Optimizer.optimize(this@Processor, processorOptions, optimizeOption).toConvertResult()

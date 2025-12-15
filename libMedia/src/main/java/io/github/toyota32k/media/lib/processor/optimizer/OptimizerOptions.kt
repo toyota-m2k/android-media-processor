@@ -1,6 +1,7 @@
 package io.github.toyota32k.media.lib.processor.optimizer
 
 import android.app.Application
+import android.content.Context
 import io.github.toyota32k.media.lib.processor.contract.IMultiPhaseProgress
 
 enum class OptimizingProcessorPhase(override var description:String, override var index:Int) : IMultiPhaseProgress.IPhase {
@@ -8,10 +9,10 @@ enum class OptimizingProcessorPhase(override var description:String, override va
     OPTIMIZING("Optimizing", 1),
 }
 
-data class OptimizeOptions(
-    val application: Application,       // 一時ファイルを作るため、コンテキストが必要
+data class OptimizerOptions(
+    val applicationContext: Context,       // 一時ファイルを作るため、コンテキストが必要
     val moveFreeAtom:Boolean,
     val onMultiPhaseProgress:((IMultiPhaseProgress<OptimizingProcessorPhase>)->Unit)?,
 ) {
-    constructor(application: Application, onProgress:(IMultiPhaseProgress<OptimizingProcessorPhase>)->Unit):this(application, true,onProgress)
+    constructor(applicationContext: Context, onProgress:(IMultiPhaseProgress<OptimizingProcessorPhase>)->Unit):this(applicationContext, true,onProgress)
 }

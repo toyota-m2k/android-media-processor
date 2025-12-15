@@ -34,8 +34,8 @@ object Optimizer {
         }
     }
 
-    fun optimize(processor:Processor, processorOptions: IProcessorOptions, optimizeOptions: OptimizeOptions): Processor.Result {
-        val workFile:AndroidFile = File.createTempFile("ame", ".tmp", optimizeOptions.application.cacheDir).toAndroidFile()
+    fun optimize(processor:Processor, processorOptions: IProcessorOptions, optimizeOptions: OptimizerOptions): Processor.Result {
+        val workFile:AndroidFile = File.createTempFile("ame", ".tmp", optimizeOptions.applicationContext.cacheDir).toAndroidFile()
         try {
             val outputFile: AndroidFile = processorOptions.outPath as? AndroidFile ?: throw IllegalStateException("output file must be AndroidFile.")
             val multiProgress = MultiPhaseProgress(2)

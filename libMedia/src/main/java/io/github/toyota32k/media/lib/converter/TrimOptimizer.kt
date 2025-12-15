@@ -3,28 +3,18 @@ package io.github.toyota32k.media.lib.converter
 import android.content.Context
 import android.graphics.Rect
 import android.net.Uri
-import io.github.toyota32k.media.lib.converter.IMultiPhaseProgress.Phase
 import io.github.toyota32k.media.lib.converter.TrimmingRangeList.Companion.toRangeMsList
 import io.github.toyota32k.media.lib.format.ContainerFormat
 import io.github.toyota32k.media.lib.processor.contract.ICancellable
+import io.github.toyota32k.media.lib.processor.contract.IMultiPhaseProgress
 import io.github.toyota32k.media.lib.processor.contract.IProgress
+import io.github.toyota32k.media.lib.processor.optimizer.OptimizingProcessorPhase
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
 import kotlin.time.Duration
-
-interface IMultiPhaseProgress : IProgress {
-    val phaseIndex:Int get() = phase.index
-    val phaseCount:Int
-    val phase:Phase
-    enum class Phase(var description:String, var index:Int) {
-        CONVERTING("Converting", 0),
-        EXTRACTING("Extracting", 0),
-        OPTIMIZING("Optimizing", 1),
-    }
-}
 
 /**
  * コンバーターの All-In-One クラス
@@ -38,17 +28,17 @@ class TrimOptimizer(
     private val removeFreeOnFastStart:Boolean,
     private val workDirectory:File?,
     private val forceConvert:Boolean,
-    private val progressCallback:((IMultiPhaseProgress)->Unit)?): ICancellable {
+    private val progressCallback:((IMultiPhaseProgress<OptimizingProcessorPhase>)->Unit)?): ICancellable {
     companion object {
         val logger = Converter.logger
     }
-    class MultiPhaseProgress(override val phaseCount: Int) : IMultiPhaseProgress {
-        override var phase = IMultiPhaseProgress.Phase.CONVERTING
+    class MultiPhaseProgress(override val phaseCount: Int) : IMultiPhaseProgress<OptimizingProcessorPhase> {
+        override var phase = OptimizingProcessorPhase.CONVERTING
         override var total: Long = 0L
         override var current: Long = 0L
         override var remainingTime: Long = 0L
 
-        fun updatePhase(phase: IMultiPhaseProgress.Phase) = apply {
+        fun updatePhase(phase: OptimizingProcessorPhase) = apply {
             this.phase = phase
             total = 0L
             current = 0L
@@ -69,7 +59,7 @@ class TrimOptimizer(
         private var mFastStart:Boolean = false
         private var mRemoveFreeOnFastStart:Boolean = false
         private var mForceConvert = false
-        private var mProgressHandler: ((IMultiPhaseProgress)->Unit)? = null
+        private var mProgressHandler: ((IMultiPhaseProgress<OptimizingProcessorPhase>)->Unit)? = null
         private var mWorkDirectory: File? = null
 
         // endregion
@@ -227,7 +217,7 @@ class TrimOptimizer(
         /**
          * 進捗報告ハンドラを設定
          */
-        fun setProgressHandler(proc:(IMultiPhaseProgress)->Unit) = apply {
+        fun setProgressHandler(proc:(IMultiPhaseProgress<OptimizingProcessorPhase>)->Unit) = apply {
             mProgressHandler = proc
         }
 
@@ -297,7 +287,7 @@ class TrimOptimizer(
         suspend fun fastStart(prevResult: IConvertResult): IConvertResult {
             if (!prevResult.succeeded) return prevResult
 
-            progressCallback?.invoke(progress.updatePhase(Phase.OPTIMIZING))
+            progressCallback?.invoke(progress.updatePhase(OptimizingProcessorPhase.OPTIMIZING))
             return withContext(Dispatchers.IO) {
                 val result = FastStart.process(workFile, outputFile, removeFreeOnFastStart) { p: IProgress ->
                     progressCallback?.invoke(progress.updateProgress(p))
@@ -357,7 +347,7 @@ class TrimOptimizer(
 
     private suspend fun convert(): IConvertResult {
         if (progressCallback != null) {
-            progressCallback(progress.updatePhase(Phase.CONVERTING))
+            progressCallback(progress.updatePhase(OptimizingProcessorPhase.CONVERTING))
             converterBuilder.setProgressHandler { p ->
                 progressCallback(progress.updateProgress(p))
             }
@@ -381,7 +371,7 @@ class TrimOptimizer(
             .rotate(converterBuilder.properties.rotation)
             .apply {
                 if (progressCallback!=null) {
-                    progressCallback(progress.updatePhase(Phase.EXTRACTING))
+                    progressCallback(progress.updatePhase(OptimizingProcessorPhase.CONVERTING))
                     setProgressHandler { p->
                         progressCallback(progress.updateProgress(p))
                     }

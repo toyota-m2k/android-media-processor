@@ -45,6 +45,7 @@ class EncodeAudioTrack(inPath:IInputMediaFile, inputMetaData: MetaData, maxDurat
             release()
         }
         mEncoder = null
+        formatDetected = false
     }
 
     override fun onDecoderOutputFormatChanged(formatFromDecoder: MediaFormat) {
