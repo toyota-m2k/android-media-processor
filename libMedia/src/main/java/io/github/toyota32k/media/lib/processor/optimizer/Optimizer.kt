@@ -1,9 +1,9 @@
 package io.github.toyota32k.media.lib.processor.optimizer
 
-import io.github.toyota32k.media.lib.converter.AndroidFile
-import io.github.toyota32k.media.lib.converter.ConvertResult
-import io.github.toyota32k.media.lib.converter.FastStart
-import io.github.toyota32k.media.lib.converter.toAndroidFile
+import io.github.toyota32k.media.lib.io.AndroidFile
+import io.github.toyota32k.media.lib.types.ConvertResult
+import io.github.toyota32k.media.lib.processor.optimizer.FastStart
+import io.github.toyota32k.media.lib.io.toAndroidFile
 import io.github.toyota32k.media.lib.processor.DerivedProcessorOptions.Companion.derive
 import io.github.toyota32k.media.lib.processor.contract.IProgress
 import io.github.toyota32k.media.lib.processor.Processor
@@ -60,7 +60,7 @@ object Optimizer {
                     ConvertResult.error(e)
                 }
             }
-            return processorResult
+            return Processor.Result(processorResult, outputFile)
         } catch(e:Throwable) {
             throw e
         } finally {

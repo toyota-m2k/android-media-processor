@@ -3,10 +3,10 @@ package io.github.toyota32k.media.lib.codec
 import android.media.MediaCodec
 import android.media.MediaFormat
 import io.github.toyota32k.logger.UtLog
-import io.github.toyota32k.media.lib.misc.ICancellation
+import io.github.toyota32k.media.lib.processor.contract.ICancellation
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.strategy.IStrategy
-import io.github.toyota32k.media.lib.track.Muxer
+import io.github.toyota32k.media.lib.legacy.track.Muxer
 import java.io.Closeable
 
 abstract class BaseCodec(

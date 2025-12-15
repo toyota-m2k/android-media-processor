@@ -2,14 +2,15 @@ package io.github.toyota32k.media.lib.processor.track
 
 import android.media.MediaCodec
 import android.media.MediaFormat
-import io.github.toyota32k.media.lib.converter.IInputMediaFile
+import io.github.toyota32k.media.lib.io.IInputMediaFile
 import io.github.toyota32k.media.lib.format.MetaData
 import io.github.toyota32k.media.lib.format.mime
+import io.github.toyota32k.media.lib.processor.contract.IBufferSource
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
-import io.github.toyota32k.media.lib.surface.InputSurface
-import io.github.toyota32k.media.lib.surface.OutputSurface
-import io.github.toyota32k.media.lib.surface.RenderOption
+import io.github.toyota32k.media.lib.internals.surface.InputSurface
+import io.github.toyota32k.media.lib.internals.surface.OutputSurface
+import io.github.toyota32k.media.lib.internals.surface.RenderOption
 
 class EncodeVideoTrack(inPath:IInputMediaFile, inputMetaData: MetaData, maxDurationUs:Long, bufferSource: IBufferSource, report: Report, val strategy: IVideoStrategy, val renderOption: RenderOption)
     : AbstractEncodeTrack(inPath, inputMetaData, maxDurationUs, bufferSource, report, video=true) {
@@ -28,6 +29,7 @@ class EncodeVideoTrack(inPath:IInputMediaFile, inputMetaData: MetaData, maxDurat
             configure(outputTrackMediaFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
             mInputSurface = InputSurface(this.createInputSurface()).apply { makeCurrent() }
             start()
+            report.updateVideoEncoder(this)
         }
 
         mOutputSurface = OutputSurface(renderOption).also { outputSurface ->
@@ -35,6 +37,7 @@ class EncodeVideoTrack(inPath:IInputMediaFile, inputMetaData: MetaData, maxDurat
                 .apply {
                     configure(inputTrackMediaFormat, outputSurface.surface, null, 0)
                     start()
+                    report.updateVideoDecoder(this)
                 }
         }
         return super.startRange(startFromUS)
@@ -78,5 +81,9 @@ class EncodeVideoTrack(inPath:IInputMediaFile, inputMetaData: MetaData, maxDurat
             inputSurface.setPresentationTime(bufferInfo.presentationTimeUs * 1000)
             inputSurface.swapBuffers()
         }
+    }
+    override fun finalize() {
+        super.finalize()
+        report.videoExtractedDurationUs = presentationTimeUs
     }
 }

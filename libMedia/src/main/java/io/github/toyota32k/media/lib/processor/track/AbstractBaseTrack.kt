@@ -3,16 +3,18 @@ package io.github.toyota32k.media.lib.processor.track
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import io.github.toyota32k.logger.UtLog
-import io.github.toyota32k.media.lib.converter.IInputMediaFile
+import io.github.toyota32k.media.lib.io.IInputMediaFile
 import io.github.toyota32k.media.lib.format.MetaData
 import io.github.toyota32k.media.lib.processor.Processor
-import io.github.toyota32k.media.lib.utils.RangeUs.Companion.formatAsUs
+import io.github.toyota32k.media.lib.processor.contract.IBufferSource
+import io.github.toyota32k.media.lib.processor.contract.ITrack
+import io.github.toyota32k.media.lib.types.RangeUs.Companion.formatAsUs
 import io.github.toyota32k.media.lib.report.Report
 
 /**
  * ITrack の共通・基底実装
  */
-abstract class AbstractBaseTrack(inPath:IInputMediaFile, val inputMetaData: MetaData, val maxDurationUs:Long, val bufferSource: IBufferSource, val video:Boolean) : ITrack {
+abstract class AbstractBaseTrack(val inPath:IInputMediaFile, val inputMetaData: MetaData, val maxDurationUs:Long, val bufferSource: IBufferSource, val report: Report, val video:Boolean) : ITrack {
     private val rawExtractor = inPath.openExtractor()
     override var presentationTimeUs:Long = 0L
     protected val buffer get() = bufferSource.buffer
@@ -64,13 +66,9 @@ abstract class AbstractBaseTrack(inPath:IInputMediaFile, val inputMetaData: Meta
     }
 
     override fun finalize() {
-    }
-
-    override fun inputSummary(report: Report, metaData: MetaData) {
-        report.updateInputSummary(extractor.getTrackFormat(trackIndex), metaData)
-    }
-
-    override fun outputSummary(report: Report) {
+        report.updateInputSummary(inputTrackMediaFormat, inputMetaData)
+        report.updateOutputSummary(outputTrackMediaFormat)
+        report.updateInputFileInfo(inPath.getLength(), inputMetaData.duration?:-1)
     }
 
     override fun close() {

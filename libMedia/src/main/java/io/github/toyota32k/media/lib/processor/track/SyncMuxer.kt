@@ -3,21 +3,21 @@ package io.github.toyota32k.media.lib.processor.track
 import android.media.MediaCodec
 import android.media.MediaFormat
 import io.github.toyota32k.logger.UtLog
-import io.github.toyota32k.media.lib.converter.IOutputMediaFile
-import io.github.toyota32k.media.lib.converter.Rotation
+import io.github.toyota32k.media.lib.io.IOutputMediaFile
+import io.github.toyota32k.media.lib.types.Rotation
 import io.github.toyota32k.media.lib.format.ContainerFormat
 import io.github.toyota32k.media.lib.format.MetaData
 import io.github.toyota32k.media.lib.misc.ISO6709LocationParser
 import io.github.toyota32k.media.lib.processor.Processor
-import io.github.toyota32k.media.lib.processor.misc.format3digits
+import io.github.toyota32k.media.lib.processor.contract.format3digits
 import io.github.toyota32k.media.lib.utils.DurationEstimator
 import io.github.toyota32k.media.lib.utils.ExpandableByteBuffer
-import io.github.toyota32k.media.lib.utils.RangeUs.Companion.formatAsUs
+import io.github.toyota32k.media.lib.types.RangeUs.Companion.formatAsUs
 import java.io.Closeable
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
-class SyncMuxer(outFile: IOutputMediaFile, containerFormat: ContainerFormat, val hasVideo:Boolean, val hasAudio:Boolean): Closeable {
+class SyncMuxer(val outFile: IOutputMediaFile, containerFormat: ContainerFormat, val hasVideo:Boolean, val hasAudio:Boolean): Closeable {
     companion object {
         val logger = UtLog("Mux", Processor.logger)
         const val BUFFER_SIZE = 64 * 1024

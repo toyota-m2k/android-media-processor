@@ -3,14 +3,13 @@ package io.github.toyota32k.media.lib.codec
 import android.media.MediaCodec
 import android.media.MediaFormat
 import io.github.toyota32k.logger.UtLog
-import io.github.toyota32k.media.lib.converter.Converter
-import io.github.toyota32k.media.lib.format.dump
-import io.github.toyota32k.media.lib.misc.ICancellation
+import io.github.toyota32k.media.lib.legacy.converter.Converter
+import io.github.toyota32k.media.lib.processor.contract.ICancellation
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
-import io.github.toyota32k.media.lib.surface.OutputSurface
-import io.github.toyota32k.media.lib.surface.RenderOption
-import io.github.toyota32k.media.lib.track.Muxer
+import io.github.toyota32k.media.lib.internals.surface.OutputSurface
+import io.github.toyota32k.media.lib.internals.surface.RenderOption
+import io.github.toyota32k.media.lib.legacy.track.Muxer
 
 class VideoDecoder(strategy: IVideoStrategy, format: MediaFormat, decoder: MediaCodec, renderOption: RenderOption, report: Report, cancellation: ICancellation)
     :BaseDecoder(strategy, format,decoder,report,cancellation)  {

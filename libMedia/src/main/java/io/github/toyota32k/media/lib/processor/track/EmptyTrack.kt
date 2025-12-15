@@ -1,8 +1,7 @@
 package io.github.toyota32k.media.lib.processor.track
 
-import io.github.toyota32k.media.lib.format.MetaData
-import io.github.toyota32k.media.lib.utils.RangeUs
-import io.github.toyota32k.media.lib.report.Report
+import io.github.toyota32k.media.lib.processor.contract.ITrack
+import io.github.toyota32k.media.lib.types.RangeUs
 
 /**
  * 何もしないITrack
@@ -17,7 +16,5 @@ object EmptyTrack : ITrack {
     override fun endRange() {}
     override fun finalize() {}
     override fun readAndWrite(rangeUs: RangeUs): Boolean = false
-    override fun inputSummary(report: Report, metaData: MetaData) {}
-    override fun outputSummary(report: Report) {}
     override fun close() {}
 }

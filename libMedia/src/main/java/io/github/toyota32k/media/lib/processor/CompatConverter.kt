@@ -1,25 +1,26 @@
 package io.github.toyota32k.media.lib.processor
 
 import android.content.Context
+import android.graphics.Rect
 import android.net.Uri
 import io.github.toyota32k.logger.UtLog
-import io.github.toyota32k.media.lib.converter.AndroidFile
-import io.github.toyota32k.media.lib.converter.HttpInputFile
-import io.github.toyota32k.media.lib.converter.IConvertResult
-import io.github.toyota32k.media.lib.converter.IHttpStreamSource
-import io.github.toyota32k.media.lib.converter.IInputMediaFile
-import io.github.toyota32k.media.lib.converter.IOutputMediaFile
+import io.github.toyota32k.media.lib.io.AndroidFile
+import io.github.toyota32k.media.lib.io.HttpInputFile
+import io.github.toyota32k.media.lib.types.IConvertResult
+import io.github.toyota32k.media.lib.io.IHttpStreamSource
+import io.github.toyota32k.media.lib.io.IInputMediaFile
+import io.github.toyota32k.media.lib.io.IOutputMediaFile
 import io.github.toyota32k.media.lib.processor.contract.IProgress
-import io.github.toyota32k.media.lib.converter.Rotation
+import io.github.toyota32k.media.lib.types.Rotation
 import io.github.toyota32k.media.lib.format.ContainerFormat
 import io.github.toyota32k.media.lib.processor.contract.IExecutor
-import io.github.toyota32k.media.lib.processor.misc.IFormattable.Companion.dump
-import io.github.toyota32k.media.lib.processor.misc.RangeUsListBuilder
+import io.github.toyota32k.media.lib.processor.contract.IFormattable.Companion.dump
+import io.github.toyota32k.media.lib.utils.RangeUsListBuilder
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
-import io.github.toyota32k.media.lib.utils.RangeUs
-import io.github.toyota32k.media.lib.utils.RangeUs.Companion.ms2us
+import io.github.toyota32k.media.lib.types.RangeUs
+import io.github.toyota32k.media.lib.types.RangeUs.Companion.ms2us
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -152,6 +153,18 @@ class CompatConverter(
         fun clipReset() = apply {
             clipStartUs(0L)
             clipEndUs(0L)
+        }
+
+        fun crop(left:Int, top:Int, width:Int, height:Int) = apply {
+            optionBuilder.crop(left, top, width, height)
+        }
+
+        fun crop(cropRect: Rect?) = apply {
+            optionBuilder.crop(cropRect)
+        }
+
+        fun brightness(brightnessFactor:Float?) = apply {
+            optionBuilder.brightness(brightnessFactor)
         }
 
         /**

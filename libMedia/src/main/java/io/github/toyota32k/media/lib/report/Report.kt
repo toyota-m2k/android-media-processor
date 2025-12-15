@@ -4,6 +4,7 @@ import android.media.MediaCodec
 import android.media.MediaFormat
 import io.github.toyota32k.media.lib.format.Codec
 import io.github.toyota32k.media.lib.format.MetaData
+import io.github.toyota32k.media.lib.types.RangeUs.Companion.formatAsUs
 import io.github.toyota32k.media.lib.utils.TimeSpan
 import java.lang.StringBuilder
 import java.text.DecimalFormat
@@ -29,7 +30,7 @@ class Report : IAttributes {
         endTick = System.currentTimeMillis()
     }
 
-    private fun updateSummary(summary:Summary, format: MediaFormat, metaData: MetaData?=null) {
+    private fun updateSummary(summary:Summary, format: MediaFormat?, metaData: MetaData?=null) {
         val codec = Codec.fromFormat(format) ?: return
         if(codec.media.isVideo()) {
             summary.videoSummary = VideoSummary(summary.videoSummary, format, metaData)
@@ -110,10 +111,10 @@ class Report : IAttributes {
             IAttributes.KeyValue("Audio Strategy", audioStrategyName ?: "n/a"),
             IAttributes.KeyValue("Consumed Time", TimeSpan(endTick - startTick).formatH()),
             IAttributes.KeyValue("Speed", speedText),
-            IAttributes.KeyValue("Duration(Input)", TimeSpan(sourceDurationUs/1000).formatH()),
-            IAttributes.KeyValue("Extracted(Video)", TimeSpan(videoExtractedDurationUs/1000).formatH()),
-            IAttributes.KeyValue("Extracted(Audio)", TimeSpan(audioExtractedDurationUs/1000).formatH()),
-            IAttributes.KeyValue("Muxer", TimeSpan(muxerDurationUs/1000).formatH()),
+            IAttributes.KeyValue("Duration(Input)",  sourceDurationUs.formatAsUs()),
+            IAttributes.KeyValue("Extracted(Video)", videoExtractedDurationUs.formatAsUs()),
+            IAttributes.KeyValue("Extracted(Audio)", audioExtractedDurationUs.formatAsUs()),
+            IAttributes.KeyValue("Muxer", muxerDurationUs.formatAsUs()),
             )
     }
 

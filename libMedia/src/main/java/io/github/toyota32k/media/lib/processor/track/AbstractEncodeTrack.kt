@@ -4,16 +4,17 @@ import android.media.MediaCodec
 import android.media.MediaFormat
 import io.github.toyota32k.media.lib.codec.BaseCodec
 import io.github.toyota32k.media.lib.codec.BaseCodec.Companion.TIMEOUT_IMMEDIATE
-import io.github.toyota32k.media.lib.converter.IInputMediaFile
+import io.github.toyota32k.media.lib.io.IInputMediaFile
 import io.github.toyota32k.media.lib.format.MetaData
 import io.github.toyota32k.media.lib.format.dump
-import io.github.toyota32k.media.lib.processor.misc.format3digits
+import io.github.toyota32k.media.lib.processor.contract.IBufferSource
+import io.github.toyota32k.media.lib.processor.contract.format3digits
 import io.github.toyota32k.media.lib.report.Report
-import io.github.toyota32k.media.lib.utils.RangeUs
-import io.github.toyota32k.media.lib.utils.RangeUs.Companion.formatAsUs
+import io.github.toyota32k.media.lib.types.RangeUs
+import io.github.toyota32k.media.lib.types.RangeUs.Companion.formatAsUs
 import java.nio.ByteBuffer
 
-abstract class AbstractEncodeTrack(inPath:IInputMediaFile, inputMetaData: MetaData, maxDurationUs:Long, bufferSource: IBufferSource, val report: Report, video:Boolean): AbstractBaseTrack(inPath, inputMetaData, maxDurationUs, bufferSource, video) {
+abstract class AbstractEncodeTrack(inPath:IInputMediaFile, inputMetaData: MetaData, maxDurationUs:Long, bufferSource: IBufferSource, report: Report, video:Boolean): AbstractBaseTrack(inPath, inputMetaData, maxDurationUs, bufferSource, report, video) {
     protected var mDecoder: MediaCodec? = null
     protected var mEncoder: MediaCodec? = null
 
@@ -218,4 +219,5 @@ abstract class AbstractEncodeTrack(inPath:IInputMediaFile, inputMetaData: MetaDa
         }
         return effected
     }
+
 }

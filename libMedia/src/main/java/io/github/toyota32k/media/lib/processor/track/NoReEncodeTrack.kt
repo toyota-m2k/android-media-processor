@@ -2,12 +2,14 @@ package io.github.toyota32k.media.lib.processor.track
 
 import android.media.MediaCodec
 import android.media.MediaExtractor
-import io.github.toyota32k.media.lib.converter.IInputMediaFile
+import io.github.toyota32k.media.lib.io.IInputMediaFile
 import io.github.toyota32k.media.lib.format.MetaData
-import io.github.toyota32k.media.lib.utils.RangeUs
+import io.github.toyota32k.media.lib.processor.contract.IBufferSource
+import io.github.toyota32k.media.lib.report.Report
+import io.github.toyota32k.media.lib.types.RangeUs
 
-class NoReEncodeTrack(inPath:IInputMediaFile, inputMetaData:MetaData, maxDurationUs:Long, bufferSource: IBufferSource, video:Boolean)
-    : AbstractBaseTrack(inPath, inputMetaData, maxDurationUs, bufferSource, video) {
+class NoReEncodeTrack(inPath:IInputMediaFile, inputMetaData:MetaData, maxDurationUs:Long, bufferSource: IBufferSource, report: Report, video:Boolean)
+    : AbstractBaseTrack(inPath, inputMetaData, maxDurationUs, bufferSource, report,video) {
     override var done:Boolean = !isAvailable
         private set
 

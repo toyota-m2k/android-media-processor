@@ -1,12 +1,12 @@
 package io.github.toyota32k.media.lib.processor.contract
 
-import io.github.toyota32k.media.lib.converter.IInputMediaFile
-import io.github.toyota32k.media.lib.converter.IOutputMediaFile
-import io.github.toyota32k.media.lib.converter.Rotation
+import io.github.toyota32k.media.lib.io.IInputMediaFile
+import io.github.toyota32k.media.lib.io.IOutputMediaFile
+import io.github.toyota32k.media.lib.types.Rotation
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
-import io.github.toyota32k.media.lib.surface.RenderOption
-import io.github.toyota32k.media.lib.utils.RangeUs
+import io.github.toyota32k.media.lib.internals.surface.RenderOption
+import io.github.toyota32k.media.lib.types.RangeUs
 
 interface IProcessorOptions {
     val inPath: IInputMediaFile

@@ -2,13 +2,14 @@ package io.github.toyota32k.media.lib.processor.track
 
 import android.media.MediaCodec
 import android.media.MediaFormat
-import io.github.toyota32k.media.lib.audio.AudioChannel
-import io.github.toyota32k.media.lib.converter.IInputMediaFile
+import io.github.toyota32k.media.lib.internals.audio.AudioChannel
+import io.github.toyota32k.media.lib.io.IInputMediaFile
 import io.github.toyota32k.media.lib.format.MetaData
 import io.github.toyota32k.media.lib.format.bitRate
 import io.github.toyota32k.media.lib.format.channelCount
 import io.github.toyota32k.media.lib.format.mime
 import io.github.toyota32k.media.lib.format.sampleRate
+import io.github.toyota32k.media.lib.processor.contract.IBufferSource
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
 
@@ -25,11 +26,13 @@ class EncodeAudioTrack(inPath:IInputMediaFile, inputMetaData: MetaData, maxDurat
                 // configure は不要？
                 configure(inputTrackMediaFormat, null, null, 0)
                 start()
+                report.updateAudioDecoder(this)
             }
         mEncoder = strategy.createEncoder().apply {
             outputTrackMediaFormat = strategy.createOutputFormat(inputTrackMediaFormat,  this)
             //configure(outputTrackMediaFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
             // encoder はまだ start() しない。デコーダーがINFO_OUTPUT_FORMAT_CHANGEDを受け取ってから start する。
+            report.updateAudioEncoder(this)
         }
         return super.startRange(startFromUS)
     }
@@ -130,4 +133,8 @@ class EncodeAudioTrack(inPath:IInputMediaFile, inputMetaData: MetaData, maxDurat
         return super.encoderToMuxer(bufferInfo)
     }
 
+    override fun finalize() {
+        super.finalize()
+        report.audioExtractedDurationUs = presentationTimeUs
+    }
 }

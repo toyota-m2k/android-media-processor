@@ -144,9 +144,9 @@ enum class Level(val codec: Codec, val value:Int) {
             }
         }
 
-        fun fromFormat(format: MediaFormat):Level? {
+        fun fromFormat(format: MediaFormat?):Level? {
             val codec = Codec.fromFormat(format) ?: return null
-            val level = format.level ?: return null
+            val level = format?.level ?: return null
             return fromValue(codec, level)
         }
     }

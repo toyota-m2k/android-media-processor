@@ -1,33 +1,33 @@
 package io.github.toyota32k.media.lib.processor
 
 import io.github.toyota32k.logger.UtLog
-import io.github.toyota32k.media.lib.converter.ActualSoughtMapImpl
-import io.github.toyota32k.media.lib.converter.ConvertResult
-import io.github.toyota32k.media.lib.converter.Converter
-import io.github.toyota32k.media.lib.converter.IActualSoughtMap
-import io.github.toyota32k.media.lib.converter.IConvertResult
-import io.github.toyota32k.media.lib.converter.IInputMediaFile
-import io.github.toyota32k.media.lib.converter.IOutputMediaFile
+import io.github.toyota32k.media.lib.legacy.converter.ActualSoughtMapImpl
+import io.github.toyota32k.media.lib.types.ConvertResult
+import io.github.toyota32k.media.lib.legacy.converter.Converter
+import io.github.toyota32k.media.lib.legacy.converter.IActualSoughtMap
+import io.github.toyota32k.media.lib.types.IConvertResult
+import io.github.toyota32k.media.lib.io.IInputMediaFile
+import io.github.toyota32k.media.lib.io.IOutputMediaFile
 import io.github.toyota32k.media.lib.processor.contract.IProgress
-import io.github.toyota32k.media.lib.converter.Rotation
+import io.github.toyota32k.media.lib.types.Rotation
 import io.github.toyota32k.media.lib.format.ContainerFormat
 import io.github.toyota32k.media.lib.processor.contract.ICancellable
 import io.github.toyota32k.media.lib.processor.contract.IProcessorOptions
-import io.github.toyota32k.media.lib.processor.misc.IFormattable
-import io.github.toyota32k.media.lib.processor.misc.format3digits
+import io.github.toyota32k.media.lib.processor.contract.IFormattable
+import io.github.toyota32k.media.lib.processor.contract.format3digits
 import io.github.toyota32k.media.lib.processor.optimizer.OptimizerOptions
 import io.github.toyota32k.media.lib.processor.optimizer.Optimizer
-import io.github.toyota32k.media.lib.processor.track.ITrack
+import io.github.toyota32k.media.lib.processor.contract.ITrack
 import io.github.toyota32k.media.lib.processor.track.SyncMuxer
 import io.github.toyota32k.media.lib.processor.track.TrackSelector
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
-import io.github.toyota32k.media.lib.surface.RenderOption
-import io.github.toyota32k.media.lib.utils.RangeUs
-import io.github.toyota32k.media.lib.utils.RangeUs.Companion.outlineRangeUs
-import io.github.toyota32k.media.lib.utils.RangeUs.Companion.totalLengthUs
-import io.github.toyota32k.media.lib.utils.RangeUs.Companion.us2ms
+import io.github.toyota32k.media.lib.internals.surface.RenderOption
+import io.github.toyota32k.media.lib.types.RangeUs
+import io.github.toyota32k.media.lib.types.RangeUs.Companion.outlineRangeUs
+import io.github.toyota32k.media.lib.types.RangeUs.Companion.totalLengthUs
+import io.github.toyota32k.media.lib.types.RangeUs.Companion.us2ms
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.Closeable
@@ -44,7 +44,7 @@ class Processor(
     companion object {
         val logger = UtLog("PRC", Converter.logger, this::class.java)
         const val DEFAULT_BUFFER_SIZE:Int = 8 * 1024 * 1024     // 8MB ... 1MB だと extractor.readSampleData() で InvalidArgumentException が発生
-        val DEFAULT:Processor get() = Processor()
+//        val DEFAULT:Processor get() = Processor()
     }
 
     override fun format(sb: StringBuilder): StringBuilder {
@@ -55,13 +55,12 @@ class Processor(
     }
 
     class Builder {
-        companion object {
-            fun fromInstance(instance:Processor) = Builder().apply {
-                mContainerFormat = instance.containerFormat
-                mBufferSize = instance.bufferSize
-//                mOnProgress = instance.onProgress
-            }
-        }
+//        companion object {
+//            fun fromInstance(instance:Processor) = Builder().apply {
+//                mContainerFormat = instance.containerFormat
+//                mBufferSize = instance.bufferSize
+//            }
+//        }
         private var mContainerFormat: ContainerFormat = ContainerFormat.MPEG_4
         private var mBufferSize:Int = DEFAULT_BUFFER_SIZE
 //        private var mOnProgress : ((IProgress)->Unit)? = null
@@ -190,7 +189,7 @@ class Processor(
                 progress.updateVideoUs(videoTrack.presentationTimeUs)
             } else if (!audioTrack.done) {
                 // audio track を処理
-                val dealt = audioTrack.readAndWrite(rangeUs)
+                audioTrack.readAndWrite(rangeUs)
                 progress.updateAudioUs(audioTrack.presentationTimeUs)
             }
         }
@@ -207,6 +206,11 @@ class Processor(
         val requestedRangeUs: RangeUs,
         val actualSoughtMap: IActualSoughtMap?,
         val report: Report) {
+        constructor(src:Result,
+            outputFile: IOutputMediaFile? = src.outputFile,
+            requestedRangeUs: RangeUs = src.requestedRangeUs,
+            actualSoughtMap: IActualSoughtMap? = src.actualSoughtMap,
+            report: Report = src.report) : this(outputFile, requestedRangeUs, actualSoughtMap, report)
 
         fun toConvertResult(): IConvertResult {
             return ProcessorResult.success(this)
@@ -230,7 +234,11 @@ class Processor(
     fun process(inPath: IInputMediaFile, outPath: IOutputMediaFile, rangesUs:List<RangeUs>, limitDurationUs:Long, rotation:Rotation?, renderOption:RenderOption?, videoStrategy: IVideoStrategy, audioStrategy: IAudioStrategy, onProgress:((IProgress)->Unit)?):Result {
         progress = ProgressHandler(onProgress)
         val actualSoughtMapImpl = ActualSoughtMapImpl()
-        val report = Report()
+        val report = Report().apply {
+            start()
+            updateVideoStrategyName(videoStrategy.name)
+            updateAudioStrategyName(audioStrategy.name)
+        }
         isCancelled = false
         Closeables().use { closer ->
             // Extractorの準備
@@ -260,7 +268,10 @@ class Processor(
             videoTrack.finalize()
             audioTrack.finalize()
             muxer.stop()
-            report.updateOutputFileInfo(outPath.getLength(), progress.current)
+            report.updateOutputFileInfo(outPath.getLength(), muxer.naturalDurationUs)
+            report.muxerDurationUs = muxer.naturalDurationUs
+            report.sourceDurationUs = totalUs
+            report.end()
 
             return Result(outPath, rangesUs.outlineRangeUs(report.sourceDurationUs), actualSoughtMapImpl, report)
         }

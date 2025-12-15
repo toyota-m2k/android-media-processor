@@ -1,8 +1,8 @@
 package io.github.toyota32k.media.lib.report
 
-import io.github.toyota32k.media.lib.converter.Converter
-import io.github.toyota32k.media.lib.converter.IInputMediaFile
-import io.github.toyota32k.media.lib.extractor.Extractor
+import io.github.toyota32k.media.lib.legacy.converter.Converter
+import io.github.toyota32k.media.lib.io.IInputMediaFile
+import io.github.toyota32k.media.lib.legacy.extractor.Extractor
 import io.github.toyota32k.media.lib.format.MetaData
 import io.github.toyota32k.media.lib.format.bitRate
 import io.github.toyota32k.media.lib.utils.TimeSpan

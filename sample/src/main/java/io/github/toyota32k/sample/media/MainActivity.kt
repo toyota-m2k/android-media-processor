@@ -41,16 +41,16 @@ import io.github.toyota32k.lib.player.model.chapter.MutableChapterList
 import io.github.toyota32k.lib.player.model.skipChapter
 import io.github.toyota32k.logger.UtLog
 import io.github.toyota32k.logger.UtLogConfig
-import io.github.toyota32k.media.lib.converter.AndroidFile
-import io.github.toyota32k.media.lib.converter.ConvertResult
-import io.github.toyota32k.media.lib.converter.Converter
-import io.github.toyota32k.media.lib.converter.FastStart
-import io.github.toyota32k.media.lib.converter.IConvertResult
-import io.github.toyota32k.media.lib.utils.RangeMs
-import io.github.toyota32k.media.lib.converter.Rotation
-import io.github.toyota32k.media.lib.converter.Splitter
+import io.github.toyota32k.media.lib.io.AndroidFile
+import io.github.toyota32k.media.lib.types.ConvertResult
+import io.github.toyota32k.media.lib.legacy.converter.Converter
+import io.github.toyota32k.media.lib.processor.optimizer.FastStart
+import io.github.toyota32k.media.lib.types.IConvertResult
+import io.github.toyota32k.media.lib.types.RangeMs
+import io.github.toyota32k.media.lib.types.Rotation
+import io.github.toyota32k.media.lib.legacy.converter.Splitter
 import io.github.toyota32k.media.lib.processor.contract.format
-import io.github.toyota32k.media.lib.converter.toAndroidFile
+import io.github.toyota32k.media.lib.io.toAndroidFile
 import io.github.toyota32k.media.lib.format.Codec
 import io.github.toyota32k.media.lib.format.getHeight
 import io.github.toyota32k.media.lib.format.getWidth
@@ -408,7 +408,7 @@ class MainActivity : UtMortalActivity() {
                                 .audioStrategy(namedAudioStrategy.value.strategy)
 //                                .audioStrategy(PresetAudioStrategies.NoAudio)
                                 .rotate(rotation)
-//                                .crop(crop)
+                                .crop(crop)
 //                                .brightness(1.3f)
                                 .trimming {
                                     addRangesMs(ranges.map { RangeMs(it.start, it.end) })

@@ -1,7 +1,6 @@
 package io.github.toyota32k.media.lib.format
 
-import io.github.toyota32k.media.lib.converter.IInputMediaFile
-import io.github.toyota32k.media.lib.format.duration
+import io.github.toyota32k.media.lib.io.IInputMediaFile
 
 data class MetaData(
     val mime: String?,
