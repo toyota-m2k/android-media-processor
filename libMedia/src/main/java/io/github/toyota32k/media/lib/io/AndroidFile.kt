@@ -295,7 +295,12 @@ class AndroidFile : IInputMediaFile, IOutputMediaFile, Comparable<AndroidFile> {
 //}
 
 fun Uri.toAndroidFile(context:Context):AndroidFile {
-    return AndroidFile(this, context)
+    if (this.scheme == "content") {
+        return AndroidFile(this, context)
+    } else {
+        val path = this.path ?: throw IllegalArgumentException("invalid uri: $this")
+        return AndroidFile(File(path))
+    }
 }
 
 @Suppress("unused")

@@ -1,10 +1,10 @@
 package io.github.toyota32k.media.lib.processor
 
 import io.github.toyota32k.logger.UtLog
-import io.github.toyota32k.media.lib.legacy.converter.ActualSoughtMapImpl
+import io.github.toyota32k.media.lib.types.ActualSoughtMapImpl
 import io.github.toyota32k.media.lib.types.ConvertResult
 import io.github.toyota32k.media.lib.legacy.converter.Converter
-import io.github.toyota32k.media.lib.legacy.converter.IActualSoughtMap
+import io.github.toyota32k.media.lib.processor.contract.IActualSoughtMap
 import io.github.toyota32k.media.lib.types.IConvertResult
 import io.github.toyota32k.media.lib.io.IInputMediaFile
 import io.github.toyota32k.media.lib.io.IOutputMediaFile

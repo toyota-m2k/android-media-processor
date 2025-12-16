@@ -1,7 +1,7 @@
 package io.github.toyota32k.media.lib.types
 
 import io.github.toyota32k.media.lib.io.IOutputMediaFile
-import io.github.toyota32k.media.lib.legacy.converter.IActualSoughtMap
+import io.github.toyota32k.media.lib.processor.contract.IActualSoughtMap
 import io.github.toyota32k.media.lib.legacy.converter.ITrimmingRangeList
 import io.github.toyota32k.media.lib.report.Report
 import kotlinx.coroutines.CancellationException
