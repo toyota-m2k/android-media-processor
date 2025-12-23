@@ -28,6 +28,19 @@ fun MediaFormat.safeGetInteger(key:String, defValue:Int):Int {
     return safeGetIntegerOrNull(key) ?: defValue
 }
 
+fun MediaFormat.safeGetLongOrNull(key:String):Long? {
+    return try {
+        getLong(key)
+    } catch (_:Throwable) {
+        null
+    }
+}
+
+fun MediaFormat.safeGetLong(key:String, defValue:Long):Long {
+    return safeGetLongOrNull(key) ?: defValue
+}
+
+
 //fun MediaFormat.getMime():String? = safeGetStringOrNull(MediaFormat.KEY_MIME)
 //fun MediaFormat.getProfile():Int? = safeGetIntegerOrNull(MediaFormat.KEY_PROFILE)
 //fun MediaFormat.getLevel():Int? = safeGetIntegerOrNull(MediaFormat.KEY_LEVEL)
@@ -156,8 +169,8 @@ var MediaFormat.sampleRate:Int?
 var MediaFormat.channelCount:Int?
     get() = safeGetIntegerOrNull(MediaFormat.KEY_CHANNEL_COUNT)
     set(v) = setIntegerOrNull(MediaFormat.KEY_CHANNEL_COUNT, v)
-val MediaFormat.duration:Int?
-    get() = safeGetIntegerOrNull(MediaFormat.KEY_DURATION)
+val MediaFormat.duration:Long?
+    get() = safeGetLongOrNull(MediaFormat.KEY_DURATION) ?: safeGetIntegerOrNull(MediaFormat.KEY_DURATION)?.toLong()
 
 
 fun MediaFormat.dump(logger: UtLog, message:String) {

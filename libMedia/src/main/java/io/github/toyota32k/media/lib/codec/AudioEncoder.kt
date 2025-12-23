@@ -3,14 +3,14 @@ package io.github.toyota32k.media.lib.codec
 import android.media.MediaCodec
 import android.media.MediaFormat
 import io.github.toyota32k.logger.UtLog
-import io.github.toyota32k.media.lib.converter.Converter
+import io.github.toyota32k.media.lib.legacy.converter.Converter
 import io.github.toyota32k.media.lib.format.bitRate
 import io.github.toyota32k.media.lib.format.channelCount
 import io.github.toyota32k.media.lib.format.sampleRate
-import io.github.toyota32k.media.lib.misc.ICancellation
+import io.github.toyota32k.media.lib.processor.contract.ICancellation
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
-import io.github.toyota32k.media.lib.track.Muxer
+import io.github.toyota32k.media.lib.legacy.track.Muxer
 
 class AudioEncoder(strategy: IAudioStrategy, format: MediaFormat, encoder: MediaCodec, report: Report, cancellation: ICancellation)
     :BaseEncoder(strategy, format, encoder, report, cancellation)  {

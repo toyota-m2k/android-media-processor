@@ -37,8 +37,8 @@ enum class Codec(val media: Media, val mime:String, val alias:String?=null) {
                 it.mime.compareTo(type, true) == 0 || it.alias?.compareTo(type, true)==0
             }
         }
-        fun fromFormat(format: MediaFormat): Codec? {
-            val mime = format.mime?:return null
+        fun fromFormat(format: MediaFormat?): Codec? {
+            val mime = format?.mime?:return null
             return fromMime(mime)
         }
     }

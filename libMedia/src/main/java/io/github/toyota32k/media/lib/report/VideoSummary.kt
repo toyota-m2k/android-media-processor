@@ -30,18 +30,18 @@ data class VideoSummary(
     val colorFormat: ColorFormat?,
     val hdrInfo: HDR.Info?,
     ) : IAttributes {
-    constructor(org:VideoSummary?, format: MediaFormat, metaData: MetaData?) : this(
+    constructor(org:VideoSummary?, format: MediaFormat?, metaData: MetaData?) : this(
         org?.codec ?: Codec.fromFormat(format),
         org?.profile ?: Profile.fromFormat(format),
         org?.level ?: Level.fromFormat(format),
 
-        width = format.width?: org?.width ?:-1,
-        height = format.height?: org?.height ?:-1,
-        bitRate = format.bitRate?: metaData?.bitRate ?: org?.bitRate ?: -1,
-        maxBitRate = format.maxBitRate?: org?.maxBitRate ?:-1,
+        width = format?.width?: org?.width ?:-1,
+        height = format?.height?: org?.height ?:-1,
+        bitRate = format?.bitRate?: metaData?.bitRate ?: org?.bitRate ?: -1,
+        maxBitRate = format?.maxBitRate?: org?.maxBitRate ?:-1,
         bitRateMode = BitRateMode.fromFormat(format) ?: org?.bitRateMode,
-        frameRate = format.frameRate?: metaData?.frameRate ?: org?.frameRate ?: -1,
-        iFrameInterval = format.iFrameInterval?: org?.iFrameInterval ?: -1,
+        frameRate = format?.frameRate?: metaData?.frameRate ?: org?.frameRate ?: -1,
+        iFrameInterval = format?.iFrameInterval?: org?.iFrameInterval ?: -1,
         colorFormat = ColorFormat.fromFormat(format) ?: org?.colorFormat,
         hdrInfo = HDR.Info.fromFormat(format)
     )

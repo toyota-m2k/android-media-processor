@@ -37,4 +37,13 @@ object PresetAudioStrategies {
         channelCount = 0,
         bitRatePerChannel = MaxDefault(32*1000, 16*1000)
     )
+
+    object InvalidStrategy : AudioStrategy(
+        codec = Codec.AAC,
+        profile = Profile.AACObjectLC,
+        fallbackProfiles = null,
+        sampleRate = MaxDefault(96*1000, 48*1000),
+        channelCount = 0,
+        bitRatePerChannel = MaxDefault(192*1000, 64*1000)
+    )
 }

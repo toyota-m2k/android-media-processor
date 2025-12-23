@@ -1,14 +1,10 @@
 package io.github.toyota32k.media.lib.strategy
 
-import android.media.MediaCodec
-import android.media.MediaFormat
 import io.github.toyota32k.media.lib.format.BitRateMode
 import io.github.toyota32k.media.lib.format.Codec
 import io.github.toyota32k.media.lib.format.ColorFormat
 import io.github.toyota32k.media.lib.format.Level
-import io.github.toyota32k.media.lib.format.MetaData
 import io.github.toyota32k.media.lib.format.Profile
-import io.github.toyota32k.media.lib.surface.RenderOption
 
 object PresetVideoStrategies {
     val HD720SizeCriteria =
@@ -193,7 +189,7 @@ object PresetVideoStrategies {
         level = Level.HEVCMainTierLevel4,
         fallbackProfiles = null,
         sizeCriteria = HD720SizeCriteria,
-        bitRate = MaxDefault(1500*1000, 1000*1000),
+        bitRate = MaxDefault(1000*1000, 768*1000),
         frameRate = MaxDefault(30),
         iFrameInterval = MinDefault(1),
         colorFormat = ColorFormat.COLOR_FormatSurface,

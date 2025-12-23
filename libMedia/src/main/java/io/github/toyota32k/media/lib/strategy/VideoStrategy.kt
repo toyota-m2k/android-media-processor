@@ -26,7 +26,7 @@ import io.github.toyota32k.media.lib.format.width
 import io.github.toyota32k.media.lib.strategy.DeviceCapabilities.capabilities
 import io.github.toyota32k.media.lib.strategy.DeviceCapabilities.isHardwareAccelerated
 import io.github.toyota32k.media.lib.strategy.DeviceCapabilities.isSoftwareOnly
-import io.github.toyota32k.media.lib.surface.RenderOption
+import io.github.toyota32k.media.lib.internals.surface.RenderOption
 import kotlin.math.min
 import kotlin.math.roundToInt
 

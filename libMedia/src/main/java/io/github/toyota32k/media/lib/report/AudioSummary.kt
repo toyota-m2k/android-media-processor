@@ -15,12 +15,12 @@ data class AudioSummary(
     val channelCount: Int,
     val bitRate: Int,
     ) : IAttributes {
-    constructor(org:AudioSummary?, format:MediaFormat) : this(
+    constructor(org:AudioSummary?, format:MediaFormat?) : this(
         org?.codec ?: Codec.fromFormat(format),
         org?.profile ?: Profile.fromFormat(format),
-        format.sampleRate?: org?.sampleRate ?: -1,
-        format.channelCount?: org?.channelCount ?:-1,
-        format.bitRate?: org?.bitRate ?: -1)
+        format?.sampleRate?: org?.sampleRate ?: -1,
+        format?.channelCount?: org?.channelCount ?:-1,
+        format?.bitRate?: org?.bitRate ?: -1)
 
     override val title: String
         get() = "Audio Summary"

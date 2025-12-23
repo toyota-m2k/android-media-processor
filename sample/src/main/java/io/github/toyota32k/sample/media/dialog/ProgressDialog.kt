@@ -84,9 +84,14 @@ class ProgressDialog : UtDialogEx() {
 
     companion object {
         suspend fun <T> withProgressDialog(taskName:String="withProgressDialog", block: suspend (IProgressSetter)->T):T {
-            var vmf = MutableStateFlow<ProgressViewModel?>(null)
+            val vmf = MutableStateFlow<ProgressViewModel?>(null)
             UtImmortalTask.launchTask(taskName) {
-                vmf.value = createViewModel<ProgressViewModel>()
+                vmf.value = createViewModel<ProgressViewModel> {
+                    progress.value = 0
+                    progressText.value = ""
+                    message.value = ""
+                    cancelled.value = false
+                }
                 showDialog(taskName) { ProgressDialog() }.status.ok
             }
             return vmf.filterNotNull().first().let { vm ->

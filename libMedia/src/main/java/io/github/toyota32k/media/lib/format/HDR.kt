@@ -24,8 +24,8 @@ class HDR {
             fun from(value: Int): ColorStandard? {
                 return entries.firstOrNull { it.value == value }
             }
-            fun fromFormat(format: MediaFormat): ColorStandard? {
-                if(!format.containsKey(MediaFormat.KEY_COLOR_STANDARD)) return null
+            fun fromFormat(format: MediaFormat?): ColorStandard? {
+                if(true!=format?.containsKey(MediaFormat.KEY_COLOR_STANDARD)) return null
                 val v = format.getInteger(MediaFormat.KEY_COLOR_STANDARD)
                 return from(v)
             }
@@ -43,8 +43,8 @@ class HDR {
             fun from(value: Int): ColorRange? {
                 return entries.firstOrNull { it.value == value }
             }
-            fun fromFormat(format: MediaFormat): ColorRange? {
-                if(!format.containsKey(MediaFormat.KEY_COLOR_RANGE)) return null
+            fun fromFormat(format: MediaFormat?): ColorRange? {
+                if(true != format?.containsKey(MediaFormat.KEY_COLOR_RANGE)) return null
                 val v = format.getInteger(MediaFormat.KEY_COLOR_RANGE)
                 return from(v)
             }
@@ -69,8 +69,8 @@ class HDR {
             fun from(value: Int): ColorTransfer? {
                 return entries.firstOrNull { it.value == value }
             }
-            fun fromFormat(format: MediaFormat): ColorTransfer? {
-                if(!format.containsKey(MediaFormat.KEY_COLOR_TRANSFER)) return null
+            fun fromFormat(format: MediaFormat?): ColorTransfer? {
+                if(true!=format?.containsKey(MediaFormat.KEY_COLOR_TRANSFER)) return null
                 val v = format.getInteger(MediaFormat.KEY_COLOR_TRANSFER)
                 return from(v)
             }
@@ -85,19 +85,19 @@ class HDR {
         val hdr10PlusInfo: ByteBuffer? = null
     ) {
         companion object {
-            private fun getHdr10PlusInfo(format: MediaFormat): ByteBuffer? {
+            private fun getHdr10PlusInfo(format: MediaFormat?): ByteBuffer? {
                 return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-                    format.getByteBuffer(MediaFormat.KEY_HDR10_PLUS_INFO)
+                    format?.getByteBuffer(MediaFormat.KEY_HDR10_PLUS_INFO)
                 } else {
                     null
                 }
             }
-            fun fromFormat(format: MediaFormat): Info {
+            fun fromFormat(format: MediaFormat?): Info {
                 return Info(
                     colorStandard = ColorStandard.fromFormat(format),
                     colorRange = ColorRange.fromFormat(format),
                     colorTransfer = ColorTransfer.fromFormat(format),
-                    hdrStaticInfo = format.getByteBuffer(MediaFormat.KEY_HDR_STATIC_INFO),
+                    hdrStaticInfo = format?.getByteBuffer(MediaFormat.KEY_HDR_STATIC_INFO),
                     hdr10PlusInfo = getHdr10PlusInfo(format)
                 )
             }

@@ -1,0 +1,352 @@
+package io.github.toyota32k.media.lib.processor.optimizer
+
+import android.content.Context
+import android.net.Uri
+import io.github.toyota32k.logger.UtLog
+import io.github.toyota32k.media.lib.io.AndroidFile
+import io.github.toyota32k.media.lib.legacy.converter.Converter
+import io.github.toyota32k.media.lib.processor.contract.IProgress
+import java.io.ByteArrayInputStream
+import java.io.ByteArrayOutputStream
+import java.io.FileInputStream
+import java.io.IOException
+import java.io.InputStream
+
+object FastStart {
+    enum class CheckResult(val optimizable:Boolean) {
+        AlreadyOptimized(false),   // already optimezed and no need to process
+        HasFreeAtom(true),        // this mp4 file has free atom ... should be processed
+        MoovAtomAtEnd(true),      // placing the moov atom at the end ... must be precessed.
+        Error(false),              // something went wrong
+    }
+    private enum class ProcessResult(val checkResult:CheckResult) {
+        AlreadyOptimized(CheckResult.AlreadyOptimized),
+        HasFreeAtom(CheckResult.HasFreeAtom),
+        MoovAtomAtEnd(CheckResult.MoovAtomAtEnd),
+        Converted(CheckResult.AlreadyOptimized),        // converted by processImpl()
+    }
+
+    /**
+     * Fast Start が必要かどうかをチェックする
+     * @param inUri 入力（動画）ファイル
+     * @param context  uri解決用コンテキスト（ApplicationContextでok）
+     * @param removeFree true にすると、MOOV Atomが先頭にあっても（= Fast Start readyであっても）、Free Atom が存在すれば true を返す。
+     * @return true: 必要 / false: 不要
+     */
+    fun check(inUri: Uri, context: Context):CheckResult
+        = check(AndroidFile(inUri, context))
+
+    fun check(inFile: AndroidFile):CheckResult {
+        return try {
+            inFile.fileInputStream { inStream->
+                processImpl(inStream, null, true, null).checkResult
+            }
+        } catch(e:Throwable) {
+            logger.error(e)
+            CheckResult.Error
+        }
+    }
+
+    /**
+     * Fast Start 化を実行する
+     * @param inUri 入力（動画）ファイル
+     * @param outUri 出力ファイル
+     * @param context  uri解決用コンテキスト（ApplicationContextでok）
+     * @return true: 処理した / false: 処理は不要だった、あるいはエラーのため処理できなかった
+     */
+    fun process(inUri: Uri, outUri: Uri, context: Context, removeFree:Boolean, progressCallback: ((IProgress) -> Unit)?):Boolean {
+        return process(AndroidFile(inUri, context), AndroidFile(outUri, context), removeFree, progressCallback)
+    }
+
+    fun process(inFile: AndroidFile, outFile: AndroidFile, removeFree:Boolean, progressCallback: ((IProgress) -> Unit)?):Boolean {
+        var result = false
+        try {
+            result = inFile.fileInputStream { inStream->
+                processImpl(inStream, outFile, removeFree, progressCallback) == ProcessResult.Converted
+            }
+        } catch(e:Throwable) {
+            logger.error(e)
+        } finally {
+            if(!result) {
+                // コンバートされなければ outFile を削除
+                outFile.safeDelete()
+            }
+        }
+        return result
+    }
+
+    val logger = UtLog("FastStart", Converter.Companion.logger)
+
+    private const val CHUNK_SIZE = 8192
+
+    private class ByteArrayInputStreamPosition(buf: ByteArray?) : ByteArrayInputStream(buf) {
+        //    constructor(buf: ByteArray?, offset: Int, length: Int) : super(buf, offset, length)
+        fun position(): Int {
+            return pos
+        }
+    }
+
+    private data class Atom(var type: String, var size: Long, var start:Long = 0) {
+        override fun toString(): String {
+            return "[$type,start=$start,size=$size]"
+        }
+    }
+
+    class FastStartException(message:String) : Exception(message)
+
+    private fun readInt(inputStream: InputStream): Int {
+        val data = ByteArray(4)
+        inputStream.read(data)
+        var n = 0
+        for (b in data) n = (n shl 8) + (b.toInt() and 0xFF)
+        return n
+    }
+
+    private fun readLong(inputStream: InputStream): Long {
+        val data = ByteArray(8)
+        inputStream.read(data)
+        var n: Long = 0
+        for (b in data) n = (n shl 8) + (b.toInt() and 0xFF)
+        return n
+    }
+
+    private fun readType(inputStream: InputStream): String {
+        val data = ByteArray(4)
+        inputStream.read(data)
+        return String(data)
+    }
+
+    private fun readAtom(inputStream: InputStream): Atom {
+        val size = readInt(inputStream)
+        val type = readType(inputStream)
+        return Atom(type, size.toLong())
+    }
+
+    private fun toByteArray(n: Int): ByteArray {
+        val b = ByteArray(4)
+        for (i in 0..3) b[3 - i] = (n ushr 8 * i).toByte()
+        return b
+    }
+
+    private fun toByteArray(n: Long): ByteArray {
+        val b = ByteArray(8)
+        for (i in 0..7) b[7 - i] = (n ushr 8 * i).toByte()
+        return b
+    }
+
+    private fun getIndex(inputStream: FileInputStream): ArrayList<Atom> {
+        logger.debug("Getting index of top level atoms...")
+        val index = ArrayList<Atom>()
+        var seenMoov = false
+        var seenMdat = false
+        val fileSize = inputStream.channel.size()
+        while (inputStream.channel.position() < fileSize) {
+            try {
+                val atom = readAtom(inputStream)
+                var skippedBytes = 8
+                if (atom.size == 1L) {
+                    atom.size = readLong(inputStream)
+                    skippedBytes = 16
+                }
+                atom.start = inputStream.channel.position() - skippedBytes
+                index.add(atom)
+                logger.debug(atom.toString())
+                if (atom.type.equals("moov", ignoreCase = true)) seenMoov = true
+                if (atom.type.equals("mdat", ignoreCase = true)) seenMdat = true
+                if (atom.size == 0L) break
+                inputStream.skip(atom.size - skippedBytes)
+            } catch (ex: IOException) {
+                logger.error(ex)
+                break
+            }
+        }
+        if (!seenMoov) throw FastStartException("No moov atom type found!")
+        if (!seenMdat) throw FastStartException("No mdat atom type found!")
+        return index
+    }
+
+    private fun skipToNextTable(inputStream: ByteArrayInputStream): Atom? {
+        while (inputStream.available() > 0) {
+            val atom = readAtom(inputStream)
+            if (isTableType(atom.type)) return atom else if (isKnownAncestorType(atom.type)) continue else inputStream.skip(atom.size - 8)
+        }
+        return null
+    }
+
+    @Suppress("SpellCheckingInspection")
+    private fun isKnownAncestorType(type: String): Boolean {
+        return type.equals("trak", ignoreCase = true) ||
+                type.equals("mdia", ignoreCase = true) ||
+                type.equals("minf", ignoreCase = true) ||
+                type.equals("stbl", ignoreCase = true)
+    }
+
+    @Suppress("SpellCheckingInspection")
+    private fun isTableType(type: String): Boolean {
+        return type.equals("stco", ignoreCase = true) ||
+                type.equals("co64", ignoreCase = true)
+    }
+
+    private class Progress(override var total: Long, val callback:((IProgress)->Unit)?) : IProgress {
+        override var current: Long = 0L
+        override val remainingTime: Long = 0L
+
+        fun update(current:Long) {
+            this.current = current
+            callback?.invoke(this)
+        }
+    }
+
+    private fun processImpl(inputStream: FileInputStream, outputFile: AndroidFile?, removeFree:Boolean, progressCallback:((IProgress)->Unit)?): ProcessResult {
+        val index: ArrayList<Atom> = try {
+            getIndex(inputStream)
+        } catch (ex: IOException) {
+            logger.error(ex)
+            throw FastStartException("IO Exception during indexing.")
+        }
+        var moov: Atom? = null
+        var mdatStart = 999999L
+        var freeSize = 0L
+
+        //Check that moov is after mdat (they are both known to exist)
+        for (atom in index) {
+            if (atom.type.equals("moov", ignoreCase = true)) {
+                moov = atom
+            } else if (atom.type.equals("mdat", ignoreCase = true)) {
+                mdatStart = atom.start
+            } else if (atom.type.equals("free", ignoreCase = true) && atom.start < mdatStart) {
+                //This free atom is before the mdat
+                freeSize += atom.size
+                logger.info("Removing free atom at ${atom.start} (${atom.size} bytes)")
+            }
+        }
+        var state = ProcessResult.MoovAtomAtEnd
+        var offset = (moov!!.size - freeSize).toInt()
+        if (moov.start < mdatStart) {
+            // moov atom は先頭（mdatより前）にある
+            offset -= moov.size.toInt()
+            if (freeSize==0L) {
+                state = ProcessResult.AlreadyOptimized
+            } else {
+                state = ProcessResult.HasFreeAtom
+            }
+        }
+        if(outputFile==null) {
+            logger.debug("check result = $state")
+            return state
+        }
+
+        if(state == ProcessResult.AlreadyOptimized || (!removeFree && state==ProcessResult.HasFreeAtom)) {
+            logger.info("No need to process. state=$state")
+            return state
+        }
+
+
+        val moovContents = ByteArray(moov.size.toInt())
+        try {
+            inputStream.channel.position(moov.start)
+            inputStream.read(moovContents)
+        } catch (ex: IOException) {
+            logger.error(ex)
+            throw FastStartException("IO Exception reading moov contents.")
+        }
+        val moovIn = ByteArrayInputStreamPosition(moovContents)
+        val moovOut = ByteArrayOutputStream(moovContents.size)
+
+        //Skip type and size
+        moovIn.skip(8)
+        try {
+            while (true) {
+                val atom = skipToNextTable(moovIn) ?: break
+                moovIn.skip(4) //skip version and flags
+                val entryCount = readInt(moovIn)
+                logger.info("Patching ${atom.type} with $entryCount entries.")
+                val entriesStart: Int = moovIn.position()
+                //write up to start of the entries
+                moovOut.write(moovContents, moovOut.size(), entriesStart - moovOut.size())
+                @Suppress("SpellCheckingInspection")
+                if (atom.type.equals("stco", ignoreCase = true)) { //32 bit
+                    var entry: ByteArray
+                    for (i in 0 until entryCount) {
+                        entry = toByteArray(readInt(moovIn) + offset)
+                        moovOut.write(entry)
+                    }
+                } else { //64 bit
+                    var entry: ByteArray
+                    for (i in 0 until entryCount) {
+                        entry = toByteArray(readLong(moovIn) + offset)
+                        moovOut.write(entry)
+                    }
+                }
+            }
+            if (moovOut.size() < moovContents.size) //write the rest
+                moovOut.write(moovContents, moovOut.size(), moovContents.size - moovOut.size())
+        } catch (ex: IOException) {
+            logger.error(ex)
+            throw FastStartException("IO Exception while patching moov.")
+        }
+        logger.debug("Writing output file:")
+
+        outputFile.fileOutputStream { outputStream ->
+            //write FTYP
+            for (atom in index) {
+                if (atom.type.equals("ftyp", ignoreCase = true)) {
+                    logger.debug("Writing ftyp...")
+                    try {
+                        inputStream.channel.position(atom.start)
+                        val data = ByteArray(atom.size.toInt())
+                        inputStream.read(data)
+                        outputStream.write(data)
+                    } catch (ex: IOException) {
+                        logger.error(ex)
+                        throw FastStartException("IO Exception during writing ftyp.")
+                    }
+                }
+            }
+
+            //write MOOV
+            try {
+                logger.debug("Writing moov...")
+                //if(DEBUG) System.out.println("Modified moov contents:\n"+moovOut.toString());
+                moovOut.writeTo(outputStream)
+                moovIn.close()
+                moovOut.close()
+            } catch (ex: IOException) {
+                logger.error(ex)
+                throw FastStartException("IO Exception during writing moov.")
+            }
+
+            //write everything else!
+            for (atom in index) {
+                if (atom.type.equals("ftyp", ignoreCase = true) ||
+                    atom.type.equals("moov", ignoreCase = true) ||
+                    atom.type.equals("free", ignoreCase = true)
+                ) {
+                    continue
+                }
+                logger.debug("Writing ${atom.type}...")
+                val progress = Progress(atom.size, progressCallback)
+                try {
+                    inputStream.channel.position(atom.start)
+                    val chunk = ByteArray(CHUNK_SIZE)
+                    for (i in 0 until atom.size / CHUNK_SIZE) {
+                        inputStream.read(chunk)
+                        outputStream.write(chunk)
+                        progress.update(progress.current + CHUNK_SIZE)
+                    }
+                    val remainder = (atom.size % CHUNK_SIZE).toInt()
+                    if (remainder > 0) {
+                        inputStream.read(chunk, 0, remainder)
+                        outputStream.write(chunk, 0, remainder)
+                    }
+                    progress.update(atom.size)
+                } catch (ex: IOException) {
+                    logger.error(ex)
+                    throw FastStartException("IO Exception during output writing.")
+                }
+            }
+            logger.info("Write complete!")
+        }
+        return ProcessResult.Converted
+    }
+}

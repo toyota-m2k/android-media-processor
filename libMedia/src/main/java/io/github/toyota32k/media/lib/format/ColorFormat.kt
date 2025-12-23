@@ -342,8 +342,8 @@ enum class ColorFormat(val value:Int) {
                 it.value == value
             }
         }
-        fun fromFormat(format:MediaFormat):ColorFormat? {
-            val cf = format.colorFormat ?: return null
+        fun fromFormat(format:MediaFormat?):ColorFormat? {
+            val cf = format?.colorFormat ?: return null
             return fromValue(cf)
         }
     }

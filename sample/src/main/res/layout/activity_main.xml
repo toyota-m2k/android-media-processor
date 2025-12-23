@@ -198,6 +198,14 @@
                 android:textColor="?attr/colorOnSecondaryContainer"
                 app:layout_constraintTop_toBottomOf="@+id/save_video" />
 
+            <CheckBox
+                android:id="@+id/use_processor"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="50dp"
+                android:checked="false"
+                android:text="@string/use_processor" />
+
             <LinearLayout
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"

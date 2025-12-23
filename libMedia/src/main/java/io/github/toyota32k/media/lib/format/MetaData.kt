@@ -1,6 +1,6 @@
 package io.github.toyota32k.media.lib.format
 
-import io.github.toyota32k.media.lib.converter.IInputMediaFile
+import io.github.toyota32k.media.lib.io.IInputMediaFile
 
 data class MetaData(
     val mime: String?,
@@ -26,4 +26,6 @@ data class MetaData(
             }
         }
     }
+    val durationUs:Long?
+        get() = if (duration!=null) duration*1000 else null
 }

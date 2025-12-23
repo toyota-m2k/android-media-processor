@@ -3,7 +3,7 @@ package io.github.toyota32k.media.lib.strategy
 import android.media.MediaCodec
 import android.media.MediaFormat
 import io.github.toyota32k.logger.UtLog
-import io.github.toyota32k.media.lib.converter.Converter
+import io.github.toyota32k.media.lib.legacy.converter.Converter
 import io.github.toyota32k.media.lib.format.BitRateMode
 import io.github.toyota32k.media.lib.format.Codec
 import io.github.toyota32k.media.lib.format.ColorFormat
@@ -12,7 +12,7 @@ import io.github.toyota32k.media.lib.format.MetaData
 import io.github.toyota32k.media.lib.format.Profile
 import io.github.toyota32k.media.lib.strategy.VideoStrategy.EncoderType
 import io.github.toyota32k.media.lib.strategy.VideoStrategy.SizeCriteria
-import io.github.toyota32k.media.lib.surface.RenderOption
+import io.github.toyota32k.media.lib.internals.surface.RenderOption
 
 interface IStrategy {
     val name:String
