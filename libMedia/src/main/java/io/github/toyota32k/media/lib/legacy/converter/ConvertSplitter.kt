@@ -206,14 +206,14 @@ class ConvertSplitter(
             acc + range.lengthMs(duration)
         }
         if (!outputFileSelector.initialize(rangeMsList)) {
-            return result.cancel()
+            return result.cancel(inputFile)
         }
         var index = 0
         val convProgress = ConvertProgress(totalLengthMs.ms2us())
         for (range in rangeMsList) {
             val output = outputFileSelector.selectOutputFile(index, range.startMs)
             if (output == null) {
-                result.cancel()
+                result.cancel(inputFile)
                 break
             }
             index++
@@ -237,7 +237,7 @@ class ConvertSplitter(
 
             this.converter = converter
             if (cancelled) {
-                result.cancel()
+                result.cancel(inputFile)
                 break
             }
             val convertResult = converter.execute()
@@ -268,7 +268,7 @@ class ConvertSplitter(
         val duration = inputFile.openMetadataRetriever().useObj { it.getDuration() } ?: throw IllegalStateException("cannot retrieve duration")
 
         if (!outputFileSelector.initialize(rangeList)) {
-            return result.cancel()
+            return result.cancel(inputFile)
         }
 
         val totalRangeMs = rangeList.fold(0L) { acc, range ->
@@ -279,7 +279,7 @@ class ConvertSplitter(
         for (range in rangeList) {
             val output = outputFileSelector.selectOutputFile(index, range.startMs)
             if (output==null) {
-                result.cancel()
+                result.cancel(inputFile)
                 break
             }
             index++
@@ -301,7 +301,7 @@ class ConvertSplitter(
                 .build()
             this.converter = converter
             if (cancelled) {
-                result.cancel()
+                result.cancel(inputFile)
                 break
             }
             val convertResult = converter.execute()

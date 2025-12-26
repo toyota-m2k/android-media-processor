@@ -78,10 +78,16 @@ class RangeUs(val startUs:Long, val endUs:Long) {
             }
         }
 
+        /**
+         * range list の先頭と末端を返す
+         *
+         * @param durationUs ソース動画の総再生時間 (endUs が不定の場合に使用)
+         * @return RangeUs
+         */
         fun List<RangeUs>.outlineRangeUs(durationUs: Long): RangeUs {
             if (this.isEmpty()) return RangeUs(0L, 0L)
             val start = this.minOf { it.startUs }
-            val end = this.maxOf { it.startUs + it.lengthUs(durationUs) }
+            val end = this.maxOf { it.actualEndUs(durationUs) }
             return RangeUs(start, end)
         }
     }

@@ -42,7 +42,7 @@ import io.github.toyota32k.lib.player.model.skipChapter
 import io.github.toyota32k.logger.UtLog
 import io.github.toyota32k.logger.UtLogConfig
 import io.github.toyota32k.media.lib.io.AndroidFile
-import io.github.toyota32k.media.lib.types.ConvertResult
+import io.github.toyota32k.media.lib.legacy.converter.ConvertResult
 import io.github.toyota32k.media.lib.legacy.converter.Converter
 import io.github.toyota32k.media.lib.processor.optimizer.FastStart
 import io.github.toyota32k.media.lib.types.IConvertResult
@@ -54,6 +54,7 @@ import io.github.toyota32k.media.lib.io.toAndroidFile
 import io.github.toyota32k.media.lib.format.Codec
 import io.github.toyota32k.media.lib.format.getHeight
 import io.github.toyota32k.media.lib.format.getWidth
+import io.github.toyota32k.media.lib.processor.Analyzer
 import io.github.toyota32k.media.lib.processor.CompatConverter
 import io.github.toyota32k.media.lib.strategy.DeviceCapabilities
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
@@ -153,17 +154,17 @@ class MainActivity : UtMortalActivity() {
 
         val analyzeInputFileCommand = LiteUnitCommand {
             val input = inputFile.value ?: return@LiteUnitCommand
-            val summary = Converter.analyze(input.toAndroidFile(application))
+            val summary = Analyzer.analyze(input.toAndroidFile(application))
             MultilineTextDialog.show("Input File", summary.toString())
         }
         val analyzeOutputFileCommand = LiteUnitCommand {
             val output = outputFile.value ?: return@LiteUnitCommand
-            val summary = Converter.analyze(output.toAndroidFile(application))
+            val summary = Analyzer.analyze(output.toAndroidFile(application))
             MultilineTextDialog.show("Output File", summary.toString())
         }
         val analyzeOutputFile2Command = LiteUnitCommand {
             val output = outputFile2.value ?: return@LiteUnitCommand
-            val summary = Converter.analyze(output.toAndroidFile(application))
+            val summary = Analyzer.analyze(output.toAndroidFile(application))
             MultilineTextDialog.show("Output File 2", summary.toString())
         }
         val videoDeviceCapabilitiesCommand = LiteUnitCommand {

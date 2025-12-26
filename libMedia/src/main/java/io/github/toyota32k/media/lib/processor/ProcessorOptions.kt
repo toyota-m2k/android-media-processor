@@ -4,7 +4,6 @@ import android.content.Context
 import android.graphics.Rect
 import android.net.Uri
 import io.github.toyota32k.media.lib.io.AndroidFile
-import io.github.toyota32k.media.lib.legacy.converter.Converter.Companion.analyze
 import io.github.toyota32k.media.lib.io.HttpInputFile
 import io.github.toyota32k.media.lib.io.IHttpStreamSource
 import io.github.toyota32k.media.lib.io.IInputMediaFile
@@ -20,6 +19,7 @@ import io.github.toyota32k.media.lib.strategy.IVideoStrategy
 import io.github.toyota32k.media.lib.strategy.PresetAudioStrategies
 import io.github.toyota32k.media.lib.strategy.PresetVideoStrategies
 import io.github.toyota32k.media.lib.internals.surface.RenderOption
+import io.github.toyota32k.media.lib.processor.Analyzer.analyze
 import io.github.toyota32k.media.lib.types.RangeUs
 import io.github.toyota32k.media.lib.types.RangeUs.Companion.formatAsUs
 import io.github.toyota32k.media.lib.types.RangeUs.Companion.ms2us

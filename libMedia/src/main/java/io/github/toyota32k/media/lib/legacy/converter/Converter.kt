@@ -5,9 +5,7 @@ import android.graphics.Rect
 import android.net.Uri
 import io.github.toyota32k.logger.UtLog
 import io.github.toyota32k.media.lib.io.AndroidFile
-import io.github.toyota32k.media.lib.types.ConvertResult
 import io.github.toyota32k.media.lib.io.HttpInputFile
-import io.github.toyota32k.media.lib.types.IConvertResult
 import io.github.toyota32k.media.lib.io.IHttpStreamSource
 import io.github.toyota32k.media.lib.io.IInputMediaFile
 import io.github.toyota32k.media.lib.io.IOutputMediaFile
@@ -35,6 +33,8 @@ import io.github.toyota32k.media.lib.legacy.track.AudioTrack
 import io.github.toyota32k.media.lib.legacy.track.Muxer
 import io.github.toyota32k.media.lib.legacy.track.Track
 import io.github.toyota32k.media.lib.legacy.track.VideoTrack
+import io.github.toyota32k.media.lib.processor.Analyzer.analyze
+import io.github.toyota32k.media.lib.processor.contract.IConvertResult
 import io.github.toyota32k.media.lib.types.RangeMs
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
@@ -76,14 +76,6 @@ class Converter(
         // 両方のトラックが、デコーダーまでEOSになった後、NOPのまま待たされる時間の限界値
         private const val LIMIT_OF_PATIENCE = 15*1000L        // 15秒
         private const val MAX_RETRY_COUNT = 1000
-
-        fun analyze(file: IInputMediaFile) : Summary {
-            return try {
-                Summary.getSummary(file)
-            } catch(_:Throwable) {
-                Summary()
-            }
-        }
 
         fun checkReEncodingNecessity(file: IInputMediaFile, strategy: IVideoStrategy) : Boolean {
             val summary = analyze(file).videoSummary ?: return true // ソース情報が不明
@@ -578,27 +570,27 @@ class Converter(
         // endregion
     }
 
-    /**
-     * Awaiter
-     * IAwaiter(キャンセル可能な待ち合わせi/f)の実装クラス
-     */
-    private class Awaiter: IAwaiter<ConvertResult>, ICancellation {
-        override var isCancelled: Boolean = false
-        lateinit var deferred:Deferred<ConvertResult>
-
-        override fun cancel() {
-            isCancelled = true      // deferred.isCancelled の参照が遅いかも知れないので、自前でフラグを持っておく
-            deferred.cancel()
-        }
-
-        override suspend fun await(): ConvertResult {
-            return try {
-                deferred.await()
-            } catch(_:CancellationException) {
-                return ConvertResult.Companion.cancelled
-            }
-        }
-    }
+//    /**
+//     * Awaiter
+//     * IAwaiter(キャンセル可能な待ち合わせi/f)の実装クラス
+//     */
+//    private class Awaiter: IAwaiter<ConvertResult>, ICancellation {
+//        override var isCancelled: Boolean = false
+//        lateinit var deferred:Deferred<ConvertResult>
+//
+//        override fun cancel() {
+//            isCancelled = true      // deferred.isCancelled の参照が遅いかも知れないので、自前でフラグを持っておく
+//            deferred.cancel()
+//        }
+//
+//        override suspend fun await(): ConvertResult {
+//            return try {
+//                deferred.await()
+//            } catch(_:CancellationException) {
+//                return ConvertResult.cancelled()
+//            }
+//        }
+//    }
 
     /**
      * IProgress(進捗報告i/f)の実装クラス
@@ -817,17 +809,17 @@ class Converter(
 //        }
 //    }
 
-    @Deprecated("use execute()")
-    fun executeAsync(coroutineScope: CoroutineScope?=null):IAwaiter<ConvertResult> {
-        val cs = coroutineScope ?: CoroutineScope(Dispatchers.IO)
-
-        return Awaiter().apply {
-            deferred = cs.async {
-                executeCore(this@apply)
-            }
-        }
-    }
-
+//    @Deprecated("use execute()")
+//    fun executeAsync(coroutineScope: CoroutineScope?=null):IAwaiter<ConvertResult> {
+//        val cs = coroutineScope ?: CoroutineScope(Dispatchers.IO)
+//
+//        return Awaiter().apply {
+//            deferred = cs.async {
+//                executeCore(this@apply)
+//            }
+//        }
+//    }
+//
     private class Cancellation: ICancellation {
         override var isCancelled: Boolean = false
         lateinit var deferred:Deferred<ConvertResult>
@@ -863,10 +855,10 @@ class Converter(
                 }
             }.deferred.await()
         } catch(_:CancellationException) {
-            ConvertResult.Companion.cancelled
+            ConvertResult.cancelled(inPath)
         } catch(e:Throwable) {
             logger.error(e)
-            ConvertResult.Companion.error(e)
+            ConvertResult.error(inPath,e)
         } finally {
             cancellation = null
         }
@@ -914,7 +906,7 @@ class Converter(
                             }
                         }
                         if(cancellation.isCancelled) {
-                            ConvertResult.Companion.cancelled
+                            ConvertResult.cancelled(inPath)
                         } else {
                             if(audioTrack!=null) {
                                 // AudioTrack の SamplingRate が、コンバート中に書き変ることがあるので、最後に更新しておく。
@@ -925,14 +917,14 @@ class Converter(
                             report.setDurationInfo(trimmingRangeKeeper.trimmedDurationUs, videoTrack.extractor.naturalDurationUs, audioTrack?.extractor?.naturalDurationUs ?: 0L, muxer.naturalDurationUs)
                             logger.info(report.toString())
                             progress?.finish()
-                            ConvertResult.Companion.succeeded(outPath, requestedRangeList.list.map { RangeMs(it.startUs / 1000L, it.endUs / 1000L) }.outlineRange(report.input.duration),trimmingRangeKeeper, report)
+                            ConvertResult.succeeded(inPath, outPath, requestedRangeList.list.map { RangeMs(it.startUs / 1000L, it.endUs / 1000L) }.outlineRange(report.input.duration),trimmingRangeKeeper, report)
                         }
                     }
                 }}}
             }
             catch(e:Throwable) {
                 logger.stackTrace(e)
-                ConvertResult.Companion.error(e)
+                ConvertResult.error(inPath,e)
             }
             if(!result.succeeded && deleteOutputOnError) {
                 outPath.safeDelete()

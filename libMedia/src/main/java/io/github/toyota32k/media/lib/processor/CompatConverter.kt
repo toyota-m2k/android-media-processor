@@ -6,19 +6,20 @@ import android.net.Uri
 import io.github.toyota32k.logger.UtLog
 import io.github.toyota32k.media.lib.io.AndroidFile
 import io.github.toyota32k.media.lib.io.HttpInputFile
-import io.github.toyota32k.media.lib.types.IConvertResult
 import io.github.toyota32k.media.lib.io.IHttpStreamSource
 import io.github.toyota32k.media.lib.io.IInputMediaFile
 import io.github.toyota32k.media.lib.io.IOutputMediaFile
 import io.github.toyota32k.media.lib.processor.contract.IProgress
 import io.github.toyota32k.media.lib.types.Rotation
 import io.github.toyota32k.media.lib.format.ContainerFormat
+import io.github.toyota32k.media.lib.processor.contract.IConvertResult
 import io.github.toyota32k.media.lib.processor.contract.IExecutor
 import io.github.toyota32k.media.lib.processor.contract.IFormattable.Companion.dump
 import io.github.toyota32k.media.lib.utils.RangeUsListBuilder
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
+import io.github.toyota32k.media.lib.legacy.converter.ConvertResult
 import io.github.toyota32k.media.lib.types.RangeUs
 import io.github.toyota32k.media.lib.types.RangeUs.Companion.ms2us
 import kotlinx.coroutines.Dispatchers
@@ -41,13 +42,13 @@ class CompatConverter(
     override suspend fun execute(): IConvertResult {
         return withContext(Dispatchers.IO) {
             try {
-                processor.process(options).toConvertResult()
+                processor.process(options)
             } catch(e:Throwable) {
                 logger.error(e)
                 if (deleteOutputOnError) {
                     options.outPath.safeDelete()
                 }
-                ProcessorResult.error(e)
+                ConvertResult.error(options.inPath,e)
             }
         }
     }
@@ -174,6 +175,19 @@ class CompatConverter(
             optionBuilder.rotate(rotation)
         }
 
+        /**
+         * HDRが有効なVideoトラックを再エンコードするとき、出力コーデックで可能ならHDRを維持するProfileを選択する。
+         */
+        fun keepHDR(flag:Boolean=true) = apply {
+            optionBuilder.keepHDR(flag)
+        }
+
+        /**
+         * Videoトラックを同じコーデックで再エンコードするとき、Profile/Levelを入力ファイルに合わせる
+         */
+        fun keepVideoProfile(flag:Boolean=true) = apply {
+            optionBuilder.keepVideoProfile(flag)
+        }
 
         /**
          * 最大動画長を指定 (ms)
