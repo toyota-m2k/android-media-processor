@@ -17,12 +17,10 @@ class SoughtMap(val durationUs:Long, enabledRanges:List<RangeUs>) : ISoughtMap {
         if (it.endUs>0 && it.endUs<Long.MAX_VALUE) { it } else RangeUs(it.startUs, durationUs)
     }
 
-    fun put(requestUs:Long, actualUs:Long, presentationTimeUs:Long) {
-//        val sp = SoughtPosition(requestUs, actualUs, presentationTimeUs).apply {
-//            Processor.logger.debug("put: $this")
-//        }
-//        soughtPositionList.add(sp)
-        soughtPositionList.add(SoughtPosition(requestUs, actualUs, presentationTimeUs))
+    fun put(requestUs:Long, actualUs:Long, presentationTimeUs:Long, estimatedPresentationTimeUs:Long) {
+        val sp = SoughtPosition(requestUs, actualUs, presentationTimeUs, estimatedPresentationTimeUs-presentationTimeUs)
+        Processor.logger.debug(sp.toString())
+        soughtPositionList.add(sp)
     }
 
     override fun correctPositionUs(timeUs:Long):Long {
@@ -39,8 +37,11 @@ class SoughtMap(val durationUs:Long, enabledRanges:List<RangeUs>) : ISoughtMap {
         }
         if (prev!=null) {
 //            return prev.presentationTimeUs + ((timeUs-prev.requestUs) + (prev.requestUs-prev.actualUs)).coerceAtLeast(0)
-            Processor.logger.debug("presentationTime=${prev.presentationTimeUs.formatAsUs()} (delta=${(timeUs - prev.actualUs).formatAsUs()}) ofs=${(timeUs-prev.requestUs).formatAsUs()} corr=${(prev.requestUs-prev.actualUs).formatAsUs()} ... $prev")
-            return prev.presentationTimeUs + (timeUs - prev.actualUs).coerceAtLeast(0)
+//            Processor.logger.debug("presentationTime=${prev.presentationTimeUs.formatAsUs()} (delta=${(timeUs - prev.actualUs).formatAsUs()}) ofs=${(timeUs-prev.requestUs).formatAsUs()} corr=${(prev.requestUs-prev.actualUs).formatAsUs()} ... $prev")
+            val adjusted = prev.presentationTimeUs + (timeUs - prev.actualUs).coerceAtLeast(0)
+            val corrected = adjusted + prev.estimatedOffset
+            Processor.logger.debug("${adjusted.formatAsUs()}-->${corrected.formatAsUs()} (D=${prev.estimatedOffset})")
+            return corrected
         } else {
             return 0
         }

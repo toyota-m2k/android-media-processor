@@ -7,6 +7,7 @@ import io.github.toyota32k.media.lib.format.MetaData
 import io.github.toyota32k.media.lib.processor.contract.IBufferSource
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.types.RangeUs
+import io.github.toyota32k.media.lib.types.RangeUs.Companion.formatAsUs
 
 class NoReEncodeTrack(inPath:IInputMediaFile, inputMetaData:MetaData, maxDurationUs:Long, bufferSource: IBufferSource, report: Report, video:Boolean)
     : AbstractBaseTrack(inPath, inputMetaData, maxDurationUs, bufferSource, report,video) {
@@ -44,6 +45,8 @@ class NoReEncodeTrack(inPath:IInputMediaFile, inputMetaData:MetaData, maxDuratio
                 muxer.writeSampleData(video, buffer, bufferInfo)
                 presentationTimeUs = currentRangeStartPresentationTimeUs + extractor.sampleTime - currentRangeStartTimeUs
                 durationEstimator.update(presentationTimeUs, bufferInfo.size.toLong())
+//                logger.debug("presentationTime=${presentationTimeUs.formatAsUs()} / estimated=${durationEstimator.estimatedDurationUs.formatAsUs()}")
+
 //                presentationTimeUs = durationEstimator.estimatedDurationUs
                 extractor.advance()
             }

@@ -23,6 +23,11 @@ interface ITrack : Closeable {
     val presentationTimeUs: Long
 
     /**
+     * DurationEstimatorによって補正された再生時間
+     */
+    val estimatedPresentationTimeUs: Long
+
+    /**
      * 現在のRangeの先頭の出力動画の書き込み位置
      */
     val currentRangeStartPresentationTimeUs: Long

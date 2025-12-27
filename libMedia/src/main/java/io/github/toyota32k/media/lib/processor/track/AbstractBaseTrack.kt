@@ -20,8 +20,10 @@ abstract class AbstractBaseTrack(val inPath:IInputMediaFile, val inputMetaData: 
     override var presentationTimeUs:Long = 0L
     protected var currentRangeStartTimeUs: Long = 0L                        // startRange()でシークした入力動画上の再生位置
 
-    val durationEstimator = DurationEstimator()
+    protected val durationEstimator = DurationEstimator()
     override var currentRangeStartPresentationTimeUs: Long = 0L
+    override val estimatedPresentationTimeUs: Long get() = durationEstimator.estimatedDurationUs
+
 
     protected val buffer get() = bufferSource.buffer
     protected val bufferInfo get() = bufferSource.bufferInfo
