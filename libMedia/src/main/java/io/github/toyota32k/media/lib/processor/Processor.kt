@@ -6,6 +6,7 @@ import io.github.toyota32k.media.lib.internals.surface.RenderOption
 import io.github.toyota32k.media.lib.io.IInputMediaFile
 import io.github.toyota32k.media.lib.io.IOutputMediaFile
 import io.github.toyota32k.media.lib.legacy.converter.Converter
+import io.github.toyota32k.media.lib.legacy.converter.dump
 import io.github.toyota32k.media.lib.processor.contract.IActualSoughtMap
 import io.github.toyota32k.media.lib.processor.contract.ICancellable
 import io.github.toyota32k.media.lib.processor.contract.IConvertResult
@@ -13,6 +14,7 @@ import io.github.toyota32k.media.lib.processor.contract.IFormattable
 import io.github.toyota32k.media.lib.processor.contract.IProcessor
 import io.github.toyota32k.media.lib.processor.contract.IProcessorOptions
 import io.github.toyota32k.media.lib.processor.contract.IProgress
+import io.github.toyota32k.media.lib.processor.contract.ISoughtMap
 import io.github.toyota32k.media.lib.processor.contract.ITrack
 import io.github.toyota32k.media.lib.processor.contract.format3digits
 import io.github.toyota32k.media.lib.processor.optimizer.Optimizer
@@ -22,13 +24,11 @@ import io.github.toyota32k.media.lib.processor.track.TrackSelector
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
-import io.github.toyota32k.media.lib.types.ActualSoughtMapImpl
 import io.github.toyota32k.media.lib.types.RangeUs
-import io.github.toyota32k.media.lib.types.RangeUs.Companion.outlineRangeUs
 import io.github.toyota32k.media.lib.types.RangeUs.Companion.totalLengthUs
 import io.github.toyota32k.media.lib.types.RangeUs.Companion.us2ms
 import io.github.toyota32k.media.lib.types.Rotation
-import io.github.toyota32k.media.lib.legacy.converter.dump
+import io.github.toyota32k.media.lib.types.SoughtMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.Closeable
@@ -177,7 +177,7 @@ class Processor(
     /**
      * 指定範囲をextractorから読み出してmuxerに書き込む
      */
-    private fun extractRange(videoTrack: ITrack, audioTrack: ITrack, rangeUs: RangeUs, actualSoughtMap: ActualSoughtMapImpl) {
+    private fun extractRange(videoTrack: ITrack, audioTrack: ITrack, rangeUs: RangeUs, soughtMap: SoughtMap) {
         val posVideo = videoTrack.startRange(rangeUs.startUs)
         audioTrack.startRange(if(posVideo>=0) posVideo else rangeUs.startUs)
         while (!videoTrack.done || !audioTrack.done) {
@@ -196,27 +196,28 @@ class Processor(
         }
         videoTrack.endRange()
         audioTrack.endRange()
-        actualSoughtMap.addPosition(rangeUs.startUs, posVideo) // [rangeUs.start] = if(posVideo>=0) posVideo else rangeUs.start
+        soughtMap.put(rangeUs.startUs, posVideo, videoTrack.currentRangeStartPresentationTimeUs) // [rangeUs.start] = if(posVideo>=0) posVideo else rangeUs.start
     }
 
     /**
      * IProcessorResult の実装クラス
      */
     data class Result(
-        override val inputFile: IInputMediaFile?,
-        override val outputFile: IOutputMediaFile?,
-//        override val requestedRangeUs: RangeUs,
-        override val actualSoughtMap: IActualSoughtMap?,
-        override val report: Report?) : IConvertResult {
-        constructor(src:IConvertResult,
-            inputFile: IInputMediaFile? = src.inputFile,
-            outputFile: IOutputMediaFile? = src.outputFile,
-//            requestedRangeUs: RangeUs = src.requestedRangeUs,
-            actualSoughtMap: IActualSoughtMap? = src.actualSoughtMap,
-            report: Report? = src.report) : this(inputFile, outputFile, actualSoughtMap, report)
+        override val inputFile: IInputMediaFile,
+        override val outputFile: IOutputMediaFile,
+        override val soughtMap: ISoughtMap,
+        override val report: Report,
+    ) : IConvertResult {
+        constructor(src:Result,
+            inputFile: IInputMediaFile = src.inputFile,
+            outputFile: IOutputMediaFile = src.outputFile,
+            soughtMap: ISoughtMap = src.soughtMap,
+            report: Report = src.report) : this(inputFile, outputFile, soughtMap, report)
 
 //        override val requestedRangeMs: RangeMs
 //            get() = requestedRangeUs.toRangeMs()
+        @Deprecated("use soughtMap")
+        override val actualSoughtMap: IActualSoughtMap? = null
 
         // Resultクラスはコンバート成功の場合にしか使わない
         override val succeeded: Boolean = true
@@ -232,6 +233,8 @@ class Processor(
         override val exception: Throwable?,
         override val errorMessage: String? = null) : IConvertResult {
         override val outputFile: IOutputMediaFile? = null
+        override val soughtMap: ISoughtMap? = null
+        @Deprecated("use soughtMap")
         override val actualSoughtMap: IActualSoughtMap? = null
         override val report: Report? = null
         override val succeeded: Boolean = false
@@ -281,10 +284,10 @@ class Processor(
 
             // Extractorから要求された範囲を読み上げてMuxerへ書き込む
             val durationUs = trackSelector.inputMetaData.durationUs ?:Long.MAX_VALUE
-            val actualSoughtMapImpl = ActualSoughtMapImpl(durationUs, rangesUs.outlineRangeUs(durationUs))
+            val soughtMap = SoughtMap(durationUs, rangesUs)
             for (rangeUs in rangesUs) {
                 if (isCancelled) throw CancellationException()
-                extractRange(videoTrack, audioTrack, rangeUs, actualSoughtMapImpl)
+                extractRange(videoTrack, audioTrack, rangeUs, soughtMap)
             }
             // ファイナライズ
             videoTrack.finalize()
@@ -295,7 +298,7 @@ class Processor(
             report.sourceDurationUs = totalUs
             report.end()
 
-            return Result(inPath, outPath, actualSoughtMapImpl, report)
+            return Result(inPath, outPath, soughtMap, report)
         }
     }
 

@@ -11,6 +11,7 @@ object EmptyTrack : ITrack {
     override val isAvailable: Boolean = false
     override val done: Boolean = true
     override val presentationTimeUs: Long = 0L
+    override var currentRangeStartPresentationTimeUs: Long = 0L
     override fun setup(muxer: SyncMuxer) {}
     override fun startRange(startFromUS: Long): Long = startFromUS
     override fun endRange() {}

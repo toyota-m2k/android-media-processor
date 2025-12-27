@@ -25,10 +25,6 @@ abstract class AbstractEncodeTrack(inPath:IInputMediaFile, inputMetaData: MetaDa
     protected var eosEncoder:Boolean = false
     protected var noResponse: Boolean = false
 
-    protected var writtenPresentationTimeUs:Long = 0
-    protected var lastRangeEndPresentationTimeUs: Long = 0L
-    protected var currentRangeStartTimeUs: Long = 0L
-
     override val done: Boolean get() = !isAvailable || noResponse || (eosExtractor && eosDecoder && eosEncoder)
 
     override fun startRange(startFromUS: Long): Long {
@@ -36,10 +32,7 @@ abstract class AbstractEncodeTrack(inPath:IInputMediaFile, inputMetaData: MetaDa
         eosExtractor = false
         eosDecoder = false
         eosEncoder = false
-        lastRangeEndPresentationTimeUs = writtenPresentationTimeUs
-        return super.startRange(startFromUS).apply {
-            currentRangeStartTimeUs = this
-        }
+        return super.startRange(startFromUS)
     }
 
     /**
@@ -70,10 +63,12 @@ abstract class AbstractEncodeTrack(inPath:IInputMediaFile, inputMetaData: MetaDa
                 val sampleSize = extractor.readSampleData(inputBuffer, 0)
                 if (sampleSize > 0) {
                     logger.verbose { "Extractor: read ${sampleSize.format3digits()} bytes at ${presentationTimeUs.formatAsUs()}" }
-                    presentationTimeUs = lastRangeEndPresentationTimeUs + extractor.sampleTime - currentRangeStartTimeUs
                     bufferInfo.offset = 0
                     bufferInfo.size = sampleSize
                     decoder.queueInputBuffer(inputBufferIdx, 0, sampleSize, presentationTimeUs, extractor.sampleFlags)
+                    presentationTimeUs = currentRangeStartPresentationTimeUs + extractor.sampleTime - currentRangeStartTimeUs
+                    durationEstimator.update(currentRangeStartPresentationTimeUs + extractor.sampleTime - currentRangeStartTimeUs, sampleSize.toLong())
+
                     extractor.advance()
 //                    logger.debug("after : trackIndex=${findTrackIdx(video=true)} extractor=${extractor.sampleTrackIndex} size=${extractor.sampleSize} time=${extractor.sampleTime}")
                     extracted = true
@@ -183,9 +178,6 @@ abstract class AbstractEncodeTrack(inPath:IInputMediaFile, inputMetaData: MetaDa
                     }
                     logger.verbose {"Encoder: output:$index size=${bufferInfo.size} time=${bufferInfo.presentationTimeUs.formatAsUs()}"}
                     muxer.writeSampleData(video, encoder.getOutputBuffer(index)!!, bufferInfo)
-                    if(bufferInfo.presentationTimeUs>0) {
-                        writtenPresentationTimeUs = bufferInfo.presentationTimeUs
-                    }
                     encoder.releaseOutputBuffer(index, false)
 
                     // TextureRender#drawImage (GLES20.glClear) でハングする不具合を回避する

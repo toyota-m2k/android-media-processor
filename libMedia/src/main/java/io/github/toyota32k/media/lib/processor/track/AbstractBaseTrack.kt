@@ -10,6 +10,7 @@ import io.github.toyota32k.media.lib.processor.contract.IBufferSource
 import io.github.toyota32k.media.lib.processor.contract.ITrack
 import io.github.toyota32k.media.lib.types.RangeUs.Companion.formatAsUs
 import io.github.toyota32k.media.lib.report.Report
+import io.github.toyota32k.media.lib.utils.DurationEstimator
 
 /**
  * ITrack の共通・基底実装
@@ -17,6 +18,11 @@ import io.github.toyota32k.media.lib.report.Report
 abstract class AbstractBaseTrack(val inPath:IInputMediaFile, val inputMetaData: MetaData, val maxDurationUs:Long, val bufferSource: IBufferSource, val report: Report, val video:Boolean) : ITrack {
     private val rawExtractor = inPath.openExtractor()
     override var presentationTimeUs:Long = 0L
+    protected var currentRangeStartTimeUs: Long = 0L                        // startRange()でシークした入力動画上の再生位置
+
+    val durationEstimator = DurationEstimator()
+    override var currentRangeStartPresentationTimeUs: Long = 0L
+
     protected val buffer get() = bufferSource.buffer
     protected val bufferInfo get() = bufferSource.bufferInfo
     val extractor = rawExtractor.obj
@@ -57,8 +63,13 @@ abstract class AbstractBaseTrack(val inPath:IInputMediaFile, val inputMetaData: 
     override fun startRange(startFromUS:Long):Long {
         return if (isAvailable) {
             logger.info("Seek To ${startFromUS.formatAsUs()}")
+            currentRangeStartPresentationTimeUs = presentationTimeUs
+//            currentRangeStartPresentationTimeUs = durationEstimator.estimatedDurationUs
+//            logger.debug("startTimeUs = ${currentRangeStartPresentationTimeUs.formatAsUs()} / estimated=${durationEstimator.estimatedDurationUs.formatAsUs()} (diff=${(currentRangeStartPresentationTimeUs - durationEstimator.estimatedDurationUs).formatAsUs()}")
             extractor.seekTo(startFromUS, MediaExtractor.SEEK_TO_CLOSEST_SYNC)
-            extractor.sampleTime
+            extractor.sampleTime.apply {
+                currentRangeStartTimeUs = this
+            }
         } else -1
     }
 
