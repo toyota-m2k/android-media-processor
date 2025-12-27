@@ -18,9 +18,9 @@ interface IResultBase {
 interface IConvertResult : IResultBase {
     val inputFile: IInputMediaFile?
     val outputFile: IOutputMediaFile?
-    val actualSoughtMap: IActualSoughtMap?
-//    val requestedRangeMs: RangeMs
-//    val requestedRangeUs: RangeUs
+    val soughtMap: ISoughtMap?
     val report:Report?
+    @Deprecated("use soughtMap")
+    val actualSoughtMap: IActualSoughtMap?
 }
 

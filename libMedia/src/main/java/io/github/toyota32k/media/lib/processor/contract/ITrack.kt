@@ -22,7 +22,6 @@ interface ITrack : Closeable {
      */
     val presentationTimeUs: Long
 
-
     /**
      * trackをMuxerに接続して処理を開始する
      */

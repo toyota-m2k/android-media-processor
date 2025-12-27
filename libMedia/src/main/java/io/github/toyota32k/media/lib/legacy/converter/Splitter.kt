@@ -19,6 +19,7 @@ import io.github.toyota32k.media.lib.processor.contract.ICancellable
 import io.github.toyota32k.media.lib.processor.contract.IConvertResult
 import io.github.toyota32k.media.lib.processor.contract.IProgress
 import io.github.toyota32k.media.lib.processor.contract.IResultBase
+import io.github.toyota32k.media.lib.processor.contract.ISoughtMap
 import io.github.toyota32k.media.lib.types.RangeUs.Companion.ms2us
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.types.ActualSoughtMapImpl
@@ -374,7 +375,8 @@ class Splitter private constructor(
     /**
      * 分割結果（１ファイル）
      */
-    data class Result(override val succeeded:Boolean, override val inputFile: IInputMediaFile?, override val outputFile: IOutputMediaFile?, override val actualSoughtMap: IActualSoughtMap?, override val exception:Throwable?, override val errorMessage: String?, override val report: Report?=null): IConvertResult {
+    data class Result(override val succeeded:Boolean, override val inputFile: IInputMediaFile?, override val outputFile: IOutputMediaFile?, @Deprecated("use soughtMap") override val actualSoughtMap: IActualSoughtMap?, override val exception:Throwable?, override val errorMessage: String?, override val report: Report?=null): IConvertResult {
+        override val soughtMap: ISoughtMap? = null
         companion object {
             fun cancelled(inputFile: IInputMediaFile?) = Result(false, inputFile, null, null,CancellationException(), null)
             fun success(inputFile: IInputMediaFile?, outputFile: IOutputMediaFile, actualSoughtMap: IActualSoughtMap, report:Report) = Result(true, inputFile,  outputFile,  actualSoughtMap, null, null, report)

@@ -60,7 +60,7 @@ object Optimizer {
                 // Fast Start が処理しなかった（すでに最適化されている）場合は、作業ファイルをoutputにコピーする。
                 outputFile.copyFrom(workFile)
             }
-            return Processor.Result(processorResult, outputFile = outputFile)
+            return Processor.Result(processorResult as Processor.Result, outputFile = outputFile)
         } catch(e:Throwable) {
             if (e !is CancellationException) {
                 logger.error(e)

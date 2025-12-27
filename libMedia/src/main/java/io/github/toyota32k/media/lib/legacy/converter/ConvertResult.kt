@@ -4,6 +4,7 @@ import io.github.toyota32k.media.lib.io.IInputMediaFile
 import io.github.toyota32k.media.lib.io.IOutputMediaFile
 import io.github.toyota32k.media.lib.processor.contract.IActualSoughtMap
 import io.github.toyota32k.media.lib.processor.contract.IConvertResult
+import io.github.toyota32k.media.lib.processor.contract.ISoughtMap
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.types.RangeMs
 import io.github.toyota32k.media.lib.types.RangeUs
@@ -35,12 +36,14 @@ data class ConvertResult(
             return if(exception is CancellationException) cancelled(inputFile) else ConvertResult(false, inputFile, null, RangeMs.Companion.empty, null, null, false, errorMessage ?: exception.message, exception)
         }
     }
+    @Deprecated("use soughtMap")
     override val actualSoughtMap : IActualSoughtMap?
         get() = adjustedTrimmingRangeList as? IActualSoughtMap
 
     val requestedRangeUs: RangeUs
         get() = RangeUs.Companion.fromMs(requestedRangeMs)
 
+    override val soughtMap: ISoughtMap? = null
 
     // for debug log
     override fun toString(): String {

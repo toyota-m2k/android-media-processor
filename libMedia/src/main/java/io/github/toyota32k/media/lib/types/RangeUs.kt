@@ -1,6 +1,7 @@
 package io.github.toyota32k.media.lib.types
 
 import io.github.toyota32k.media.lib.utils.TimeSpan
+import kotlin.math.abs
 
 /**
  * US単位の時間範囲を保持するクラス
@@ -40,7 +41,7 @@ class RangeUs(val startUs:Long, val endUs:Long) {
 
         fun Long.formatAsUs(): String {
             return when {
-                this < 0 -> "(uav)"
+                this < 0 -> "-${(-this).formatAsUs()}"
                 this == Long.MAX_VALUE -> "(inf)"
                 else -> this.usToTimeSpan().formatAutoM()
             }
