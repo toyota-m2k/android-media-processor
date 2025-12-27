@@ -67,10 +67,7 @@ abstract class AbstractEncodeTrack(inPath:IInputMediaFile, inputMetaData: MetaDa
                     bufferInfo.size = sampleSize
                     decoder.queueInputBuffer(inputBufferIdx, 0, sampleSize, presentationTimeUs, extractor.sampleFlags)
                     presentationTimeUs = currentRangeStartPresentationTimeUs + extractor.sampleTime - currentRangeStartTimeUs
-                    durationEstimator.update(currentRangeStartPresentationTimeUs + extractor.sampleTime - currentRangeStartTimeUs, sampleSize.toLong())
-
                     extractor.advance()
-//                    logger.debug("after : trackIndex=${findTrackIdx(video=true)} extractor=${extractor.sampleTrackIndex} size=${extractor.sampleSize} time=${extractor.sampleTime}")
                     extracted = true
                 } else {
                     // 本来は、↑の idx < 0 でチェックしているので、ここには入らないはず。

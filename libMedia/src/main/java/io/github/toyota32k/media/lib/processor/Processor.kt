@@ -179,7 +179,6 @@ class Processor(
      */
     private fun extractRange(videoTrack: ITrack, audioTrack: ITrack, rangeUs: RangeUs, soughtMap: SoughtMap) {
         val posVideo = videoTrack.startRange(rangeUs.startUs)
-        val estimatedPresentationTimeUs = videoTrack.estimatedPresentationTimeUs    // 範囲開始時点の補正値を退避しておく
 
         audioTrack.startRange(if(posVideo>=0) posVideo else rangeUs.startUs)
         while (!videoTrack.done || !audioTrack.done) {
@@ -198,7 +197,7 @@ class Processor(
         }
         videoTrack.endRange()
         audioTrack.endRange()
-        soughtMap.put(rangeUs.startUs, posVideo, videoTrack.currentRangeStartPresentationTimeUs, estimatedPresentationTimeUs) // [rangeUs.start] = if(posVideo>=0) posVideo else rangeUs.start
+        soughtMap.put(rangeUs.startUs, posVideo, videoTrack.currentRangeStartPresentationTimeUs) // [rangeUs.start] = if(posVideo>=0) posVideo else rangeUs.start
     }
 
     /**

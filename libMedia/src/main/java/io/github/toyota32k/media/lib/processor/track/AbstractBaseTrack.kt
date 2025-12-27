@@ -3,14 +3,13 @@ package io.github.toyota32k.media.lib.processor.track
 import android.media.MediaExtractor
 import android.media.MediaFormat
 import io.github.toyota32k.logger.UtLog
-import io.github.toyota32k.media.lib.io.IInputMediaFile
 import io.github.toyota32k.media.lib.format.MetaData
+import io.github.toyota32k.media.lib.io.IInputMediaFile
 import io.github.toyota32k.media.lib.processor.Processor
 import io.github.toyota32k.media.lib.processor.contract.IBufferSource
 import io.github.toyota32k.media.lib.processor.contract.ITrack
-import io.github.toyota32k.media.lib.types.RangeUs.Companion.formatAsUs
 import io.github.toyota32k.media.lib.report.Report
-import io.github.toyota32k.media.lib.utils.DurationEstimator
+import io.github.toyota32k.media.lib.types.RangeUs.Companion.formatAsUs
 
 /**
  * ITrack の共通・基底実装
@@ -18,11 +17,8 @@ import io.github.toyota32k.media.lib.utils.DurationEstimator
 abstract class AbstractBaseTrack(val inPath:IInputMediaFile, val inputMetaData: MetaData, val maxDurationUs:Long, val bufferSource: IBufferSource, val report: Report, val video:Boolean) : ITrack {
     private val rawExtractor = inPath.openExtractor()
     override var presentationTimeUs:Long = 0L
-    protected var currentRangeStartTimeUs: Long = 0L                        // startRange()でシークした入力動画上の再生位置
-
-    protected val durationEstimator = DurationEstimator()
     override var currentRangeStartPresentationTimeUs: Long = 0L
-    override val estimatedPresentationTimeUs: Long get() = durationEstimator.estimatedDurationUs
+    protected var currentRangeStartTimeUs: Long = 0L                        // startRange()でシークした入力動画上の再生位置
 
 
     protected val buffer get() = bufferSource.buffer
