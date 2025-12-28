@@ -5,10 +5,8 @@ import android.media.MediaExtractor
 import android.media.MediaFormat
 import android.media.MediaMuxer
 import io.github.toyota32k.logger.UtLog
-import io.github.toyota32k.media.lib.types.IConvertResult
 import io.github.toyota32k.media.lib.io.IInputMediaFile
 import io.github.toyota32k.media.lib.io.IOutputMediaFile
-import io.github.toyota32k.media.lib.types.IResultBase
 import io.github.toyota32k.media.lib.types.Rotation
 import io.github.toyota32k.media.lib.types.RangeMs.Companion.outlineRange
 import io.github.toyota32k.media.lib.legacy.converter.TrimmingRangeList.Companion.toRangeMsList
@@ -18,12 +16,16 @@ import io.github.toyota32k.media.lib.format.getDuration
 import io.github.toyota32k.media.lib.misc.ISO6709LocationParser
 import io.github.toyota32k.media.lib.processor.contract.IActualSoughtMap
 import io.github.toyota32k.media.lib.processor.contract.ICancellable
+import io.github.toyota32k.media.lib.processor.contract.IConvertResult
 import io.github.toyota32k.media.lib.processor.contract.IProgress
+import io.github.toyota32k.media.lib.processor.contract.IResultBase
+import io.github.toyota32k.media.lib.processor.contract.ISoughtMap
 import io.github.toyota32k.media.lib.types.RangeUs.Companion.ms2us
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.types.ActualSoughtMapImpl
 import io.github.toyota32k.media.lib.types.RangeMs
 import io.github.toyota32k.media.lib.types.RangeUs
+import io.github.toyota32k.media.lib.types.RangeUs.Companion.outlineRangeUs
 import io.github.toyota32k.utils.UtLazyResetableValue
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -83,9 +85,8 @@ class Splitter private constructor(
     private val abortOnError:Boolean,
     private val rotation: Rotation?,
     private val bufferSize:Int,
-    private val actualSoughtMap: ActualSoughtMapImpl = ActualSoughtMapImpl(),
     onProgress : ((IProgress)->Unit)?
-    ) : IActualSoughtMap by actualSoughtMap, IMultiChopper {
+    ) : IMultiChopper {
     companion object {
         val logger = UtLog("Splitter", Converter.logger, Splitter::class.java)
         const val DEFAULT_BUFFER_SIZE:Int = 8 * 1024 * 1024     // 8MB ... 1MB だと extractor.readSampleData() で InvalidArgumentException が発生
@@ -317,7 +318,7 @@ class Splitter private constructor(
     /**
      * 指定範囲をextractorから読み出してmuxerに書き込む
      */
-    private fun extractRange(videoTrack:TrackInfo, audioTrack:TrackInfo, rangeUs:RangeUs) {
+    private fun extractRange(videoTrack:TrackInfo, audioTrack:TrackInfo, rangeUs:RangeUs, actualSoughtMap: ActualSoughtMapImpl) {
         val posVideo = videoTrack.initialSeek(rangeUs.startUs)
         audioTrack.initialSeek(if(posVideo>=0) posVideo else rangeUs.startUs)
         while (!videoTrack.done || !audioTrack.done) {
@@ -341,7 +342,7 @@ class Splitter private constructor(
     /**
      * 指定範囲をファイルに出力
      */
-    private fun extractRangesToFile(inPath: IInputMediaFile, inputMetaData:MetaData, outPath: IOutputMediaFile, rangesUs:List<RangeUs>, report:Report) {
+    private fun extractRangesToFile(inPath: IInputMediaFile, inputMetaData:MetaData, outPath: IOutputMediaFile, rangesUs:List<RangeUs>, report:Report, actualSoughtMap: ActualSoughtMapImpl) {
         if (isCancelled) throw CancellationException("not started")
         Closeables().use { closer ->
             // Extractorの準備
@@ -363,7 +364,7 @@ class Splitter private constructor(
 
             // Extractorから要求された範囲を読み上げてMuxerへ書き込む
             for (rangeUs in rangesUs) {
-                extractRange(videoTrack, audioTrack, rangeUs)
+                extractRange(videoTrack, audioTrack, rangeUs, actualSoughtMap)
             }
             // ファイナライズ
             muxer.stop()
@@ -374,11 +375,12 @@ class Splitter private constructor(
     /**
      * 分割結果（１ファイル）
      */
-    data class Result(override val succeeded:Boolean, override val outputFile: IOutputMediaFile?, override val requestedRangeMs: RangeMs, override val actualSoughtMap: IActualSoughtMap?, override val exception:Throwable?, override val errorMessage: String?, override val report: Report?=null): IConvertResult {
+    data class Result(override val succeeded:Boolean, override val inputFile: IInputMediaFile?, override val outputFile: IOutputMediaFile?, @Deprecated("use soughtMap") override val actualSoughtMap: IActualSoughtMap?, override val exception:Throwable?, override val errorMessage: String?, override val report: Report?=null): IConvertResult {
+        override val soughtMap: ISoughtMap? = null
         companion object {
-            val cancelled = Result(false, null, RangeMs.empty, null,CancellationException(), null)
-            fun success(outputFile: IOutputMediaFile, requestedRangeMs: RangeMs, actualSoughtMap: IActualSoughtMap, report:Report) = Result(true, outputFile, requestedRangeMs, actualSoughtMap, null, null, report)
-            fun error(e:Throwable, msg:String?=null) = Result(false, null, RangeMs.empty, null, e, msg)
+            fun cancelled(inputFile: IInputMediaFile?) = Result(false, inputFile, null, null,CancellationException(), null)
+            fun success(inputFile: IInputMediaFile?, outputFile: IOutputMediaFile, actualSoughtMap: IActualSoughtMap, report:Report) = Result(true, inputFile,  outputFile,  actualSoughtMap, null, null, report)
+            fun error(inputFile: IInputMediaFile?, e:Throwable, msg:String?=null) = Result(false, inputFile,null, null, e, msg)
         }
     }
 
@@ -437,18 +439,17 @@ class Splitter private constructor(
      * @return Result
      */
     suspend fun trim(inPath: IInputMediaFile, outPath: IOutputMediaFile, startMs: Long, endMs:Long): IConvertResult {
-        actualSoughtMap.clear()
         isCancelled = false
         return withContext(Dispatchers.IO) {
             val metaData = MetaData.fromFile(inPath)
-            actualSoughtMap.setDurationMs(metaData.duration ?: Long.MAX_VALUE)
-            val actualEndMs = if (endMs>=0) endMs else actualSoughtMap.durationMs
-            if (startMs<0 || actualEndMs<=startMs) return@withContext Result.error(IllegalArgumentException("invalid range: $startMs-$actualEndMs"))
+            val actualSoughtMap = ActualSoughtMapImpl(metaData.durationUs ?: Long.MAX_VALUE, RangeUs(startMs.ms2us(), endMs.ms2us()))
+            val actualEndMs = if (endMs>=0) endMs else metaData.duration ?: Long.MAX_VALUE
+            if (startMs<0 || actualEndMs<=startMs) return@withContext Result.error(inPath,IllegalArgumentException("invalid range: $startMs-$actualEndMs"))
             try {
                 progress.setTotalMs(if (actualEndMs==Long.MAX_VALUE) -1L else actualEndMs-startMs)
                 val report = Report().apply { start() }
-                extractRangesToFile(inPath, metaData, outPath, listOf(RangeUs.fromMs(startMs, actualEndMs)), report)
-                Result.success(outPath, RangeMs(startMs, actualEndMs), detachActualSoughtMap(), report.apply { end() })
+                extractRangesToFile(inPath, metaData, outPath, listOf(RangeUs.fromMs(startMs, actualEndMs)), report, actualSoughtMap)
+                Result.success(inPath,outPath, actualSoughtMap, report.apply { end() })
             } catch (e:Throwable) {
                 if (e !is CancellationException) {
                     logger.error(e)
@@ -456,7 +457,7 @@ class Splitter private constructor(
                 if (deleteOutputOnError) {
                     outPath.safeDelete()
                 }
-                Result.error(e)
+                Result.error(inPath, e)
             } finally {
                 resetBuffer()
             }
@@ -472,22 +473,21 @@ class Splitter private constructor(
      * @return Result
      */
     suspend fun trim(inPath: IInputMediaFile, outPath: IOutputMediaFile, ranges: List<RangeMs>): IConvertResult {
-        actualSoughtMap.clear()
         isCancelled = false
         return withContext(Dispatchers.IO) {
-            if (ranges.isEmpty()) return@withContext Result.error(IllegalArgumentException("ranges is empty"))
+            if (ranges.isEmpty()) return@withContext Result.error(inPath,IllegalArgumentException("ranges is empty"))
             val metaData = MetaData.fromFile(inPath)
-            actualSoughtMap.setDurationMs(metaData.duration ?: Long.MAX_VALUE)
+            val actualSoughtMap = ActualSoughtMapImpl(metaData.durationUs ?: Long.MAX_VALUE, ranges.map { RangeUs.fromMs(it) }.outlineRangeUs(metaData.duration ?: Long.MAX_VALUE))
             progress.setTotalMs( ranges.fold(0L) { acc, range ->
                 if (acc<0) return@fold -1
-                val actualEnd = if (range.endMs<0||range.endMs==Long.MAX_VALUE) actualSoughtMap.durationMs else range.endMs
+                val actualEnd = if (range.endMs<0||range.endMs==Long.MAX_VALUE) metaData.duration ?: Long.MAX_VALUE else range.endMs
                 if (actualEnd == Long.MAX_VALUE) -1
                 else acc + (actualEnd - range.startMs)
             })
             try {
                 val report = Report().apply { start() }
-                extractRangesToFile(inPath, metaData, outPath, ranges.map { RangeUs.fromMs(it) }, report)
-                Result.success(outPath, ranges.outlineRange(metaData.duration ?: Long.MAX_VALUE),detachActualSoughtMap(), report.apply { end() })
+                extractRangesToFile(inPath, metaData, outPath, ranges.map { RangeUs.fromMs(it) }, report, actualSoughtMap)
+                Result.success(inPath,outPath, actualSoughtMap, report.apply { end() })
             } catch (e:Throwable) {
                 if (e !is CancellationException) {
                     logger.error(e)
@@ -495,7 +495,7 @@ class Splitter private constructor(
                 if (deleteOutputOnError) {
                     outPath.safeDelete()
                 }
-                Result.error(e)
+                Result.error(inPath,e)
             } finally {
                 resetBuffer()
             }
@@ -511,22 +511,23 @@ class Splitter private constructor(
      * @return Result
      */
     suspend fun chop(inPath: IInputMediaFile, out1Path: IOutputMediaFile, out2Path: IOutputMediaFile, atTimeMs:Long) : List<IConvertResult> {
-        actualSoughtMap.clear()
         isCancelled = false
         return withContext(Dispatchers.IO) {
-            if (atTimeMs<=0L) return@withContext listOf(Result.error(IllegalArgumentException("invalid time: $atTimeMs")))
+            if (atTimeMs<=0L) return@withContext listOf(Result.error(inPath,IllegalArgumentException("invalid time: $atTimeMs")))
             val metaData = MetaData.fromFile(inPath)
-            actualSoughtMap.setDurationMs(metaData.duration ?: Long.MAX_VALUE)
+//            actualSoughtMap.setDurationMs(metaData.duration ?: Long.MAX_VALUE)
             try {
                 progress.setTotalMs( metaData.duration?:-1L )
                 val report1 = Report().apply { start() }
-                extractRangesToFile(inPath, metaData, out1Path, listOf(RangeUs.fromMs(0L,atTimeMs)), report1)
+                val actualSoughtMap1 = ActualSoughtMapImpl(metaData.durationUs?:Long.MAX_VALUE, RangeUs.fromMs(0L,atTimeMs))
+                extractRangesToFile(inPath, metaData, out1Path, listOf(RangeUs.fromMs(0L,atTimeMs)), report1, actualSoughtMap1)
+
                 val report2 = Report().apply { start() }
-                extractRangesToFile(inPath, metaData, out2Path, listOf(RangeUs.fromMs(atTimeMs, Long.MAX_VALUE)), report2)
-                val map = detachActualSoughtMap()
+                val actualSoughtMap2 = ActualSoughtMapImpl(metaData.durationUs?:Long.MAX_VALUE, RangeUs.fromMs(atTimeMs, metaData.duration ?: Long.MAX_VALUE))
+                extractRangesToFile(inPath, metaData, out2Path, listOf(RangeUs.fromMs(atTimeMs, Long.MAX_VALUE)), report2, actualSoughtMap2)
                 listOf(
-                    Result.success(out1Path, RangeMs(0L, atTimeMs),map, report1),
-                    Result.success(out2Path, RangeMs(atTimeMs, metaData.duration ?: Long.MAX_VALUE), map, report2))
+                    Result.success(inPath,out1Path, actualSoughtMap1, report1),
+                    Result.success(inPath,out2Path, actualSoughtMap2, report2))
             } catch (e:Throwable) {
                 if (e !is CancellationException) {
                     logger.error(e)
@@ -535,7 +536,7 @@ class Splitter private constructor(
                     out1Path.safeDelete()
                     out2Path.safeDelete()
                 }
-                return@withContext listOf(Result.error(e), Result.error(e))
+                return@withContext listOf(Result.error(inPath,e), Result.error(inPath,e))
             } finally {
                 resetBuffer()
             }
@@ -556,12 +557,12 @@ class Splitter private constructor(
             results.add(result)
         }
 
-        fun cancel(): MultiResult = apply {
-            add(Result.cancelled)
+        fun cancel(inPath: IInputMediaFile?): MultiResult = apply {
+            add(Result.cancelled(inPath))
         }
 
-        fun error(e: Throwable, msg: String? = null): MultiResult = apply {
-            add(Result.error(e,msg))
+        fun error(inPath:IInputMediaFile?, e: Throwable, msg: String? = null): MultiResult = apply {
+            add(Result.error(inPath,e,msg))
         }
     }
 
@@ -575,7 +576,6 @@ class Splitter private constructor(
      */
     override suspend fun chop(inputFile: IInputMediaFile, positionMsList: List<Long>, outputFileSelector: IOutputFileSelector): IMultiSplitResult {
         val results = MultiResult()
-        actualSoughtMap.clear()
         isCancelled = false
 
         // outputFileSelector.initializeByRanges()用に positionMsList を RangeMsリストに変換
@@ -588,37 +588,38 @@ class Splitter private constructor(
         }
         rangeMsList.add(RangeMs(start, 0))
         if (!outputFileSelector.initialize(rangeMsList)) {
-            return results.cancel()
+            return results.cancel(inputFile)
         }
 
         return withContext(Dispatchers.IO) {
             try {
                 val metaData = MetaData.fromFile(inputFile)
                 val count = positionMsList.size
+
                 for (i in 0..count) {
-                    actualSoughtMap.setDurationMs(metaData.duration ?: Long.MAX_VALUE)
                     val toTimeMs = if (i < count) positionMsList[i] else Long.MAX_VALUE
                     val fromTimeMs = if (i > 0) positionMsList[i - 1] else 0L
                     val outPath = outputFileSelector.selectOutputFile(i, fromTimeMs)
                     if (outPath == null) {
                         // cancelled
-                        results.cancel()
+                        results.cancel(inputFile)
                         break
                     }
                     try {
                         progress.setTotalMs(metaData.duration ?: -1L)
+                        val actualSoughtMap = ActualSoughtMapImpl(metaData.durationUs ?: Long.MAX_VALUE, RangeUs.fromMs(fromTimeMs, toTimeMs))
                         val report = Report().apply { start() }
-                        extractRangesToFile(inputFile,metaData, outPath, listOf(RangeUs.fromMs(fromTimeMs, toTimeMs)), report)
-                        results.add(Result.success(outPath, RangeMs(fromTimeMs, toTimeMs), detachActualSoughtMap(), report.apply { end()}))
+                        extractRangesToFile(inputFile,metaData, outPath, listOf(RangeUs.fromMs(fromTimeMs, toTimeMs)), report, actualSoughtMap)
+                        results.add(Result.success(inputFile,outPath,  actualSoughtMap, report.apply { end()}))
                     } catch (e: Throwable) {
                         if (deleteOutputOnError) {
                             outPath.safeDelete()
                         }
                         if (e is CancellationException) {
-                            results.cancel()
+                            results.cancel(inputFile)
                             break
                         } else {
-                            results.error(e)
+                            results.error(inputFile, e)
                             if (abortOnError) {
                                 break
                             }
@@ -629,7 +630,7 @@ class Splitter private constructor(
                 results
             } catch (e: Throwable) {
                 logger.error(e)
-                results.error(e)
+                results.error(inputFile, e)
             } finally {
                 resetBuffer()
                 outputFileSelector.terminate()
@@ -640,11 +641,11 @@ class Splitter private constructor(
     /**
      * ActualSoughtMap を切り離して取得する。
      */
-    fun detachActualSoughtMap(): IActualSoughtMap {
-        val map = actualSoughtMap.clone()
-        actualSoughtMap.clear()
-        return map
-    }
+//    fun detachActualSoughtMap(): IActualSoughtMap {
+//        val map = actualSoughtMap.clone()
+//        actualSoughtMap.clear()
+//        return map
+//    }
 }
 
 /**
@@ -700,8 +701,8 @@ class TrimSplitter(
             mSplitterBuilder.rotate(rotation)
         }
 
-        fun build(): TrimSplitter? {
-            val trimmingRangeList = mTrimmingRangeListBuilder.build()?.list ?: return null
+        fun build(): TrimSplitter {
+            val trimmingRangeList = mTrimmingRangeListBuilder.build().list
             return TrimSplitter(mSplitterBuilder, mAbortOnError, trimmingRangeList, mOnProgress)
         }
     }
@@ -731,14 +732,14 @@ class TrimSplitter(
             acc + range.lengthMs(duration)
         }
         if (!outputFileSelector.initialize(rangeMsList)) {
-            return result.cancel()
+            return result.cancel(inputFile)
         }
         var index = 0
         val convProgress = ConvertSplitter.ConvertProgress(totalLengthMs * 1000)
         for (range in rangeMsList) {
             val output = outputFileSelector.selectOutputFile(index, range.startMs)
             if (output == null) {
-                result.cancel()
+                result.cancel(inputFile)
                 break
             }
             index++
@@ -754,14 +755,14 @@ class TrimSplitter(
                 .build()
             this.splitter = splitter
             if (cancelled) {
-                result.cancel()
+                result.cancel(inputFile)
                 break
             }
             val trimmingRangeList = TrimmingRangeList.Builder(trimmingRangeList)
                 .startFromMs(range.startMs)
                 .endAtMs(range.endMs)
-                .build() ?: continue
-//                .list.toRangeMsList()
+                .build()
+
             val ranges = trimmingRangeList.list.toRangeMsList()
             val splitResult = splitter.trim(inputFile, output, ranges)
             result.add (splitResult)
@@ -793,7 +794,7 @@ class TrimSplitter(
 
         val result = Splitter.MultiResult()
         if (!outputFileSelector.initialize(rangeList)) {
-            return result.cancel()
+            return result.cancel(inputFile)
         }
         val totalRangeMs = rangeList.fold(0L) { acc, range ->
             acc + range.lengthMs(duration)
@@ -803,7 +804,7 @@ class TrimSplitter(
         for (range in rangeList) {
             val output = outputFileSelector.selectOutputFile(index, range.startMs)
             if (output==null) {
-                result.cancel()
+                result.cancel(inputFile)
                 break
             }
             index++
@@ -819,7 +820,7 @@ class TrimSplitter(
                 .build()
             this.splitter = splitter
             if (cancelled) {
-                result.cancel()
+                result.cancel(inputFile)
                 break
             }
             val splitResult = splitter.trim(inputFile, output, range.startMs, range.endMs)

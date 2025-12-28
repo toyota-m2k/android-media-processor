@@ -1,6 +1,7 @@
 package io.github.toyota32k.media.lib.types
 
 import io.github.toyota32k.media.lib.utils.TimeSpan
+import kotlin.math.abs
 
 /**
  * US単位の時間範囲を保持するクラス
@@ -40,7 +41,7 @@ class RangeUs(val startUs:Long, val endUs:Long) {
 
         fun Long.formatAsUs(): String {
             return when {
-                this < 0 -> "(uav)"
+                this < 0 -> "-${(-this).formatAsUs()}"
                 this == Long.MAX_VALUE -> "(inf)"
                 else -> this.usToTimeSpan().formatAutoM()
             }
@@ -78,10 +79,16 @@ class RangeUs(val startUs:Long, val endUs:Long) {
             }
         }
 
+        /**
+         * range list の先頭と末端を返す
+         *
+         * @param durationUs ソース動画の総再生時間 (endUs が不定の場合に使用)
+         * @return RangeUs
+         */
         fun List<RangeUs>.outlineRangeUs(durationUs: Long): RangeUs {
             if (this.isEmpty()) return RangeUs(0L, 0L)
             val start = this.minOf { it.startUs }
-            val end = this.maxOf { it.startUs + it.lengthUs(durationUs) }
+            val end = this.maxOf { it.actualEndUs(durationUs) }
             return RangeUs(start, end)
         }
     }

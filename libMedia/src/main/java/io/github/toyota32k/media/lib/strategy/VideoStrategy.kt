@@ -280,7 +280,7 @@ open class VideoStrategy(
      */
     @Suppress("unused")
     fun calcSize(width:Int, height:Int) : Size {
-        return calcVideoSize(width, height, sizeCriteria ?: throw IllegalStateException("sizeCriteria is null."))
+        return calcVideoSize(width, height, sizeCriteria)
     }
 
     data class SizeCriteria(val shortSide:Int, val longSide:Int)

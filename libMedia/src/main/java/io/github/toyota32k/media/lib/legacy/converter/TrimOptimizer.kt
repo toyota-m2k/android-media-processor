@@ -4,10 +4,8 @@ import android.content.Context
 import android.graphics.Rect
 import android.net.Uri
 import io.github.toyota32k.media.lib.io.AndroidFile
-import io.github.toyota32k.media.lib.types.ConvertResult
 import io.github.toyota32k.media.lib.processor.optimizer.FastStart
 import io.github.toyota32k.media.lib.io.HttpInputFile
-import io.github.toyota32k.media.lib.types.IConvertResult
 import io.github.toyota32k.media.lib.io.IHttpStreamSource
 import io.github.toyota32k.media.lib.io.IInputMediaFile
 import io.github.toyota32k.media.lib.io.IOutputMediaFile
@@ -16,6 +14,7 @@ import io.github.toyota32k.media.lib.legacy.converter.TrimmingRangeList.Companio
 import io.github.toyota32k.media.lib.io.toAndroidFile
 import io.github.toyota32k.media.lib.format.ContainerFormat
 import io.github.toyota32k.media.lib.processor.contract.ICancellable
+import io.github.toyota32k.media.lib.processor.contract.IConvertResult
 import io.github.toyota32k.media.lib.processor.contract.IMultiPhaseProgress
 import io.github.toyota32k.media.lib.processor.contract.IProgress
 import io.github.toyota32k.media.lib.processor.optimizer.OptimizingProcessorPhase
@@ -308,7 +307,7 @@ class TrimOptimizer(
                     prevResult
                 } catch(e:Throwable) {
                     logger.error(e)
-                    ConvertResult.Companion.error(e)
+                    ConvertResult.Companion.error(prevResult.inputFile, e)
                 }
             }
         }
@@ -347,7 +346,7 @@ class TrimOptimizer(
             }
             fastStartInfo?.fastStart(converted) ?: converted
         } catch(e:Throwable) {
-            ConvertResult.Companion.error(e)
+            ConvertResult.error(converterBuilder.properties.inPath, e)
         } finally {
             fastStartInfo?.dispose()
             fastStartInfo = null
@@ -365,7 +364,7 @@ class TrimOptimizer(
         val converter = converterBuilder.build()
         cancellable = converter
         if (cancelled) {
-            return ConvertResult.Companion.cancelled
+            return ConvertResult.cancelled(converterBuilder.properties.inPath)
         }
         return try {
             converter.execute()
@@ -390,7 +389,7 @@ class TrimOptimizer(
             .build()
         cancellable = splitter
         if (cancelled) {
-            return ConvertResult.Companion.cancelled
+            return ConvertResult.cancelled(converterBuilder.properties.inPath)
         }
 
         val trimmingRangeList = converterBuilder.properties.trimmingRangeListBuilder.build()

@@ -1,7 +1,10 @@
 package io.github.toyota32k.media.lib.legacy.converter
 
 import io.github.toyota32k.media.lib.types.RangeMs
+import io.github.toyota32k.media.lib.types.RangeUs
 import io.github.toyota32k.media.lib.types.RangeUs.Companion.us2ms
+import kotlin.collections.maxOf
+import kotlin.collections.minOf
 import kotlin.math.min
 
 class TrimmingRangeKeeper(val trimmingRangeList: ITrimmingRangeList = TrimmingRangeList()): ITrimmingRangeKeeper, ITrimmingRangeList by trimmingRangeList {
@@ -15,6 +18,14 @@ class TrimmingRangeKeeper(val trimmingRangeList: ITrimmingRangeList = TrimmingRa
         map.putAll(actualSoughtMap)
     }
     override val entries: Set<Map.Entry<Long, Long>> get() = actualSoughtMap.entries
+
+    override val outlineRangeUs: RangeUs
+        get() {
+            if (trimmingRangeList.list.isEmpty()) return RangeUs(0L, 0L)
+            val start = trimmingRangeList.list.minOf { it.startUs }
+            val end = trimmingRangeList.list.maxOf { it.actualEndUs }
+            return RangeUs(start, end)
+        }
 
     override fun adjustedRangeList(ranges:List<RangeMs>) : ITrimmingRangeList {
         if (naturalDurationUs<0) throw IllegalStateException("call closeBy() in advance.")

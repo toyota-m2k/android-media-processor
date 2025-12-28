@@ -3,10 +3,17 @@ package io.github.toyota32k.media.lib.processor.contract
 import io.github.toyota32k.media.lib.legacy.converter.ITrimmingRangeList
 import io.github.toyota32k.media.lib.legacy.converter.TrimmingRangeList
 import io.github.toyota32k.media.lib.types.RangeMs
+import io.github.toyota32k.media.lib.types.RangeUs
 import io.github.toyota32k.media.lib.types.RangeUs.Companion.ms2us
 import io.github.toyota32k.media.lib.types.RangeUs.Companion.us2ms
 
 interface IActualSoughtMap {
+    /**
+     * map の有効範囲
+     * requestedRangeUs
+     */
+    val outlineRangeUs: RangeUs
+
     /**
      * 切り取り位置の補正
      * splitAtMs や startMs で指定した位置と実際に切り取られた位置（キーフレーム位置）は異なる可能性がある。

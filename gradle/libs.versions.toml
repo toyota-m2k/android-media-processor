@@ -13,10 +13,10 @@ espressoCore = "3.7.0"
 coreKtx = "1.17.0"
 activityKtx = "1.12.2"
 constraintLayout = "2.2.1"
-androidUtilities = "4.10.1"
-androidBinding = "1.11.0"    # for sample only
-androidDialog = "6.3.2"     # for sample only
-androidPlayer = "4.1.0"     # for sample only
+androidUtilities = "4.11.0"
+androidBinding = "1.12.0"    # for sample only
+androidDialog = "6.3.3"     # for sample only
+androidPlayer = "4.2.0"     # for sample only
 documentfile = "1.1.0"     # for sample only
 
 [libraries]

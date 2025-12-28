@@ -1,16 +1,20 @@
 package io.github.toyota32k.media.lib.processor.optimizer
 
 import io.github.toyota32k.media.lib.io.AndroidFile
-import io.github.toyota32k.media.lib.types.ConvertResult
-import io.github.toyota32k.media.lib.processor.optimizer.FastStart
 import io.github.toyota32k.media.lib.io.toAndroidFile
 import io.github.toyota32k.media.lib.processor.DerivedProcessorOptions.Companion.derive
 import io.github.toyota32k.media.lib.processor.contract.IProgress
 import io.github.toyota32k.media.lib.processor.Processor
 import io.github.toyota32k.media.lib.processor.contract.IMultiPhaseProgress
+import io.github.toyota32k.media.lib.processor.contract.IProcessor
 import io.github.toyota32k.media.lib.processor.contract.IProcessorOptions
+import kotlinx.coroutines.CancellationException
 import java.io.File
 
+/**
+ * FastStartを呼ぶための作業ファイル関連の処理を隠蔽するヘルパークラス
+ * 通常は Processor.execute() 内で利用され、直接このクラスを利用することはない。
+ */
 object Optimizer {
     val logger = Processor.logger
 
@@ -34,7 +38,7 @@ object Optimizer {
         }
     }
 
-    fun optimize(processor:Processor, processorOptions: IProcessorOptions, optimizeOptions: OptimizerOptions): Processor.Result {
+    fun optimize(processor: IProcessor, processorOptions: IProcessorOptions, optimizeOptions: OptimizerOptions): Processor.Result {
         val workFile:AndroidFile = File.createTempFile("ame", ".tmp", optimizeOptions.applicationContext.cacheDir).toAndroidFile()
         try {
             val outputFile: AndroidFile = processorOptions.outPath as? AndroidFile ?: throw IllegalStateException("output file must be AndroidFile.")
@@ -48,20 +52,19 @@ object Optimizer {
             val processorResult = processor.process(derivedProcessorOptions)
 
             // Fast Start
+            progressCallback?.invoke(multiProgress.updatePhase(OptimizingProcessorPhase.OPTIMIZING))
             val result = FastStart.process(workFile, outputFile, optimizeOptions.moveFreeAtom) { p: IProgress ->
                 progressCallback?.invoke(multiProgress.updateProgress(p))
             }
             if (!result) {
                 // Fast Start が処理しなかった（すでに最適化されている）場合は、作業ファイルをoutputにコピーする。
-                try {
-                    outputFile.copyFrom(workFile)
-                } catch (e: Throwable) {
-                    logger.error(e)
-                    ConvertResult.error(e)
-                }
+                outputFile.copyFrom(workFile)
             }
-            return Processor.Result(processorResult, outputFile)
+            return Processor.Result(processorResult as Processor.Result, outputFile = outputFile)
         } catch(e:Throwable) {
+            if (e !is CancellationException) {
+                logger.error(e)
+            }
             throw e
         } finally {
             workFile.safeDelete()

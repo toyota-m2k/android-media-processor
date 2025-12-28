@@ -1,33 +1,34 @@
 package io.github.toyota32k.media.lib.processor
 
 import io.github.toyota32k.logger.UtLog
-import io.github.toyota32k.media.lib.types.ActualSoughtMapImpl
-import io.github.toyota32k.media.lib.types.ConvertResult
-import io.github.toyota32k.media.lib.legacy.converter.Converter
-import io.github.toyota32k.media.lib.processor.contract.IActualSoughtMap
-import io.github.toyota32k.media.lib.types.IConvertResult
+import io.github.toyota32k.media.lib.format.ContainerFormat
+import io.github.toyota32k.media.lib.internals.surface.RenderOption
 import io.github.toyota32k.media.lib.io.IInputMediaFile
 import io.github.toyota32k.media.lib.io.IOutputMediaFile
-import io.github.toyota32k.media.lib.processor.contract.IProgress
-import io.github.toyota32k.media.lib.types.Rotation
-import io.github.toyota32k.media.lib.format.ContainerFormat
+import io.github.toyota32k.media.lib.legacy.converter.Converter
+import io.github.toyota32k.media.lib.legacy.converter.dump
+import io.github.toyota32k.media.lib.processor.contract.IActualSoughtMap
 import io.github.toyota32k.media.lib.processor.contract.ICancellable
-import io.github.toyota32k.media.lib.processor.contract.IProcessorOptions
+import io.github.toyota32k.media.lib.processor.contract.IConvertResult
 import io.github.toyota32k.media.lib.processor.contract.IFormattable
-import io.github.toyota32k.media.lib.processor.contract.format3digits
-import io.github.toyota32k.media.lib.processor.optimizer.OptimizerOptions
-import io.github.toyota32k.media.lib.processor.optimizer.Optimizer
+import io.github.toyota32k.media.lib.processor.contract.IProcessor
+import io.github.toyota32k.media.lib.processor.contract.IProcessorOptions
+import io.github.toyota32k.media.lib.processor.contract.IProgress
+import io.github.toyota32k.media.lib.processor.contract.ISoughtMap
 import io.github.toyota32k.media.lib.processor.contract.ITrack
+import io.github.toyota32k.media.lib.processor.contract.format3digits
+import io.github.toyota32k.media.lib.processor.optimizer.Optimizer
+import io.github.toyota32k.media.lib.processor.optimizer.OptimizerOptions
 import io.github.toyota32k.media.lib.processor.track.SyncMuxer
 import io.github.toyota32k.media.lib.processor.track.TrackSelector
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
-import io.github.toyota32k.media.lib.internals.surface.RenderOption
 import io.github.toyota32k.media.lib.types.RangeUs
-import io.github.toyota32k.media.lib.types.RangeUs.Companion.outlineRangeUs
 import io.github.toyota32k.media.lib.types.RangeUs.Companion.totalLengthUs
 import io.github.toyota32k.media.lib.types.RangeUs.Companion.us2ms
+import io.github.toyota32k.media.lib.types.Rotation
+import io.github.toyota32k.media.lib.types.SoughtMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.Closeable
@@ -40,7 +41,7 @@ import kotlin.math.min
 class Processor(
     val containerFormat: ContainerFormat = ContainerFormat.MPEG_4,
     val bufferSize:Int = DEFAULT_BUFFER_SIZE,
-) : ICancellable, IFormattable {
+) : IProcessor, ICancellable, IFormattable {
     companion object {
         val logger = UtLog("PRC", Converter.logger, this::class.java)
         const val DEFAULT_BUFFER_SIZE:Int = 8 * 1024 * 1024     // 8MB ... 1MB だと extractor.readSampleData() で InvalidArgumentException が発生
@@ -176,8 +177,9 @@ class Processor(
     /**
      * 指定範囲をextractorから読み出してmuxerに書き込む
      */
-    private fun extractRange(videoTrack: ITrack, audioTrack: ITrack, rangeUs: RangeUs, actualSoughtMap: ActualSoughtMapImpl) {
+    private fun extractRange(videoTrack: ITrack, audioTrack: ITrack, rangeUs: RangeUs, soughtMap: SoughtMap) {
         val posVideo = videoTrack.startRange(rangeUs.startUs)
+
         audioTrack.startRange(if(posVideo>=0) posVideo else rangeUs.startUs)
         while (!videoTrack.done || !audioTrack.done) {
             if (isCancelled) {
@@ -195,26 +197,48 @@ class Processor(
         }
         videoTrack.endRange()
         audioTrack.endRange()
-        actualSoughtMap.addPosition(rangeUs.startUs, posVideo) // [rangeUs.start] = if(posVideo>=0) posVideo else rangeUs.start
+        soughtMap.put(rangeUs.startUs, posVideo, videoTrack.currentRangeStartPresentationTimeUs) // [rangeUs.start] = if(posVideo>=0) posVideo else rangeUs.start
     }
 
     /**
-     *
+     * IProcessorResult の実装クラス
      */
     data class Result(
-        val outputFile: IOutputMediaFile?,
-        val requestedRangeUs: RangeUs,
-        val actualSoughtMap: IActualSoughtMap?,
-        val report: Report) {
+        override val inputFile: IInputMediaFile,
+        override val outputFile: IOutputMediaFile,
+        override val soughtMap: ISoughtMap,
+        override val report: Report,
+    ) : IConvertResult {
         constructor(src:Result,
-            outputFile: IOutputMediaFile? = src.outputFile,
-            requestedRangeUs: RangeUs = src.requestedRangeUs,
-            actualSoughtMap: IActualSoughtMap? = src.actualSoughtMap,
-            report: Report = src.report) : this(outputFile, requestedRangeUs, actualSoughtMap, report)
+            inputFile: IInputMediaFile = src.inputFile,
+            outputFile: IOutputMediaFile = src.outputFile,
+            soughtMap: ISoughtMap = src.soughtMap,
+            report: Report = src.report) : this(inputFile, outputFile, soughtMap, report)
 
-        fun toConvertResult(): IConvertResult {
-            return ProcessorResult.success(this)
+//        override val requestedRangeMs: RangeMs
+//            get() = requestedRangeUs.toRangeMs()
+        @Deprecated("use soughtMap")
+        override val actualSoughtMap: IActualSoughtMap? = null
+
+        // Resultクラスはコンバート成功の場合にしか使わない
+        override val succeeded: Boolean = true
+        override val exception: Throwable? = null
+        override val errorMessage: String? = null
+
+        override fun toString(): String {
+            return dump()
         }
+    }
+    data class ErrorResult(
+        override val inputFile: IInputMediaFile?,
+        override val exception: Throwable?,
+        override val errorMessage: String? = null) : IConvertResult {
+        override val outputFile: IOutputMediaFile? = null
+        override val soughtMap: ISoughtMap? = null
+        @Deprecated("use soughtMap")
+        override val actualSoughtMap: IActualSoughtMap? = null
+        override val report: Report? = null
+        override val succeeded: Boolean = false
     }
 
     // endregion
@@ -231,9 +255,9 @@ class Processor(
      * @param rotation 回転
      * @param renderOption RenderOption
      */
-    fun process(inPath: IInputMediaFile, outPath: IOutputMediaFile, rangesUs:List<RangeUs>, limitDurationUs:Long, rotation:Rotation?, renderOption:RenderOption?, videoStrategy: IVideoStrategy, audioStrategy: IAudioStrategy, onProgress:((IProgress)->Unit)?):Result {
+    fun process(inPath: IInputMediaFile, outPath: IOutputMediaFile, rangesUs:List<RangeUs>, limitDurationUs:Long, rotation:Rotation?, renderOption:RenderOption?, videoStrategy: IVideoStrategy, audioStrategy: IAudioStrategy, onProgress:((IProgress)->Unit)?): IConvertResult {
         progress = ProgressHandler(onProgress)
-        val actualSoughtMapImpl = ActualSoughtMapImpl()
+
         val report = Report().apply {
             start()
             updateVideoStrategyName(videoStrategy.name)
@@ -260,9 +284,11 @@ class Processor(
             progress.initialize(if (limitDurationUs>0) min(limitDurationUs, totalUs) else totalUs, videoTrack.isAvailable, audioTrack.isAvailable)
 
             // Extractorから要求された範囲を読み上げてMuxerへ書き込む
+            val durationUs = trackSelector.inputMetaData.durationUs ?:Long.MAX_VALUE
+            val soughtMap = SoughtMap(durationUs, rangesUs)
             for (rangeUs in rangesUs) {
                 if (isCancelled) throw CancellationException()
-                extractRange(videoTrack, audioTrack, rangeUs, actualSoughtMapImpl)
+                extractRange(videoTrack, audioTrack, rangeUs, soughtMap)
             }
             // ファイナライズ
             videoTrack.finalize()
@@ -273,14 +299,14 @@ class Processor(
             report.sourceDurationUs = totalUs
             report.end()
 
-            return Result(outPath, rangesUs.outlineRangeUs(report.sourceDurationUs), actualSoughtMapImpl, report)
+            return Result(inPath, outPath, soughtMap, report)
         }
     }
 
     /**
      * optionsにしたがって変換を実行
      */
-    fun process(options: IProcessorOptions):Result {
+    override fun process(options: IProcessorOptions): IConvertResult {
         return process(options.inPath, options.outPath, options.rangesUs, options.limitDurationUs, options.rotation, options.renderOption, options.videoStrategy, options.audioStrategy, options.onProgress)
     }
 
@@ -290,12 +316,12 @@ class Processor(
     suspend fun execute(processorOptions: IProcessorOptions, deleteOutputOnError:Boolean=true): IConvertResult {
         return withContext(Dispatchers.IO) {
             try {
-                process(processorOptions).toConvertResult()
+                process(processorOptions)
             } catch (e: Throwable) {
                 if (deleteOutputOnError) {
                     processorOptions.outPath.safeDelete()
                 }
-                ConvertResult.error(e)
+                ErrorResult(processorOptions.inPath, e)
             }
         }
     }
@@ -303,15 +329,19 @@ class Processor(
     /**
      * process()の後、fast start を実行
      */
-    suspend fun execute(processorOptions:IProcessorOptions, optimizeOption: OptimizerOptions, deleteOutputOnError:Boolean=true): IConvertResult {
+    suspend fun execute(processorOptions:IProcessorOptions, optimizeOption: OptimizerOptions?, deleteOutputOnError:Boolean=true): IConvertResult {
+        if (optimizeOption==null) {
+            // 最適化しない
+            return execute(processorOptions, deleteOutputOnError)
+        }
         return withContext(Dispatchers.IO) {
             try {
-                Optimizer.optimize(this@Processor, processorOptions, optimizeOption).toConvertResult()
+                Optimizer.optimize(this@Processor, processorOptions, optimizeOption)
             } catch (e: Throwable) {
                 if (deleteOutputOnError) {
                     processorOptions.outPath.safeDelete()
                 }
-                ConvertResult.error(e)
+                ErrorResult(processorOptions.inPath, e)
             }
         }
     }

@@ -10,9 +10,9 @@ import kotlin.math.max
  * その程度は誤差としてネグってもよいかもしれないが、それまでに書き込んだバイト数から比例計算で類推するようにしてみた。
  */
 class DurationEstimator {
-    var durationUs: Long = 0L
-    var previousSize = 0L
-    var lastSize: Long = 0L
+    private var durationUs: Long = 0L
+    private var previousSize = 0L
+    private var lastSize: Long = 0L
 
     fun update(currentTimeUs: Long, bufferSize: Long) {
         durationUs = max(durationUs, currentTimeUs)

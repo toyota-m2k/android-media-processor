@@ -2,13 +2,11 @@ package io.github.toyota32k.media.lib.types
 
 import io.github.toyota32k.media.lib.legacy.converter.ITrimmingRangeList
 import io.github.toyota32k.media.lib.processor.contract.IActualSoughtMap
+import io.github.toyota32k.media.lib.types.RangeUs.Companion.us2ms
 
-class ActualSoughtMapImpl : IActualSoughtMap {
+class ActualSoughtMapImpl(val durationUs:Long, override val outlineRangeUs: RangeUs) : IActualSoughtMap {
     // 位置補正情報
     private var actualSoughtMap = mutableMapOf<Long,Long>()
-    var durationMs:Long = 0L
-        private set
-
     /**
      * 切り取り位置の補正
      * splitAtMs や startMs で指定した位置と実際に切り取られた位置（キーフレーム位置）は異なる可能性がある。
@@ -29,25 +27,20 @@ class ActualSoughtMapImpl : IActualSoughtMap {
      * ConvertResult#adjustedTrimmingRangeList と型互換
      */
     override fun adjustedRangeList(ranges: List<RangeMs>): ITrimmingRangeList {
-        return super.adjustedRangeList(durationMs, ranges)
+        return super.adjustedRangeList(durationUs.us2ms(), ranges)
     }
-    fun setDurationMs(durationMs:Long) {
-        this.durationMs = durationMs
-    }
-    fun addPosition(at:Long, pos:Long) {
+    fun addPosition(atUs:Long, posUs:Long) {
 //        actualSoughtMap[rangeUs.start] = if(posVideo>=0) posVideo else rangeUs.start
-        actualSoughtMap[at] = if(pos>=0) pos else at
+        actualSoughtMap[atUs] = if(posUs>=0) posUs else atUs
     }
 
     fun clear() {
         actualSoughtMap.clear()
-        durationMs = 0L
     }
 
     fun clone(): ActualSoughtMapImpl {
-        return ActualSoughtMapImpl().also { copy ->
+        return ActualSoughtMapImpl(durationUs, outlineRangeUs).also { copy ->
             copy.actualSoughtMap.putAll(actualSoughtMap)
-            copy.durationMs = durationMs
         }
     }
 }

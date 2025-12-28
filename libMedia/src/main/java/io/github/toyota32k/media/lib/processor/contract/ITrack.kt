@@ -22,6 +22,10 @@ interface ITrack : Closeable {
      */
     val presentationTimeUs: Long
 
+    /**
+     * 現在のRangeの先頭の出力動画の書き込み位置
+     */
+    val currentRangeStartPresentationTimeUs: Long
 
     /**
      * trackをMuxerに接続して処理を開始する
