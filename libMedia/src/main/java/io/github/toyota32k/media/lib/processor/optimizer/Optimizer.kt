@@ -23,9 +23,11 @@ object Optimizer {
         override var total: Long = 0L
         override var current: Long = 0L
         override var remainingTime: Long = 0L
+        override var valueUnit: IProgress.ValueUnit = IProgress.ValueUnit.US
 
         fun updatePhase(phase: OptimizingProcessorPhase) = apply {
             this.phase = phase
+            valueUnit = if (phase == OptimizingProcessorPhase.OPTIMIZING) IProgress.ValueUnit.BYTES else IProgress.ValueUnit.US
             total = 0L
             current = 0L
             remainingTime = 0L

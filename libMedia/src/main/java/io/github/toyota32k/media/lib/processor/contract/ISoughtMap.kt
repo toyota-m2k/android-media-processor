@@ -4,6 +4,7 @@ import io.github.toyota32k.media.lib.types.RangeUs.Companion.formatAsUs
 
 data class SoughtPosition(val requestUs:Long, val actualUs:Long, val presentationTimeUs:Long) {
     override fun toString(): String {
+
         return "req=${requestUs.formatAsUs()}, act=${actualUs.formatAsUs()}, diff=${(requestUs-actualUs).formatAsUs()} at ${presentationTimeUs.formatAsUs()}"
     }
 }

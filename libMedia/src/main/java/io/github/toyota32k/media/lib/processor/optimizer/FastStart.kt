@@ -188,6 +188,7 @@ object FastStart {
     }
 
     private class Progress(override var total: Long, val callback:((IProgress)->Unit)?) : IProgress {
+        override val valueUnit: IProgress.ValueUnit = IProgress.ValueUnit.BYTES
         override var current: Long = 0L
         override val remainingTime: Long = 0L
 

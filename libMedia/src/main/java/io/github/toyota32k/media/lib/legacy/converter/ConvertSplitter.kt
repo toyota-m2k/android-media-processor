@@ -163,6 +163,7 @@ class ConvertSplitter(
     }
 
     class ConvertProgress(override val total: Long) : IProgress {
+        override val valueUnit = IProgress.ValueUnit.US
         override val current: Long // in us
             get () = previousDuration + currentInPart
         val initialTIme = System.currentTimeMillis()

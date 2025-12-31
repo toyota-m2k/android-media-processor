@@ -26,13 +26,13 @@ import io.github.toyota32k.media.lib.strategy.IAudioStrategy
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
 import io.github.toyota32k.media.lib.types.RangeUs
 import io.github.toyota32k.media.lib.types.RangeUs.Companion.totalLengthUs
-import io.github.toyota32k.media.lib.types.RangeUs.Companion.us2ms
 import io.github.toyota32k.media.lib.types.Rotation
 import io.github.toyota32k.media.lib.types.SoughtMap
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.Closeable
 import kotlin.coroutines.cancellation.CancellationException
+import kotlin.math.max
 import kotlin.math.min
 
 /**
@@ -123,9 +123,10 @@ class Processor(
             get() = min(if(videoAvailable) videoLength else Long.MAX_VALUE, if(audioAvailable) audioLength else Long.MAX_VALUE)
         override var remainingTime: Long = -1L
             private set
+        override val valueUnit: IProgress.ValueUnit = IProgress.ValueUnit.US
 
         fun initialize(totalUs:Long, video:Boolean, audio:Boolean) {
-            total = totalUs.us2ms()
+            total = totalUs
             videoLength = 0L
             audioLength = 0L
             videoAvailable = video
@@ -133,14 +134,22 @@ class Processor(
         }
 
         private fun updateRemainingTime() {
-            if (percentage>10) {
-                remainingTime = (System.currentTimeMillis() - startTick) * (100 - percentage) / percentage
+            val elapsedTime = System.currentTimeMillis() - startTick
+            if (elapsedTime>1000 && percentage>1) {
+                if (percentage<5) {
+                    // 最初のうちは誤差が大きいので、未加工で表示
+                    remainingTime = elapsedTime * (100 - percentage) / percentage
+                } else {
+                    // ある程度進めば、安定するはずなので、進捗が後戻りしないようにする。
+                    remainingTime = min(elapsedTime * (100 - percentage) / percentage, remainingTime)
+                }
             }
         }
 
         fun updateVideoUs(videoUs:Long) {
             val prev = current
-            videoLength = videoUs.us2ms()
+            videoLength = max(videoLength, videoUs)
+            videoLength += videoUs
             if (prev!=current && total>0 && total!=Long.MAX_VALUE) {
                 updateRemainingTime()
                 onProgress?.invoke(this)
@@ -149,7 +158,8 @@ class Processor(
 
         fun updateAudioUs(audioUs:Long) {
             val prev = current
-            audioLength = audioUs.us2ms()
+            audioLength = max(audioLength, audioUs)
+            audioLength += audioUs
             if (prev!=current) {
                 updateRemainingTime()
                 onProgress?.invoke(this)

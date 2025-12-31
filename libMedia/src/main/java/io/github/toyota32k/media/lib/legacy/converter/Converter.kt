@@ -602,6 +602,8 @@ class Converter(
                 return if(onProgress!=null) Progress(trimmingRangeList, onProgress) else null
             }
         }
+
+        override val valueUnit: IProgress.ValueUnit = IProgress.ValueUnit.US
         private data class DealtEntry(val position:Long, val tick:Long)
         val statistics = RingBuffer<DealtEntry>(ENTRY_COUNT)
         var audioProgressInUs: Long = 0L
@@ -632,6 +634,7 @@ class Converter(
                 override var total: Long = 0,
                 override var current: Long = 0,
                 override var remainingTime: Long = 0): IProgress {
+                override val valueUnit: IProgress.ValueUnit = IProgress.ValueUnit.US
                 fun update(progress: IProgress) {
                     total = progress.total
                     current = progress.current

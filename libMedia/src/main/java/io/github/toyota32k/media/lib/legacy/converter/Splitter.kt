@@ -398,6 +398,7 @@ class Splitter private constructor(
             get() = min(videoLength, audioLength)
         override var remainingTime: Long = -1L
             private set
+        override val valueUnit: IProgress.ValueUnit = IProgress.ValueUnit.US
 
         fun setTotalMs(totalMs:Long) {
             total = totalMs
