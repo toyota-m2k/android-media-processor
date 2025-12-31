@@ -24,10 +24,12 @@ class SoughtMap(val durationUs:Long, enabledRanges:List<RangeUs>) : ISoughtMap {
         enabledRanges.firstOrNull { it.startUs <= timeUs && timeUs <= it.endUs } ?: return -1
         var prev:SoughtPosition? = null
         for (s in soughtPositionList) {
-//            if (timeUs == s.requestUs) {
-//                return s.presentationTimeUs + (s.requestUs-s.actualUs).coerceAtLeast(0)
-//            }
-            if (timeUs <= s.requestUs) {
+            if (timeUs == s.requestUs) {
+                // 要求位置がSoughtMapと完全一致
+                return s.presentationTimeUs + (s.requestUs-s.actualUs).coerceAtLeast(0)
+            }
+            else if (timeUs < s.requestUs) {
+                // 要求位置が１つ前の区間に含まれている
                 break
             }
             prev = s
