@@ -48,7 +48,6 @@ import io.github.toyota32k.media.lib.processor.optimizer.FastStart
 import io.github.toyota32k.media.lib.types.RangeMs
 import io.github.toyota32k.media.lib.types.Rotation
 import io.github.toyota32k.media.lib.legacy.converter.Splitter
-import io.github.toyota32k.media.lib.processor.contract.format
 import io.github.toyota32k.media.lib.io.toAndroidFile
 import io.github.toyota32k.media.lib.format.Codec
 import io.github.toyota32k.media.lib.format.getHeight
@@ -246,7 +245,6 @@ class MainActivity : UtMortalActivity() {
                         updatePlayerSource()
                     }
                 }
-                true
             }
         }
 
@@ -265,7 +263,6 @@ class MainActivity : UtMortalActivity() {
                         updatePlayerSource()
                     }
                 }
-                true
             }
         }
         val selectOutputFile2Command = LiteUnitCommand {
@@ -283,7 +280,6 @@ class MainActivity : UtMortalActivity() {
                         updatePlayerSource()
                     }
                 }
-                true
             }
         }
 
