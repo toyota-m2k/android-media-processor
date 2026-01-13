@@ -52,6 +52,6 @@ interface IInputMediaFile : IMediaFile {
 interface IOutputMediaFile : IMediaFile {
     fun openMuxer(format:ContainerFormat): CloseableMuxer
     fun delete()
-    fun safeDelete() = runCatching { delete() }
+    fun safeDelete()
 }
 
