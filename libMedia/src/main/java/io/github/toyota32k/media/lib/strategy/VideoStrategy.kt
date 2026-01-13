@@ -104,9 +104,23 @@ open class VideoStrategy(
     }
 
     override fun createOutputFormat(inputFormat: MediaFormat, metaData: MetaData, encoder: MediaCodec, renderOption: RenderOption): MediaFormat {
-        // bitRate は、MediaFormat に含まれず、MetaDataにのみ含まれるケースがあるようなので、
-        // 両方をチェックするようにしてみた。
-        val bitRate = this.bitRate.value(inputFormat.bitRate, metaData.bitRate)
+        val inCodec = Codec.fromFormat(inputFormat)
+        // Cropping によるピクセル数減少がビットレート低減に寄与する比率 (理想値の70%程度とする）
+        val cropFactor = (renderOption.matrixProvider.scaleRatio * 1.4f).coerceIn(0.3f, 1.0f)
+
+        val inBR = inputFormat.bitRate ?: metaData.bitRate
+        val bitRate = if (this.codec == Codec.HEVC && inCodec == Codec.AVC) {
+            // HEVC->AVC なら最大ビットレートを、AVCの 70% とする
+            val br = if (inBR != null) (inBR.toFloat() * 0.7f * cropFactor).toInt() else null
+            this.bitRate.value(br)
+        } else if (inCodec == Codec.AVC && this.codec == Codec.HEVC) {
+            // AVC->HEVC なら最大ビットレートを、HEVCの 1.4倍 (1/0.7) とする
+            val br = if (inBR != null) (inBR.toFloat() * 1.4f * cropFactor).toInt() else null
+            this.bitRate.value(br)
+        } else {
+            val br = if (inBR != null) (inBR.toFloat() * cropFactor).toInt() else null
+            this.bitRate.value(br)
+        }
         val frameRate = this.frameRate.value(inputFormat.frameRate, metaData.frameRate)
         val iFrameInterval = this.iFrameInterval.value(inputFormat.iFrameInterval)
         val bitRateMode = this.bitRateMode

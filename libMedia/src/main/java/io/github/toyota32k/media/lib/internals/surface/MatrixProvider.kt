@@ -7,6 +7,7 @@ import android.util.Size
 interface IMatrixProvider {
     fun createMatrix(output:FloatArray)
     fun getOutputVideoSize(inputWidth:Int, inputHeight:Int): Size
+    val scaleRatio:Float
 }
 
 // 動画全体をそのまま出力するための単位マトリックス
@@ -17,6 +18,8 @@ object IdentityMatrixProvider : IMatrixProvider {
     override fun getOutputVideoSize(inputWidth:Int, inputHeight:Int): Size {
         return Size(inputWidth, inputHeight)
     }
+
+    override val scaleRatio: Float = 1f
 
     override fun toString(): String {
         return "NoCrop"
@@ -29,6 +32,9 @@ class MatrixProvider(val videoWidth:Int, val videoHeight:Int, val cropX: Int, va
         const val MIN_OUTPUT_VIDEO_WIDTH = 100
         const val MIN_OUTPUT_VIDEO_HEIGHT = 100
     }
+
+    override val scaleRatio: Float
+        get() = (cropWidth*cropHeight).toFloat()/(videoWidth*videoHeight).toFloat()
 
     override fun createMatrix(output:FloatArray) {
         // スケール

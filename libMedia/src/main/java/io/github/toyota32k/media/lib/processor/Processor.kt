@@ -149,7 +149,6 @@ class Processor(
         fun updateVideoUs(videoUs:Long) {
             val prev = current
             videoLength = max(videoLength, videoUs)
-            videoLength += videoUs
             if (prev!=current && total>0 && total!=Long.MAX_VALUE) {
                 updateRemainingTime()
                 onProgress?.invoke(this)
@@ -159,8 +158,7 @@ class Processor(
         fun updateAudioUs(audioUs:Long) {
             val prev = current
             audioLength = max(audioLength, audioUs)
-            audioLength += audioUs
-            if (prev!=current) {
+            if (prev!=current && total>0 && total!=Long.MAX_VALUE) {
                 updateRemainingTime()
                 onProgress?.invoke(this)
             }
