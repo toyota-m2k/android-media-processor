@@ -1,7 +1,6 @@
 [versions]
 #plugins
-kotlin = "2.3.0"
-agp = "8.13.2"
+agp = "9.0.0"
 
 #libraries
 appcompat = "1.7.1"
@@ -37,6 +36,5 @@ android-player = { module = "com.github.toyota-m2k:android-media-player", versio
 documentfile = { group = "androidx.documentfile", name = "documentfile", version.ref = "documentfile" }
 
 [plugins]
-jetbrains-kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 android-application = { id = "com.android.application", version.ref = "agp" }
 android-library = { id = "com.android.library", version.ref = "agp" }
