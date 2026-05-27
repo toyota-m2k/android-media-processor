@@ -8,6 +8,7 @@ import io.github.toyota32k.media.lib.processor.Processor
 import io.github.toyota32k.media.lib.processor.contract.IMultiPhaseProgress
 import io.github.toyota32k.media.lib.processor.contract.IProcessor
 import io.github.toyota32k.media.lib.processor.contract.IProcessorOptions
+import io.github.toyota32k.media.lib.strategy.PresetVideoStrategies
 import kotlinx.coroutines.CancellationException
 import java.io.File
 
@@ -18,14 +19,14 @@ import java.io.File
 object Optimizer {
     val logger = Processor.logger
 
-    private class MultiPhaseProgress(override val phaseCount: Int) : IMultiPhaseProgress<OptimizingProcessorPhase> {
+    private class MultiPhaseProgress(override val phaseCount: Int) : IMultiPhaseProgress {
         override var phase = OptimizingProcessorPhase.CONVERTING
         override var total: Long = 0L
         override var current: Long = 0L
         override var remainingTime: Long = 0L
         override var valueUnit: IProgress.ValueUnit = IProgress.ValueUnit.US
 
-        fun updatePhase(phase: OptimizingProcessorPhase) = apply {
+        fun updatePhase(phase: IMultiPhaseProgress.IPhase) = apply {
             this.phase = phase
             valueUnit = if (phase == OptimizingProcessorPhase.OPTIMIZING) IProgress.ValueUnit.BYTES else IProgress.ValueUnit.US
             total = 0L
@@ -50,7 +51,8 @@ object Optimizer {
                  progressCallback?.invoke(multiProgress.updateProgress(it))
             }
             // Convert
-            progressCallback?.invoke(multiProgress.updatePhase(OptimizingProcessorPhase.CONVERTING))
+            val firstPhase = if (derivedProcessorOptions.videoStrategy == PresetVideoStrategies.InvalidStrategy) OptimizingProcessorPhase.SPLITTING else OptimizingProcessorPhase.CONVERTING
+            progressCallback?.invoke(multiProgress.updatePhase(firstPhase))
             val processorResult = processor.process(derivedProcessorOptions)
 
             // Fast Start

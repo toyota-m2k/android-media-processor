@@ -37,21 +37,20 @@ class TrimOptimizer(
     private val removeFreeOnFastStart:Boolean,
     private val workDirectory:File?,
     private val forceConvert:Boolean,
-    private val progressCallback:((IMultiPhaseProgress<OptimizingProcessorPhase>)->Unit)?): ICancellable {
+    private val progressCallback:((IMultiPhaseProgress)->Unit)?): ICancellable {
     companion object {
         val logger = Converter.logger
     }
-    class MultiPhaseProgress(override val phaseCount: Int) : IMultiPhaseProgress<OptimizingProcessorPhase> {
-        override var phase = OptimizingProcessorPhase.CONVERTING
+    class MultiPhaseProgress(override val phaseCount: Int) : IMultiPhaseProgress {
+        override var phase = OptimizingProcessorPhase.INITIAL
         override var total: Long = 0L
         override var current: Long = 0L
         override var remainingTime: Long = 0L
-        override var valueUnit: IProgress.ValueUnit = IProgress.ValueUnit.US
+        override val valueUnit: IProgress.ValueUnit get() =phase.valueUnit
 
 
-        fun updatePhase(phase: OptimizingProcessorPhase) = apply {
+        fun updatePhase(phase: IMultiPhaseProgress.IPhase) = apply {
             this.phase = phase
-            valueUnit = if (phase == OptimizingProcessorPhase.OPTIMIZING) IProgress.ValueUnit.BYTES else IProgress.ValueUnit.US
             total = 0L
             current = 0L
             remainingTime = 0L
@@ -71,7 +70,7 @@ class TrimOptimizer(
         private var mFastStart:Boolean = false
         private var mRemoveFreeOnFastStart:Boolean = false
         private var mForceConvert = false
-        private var mProgressHandler: ((IMultiPhaseProgress<OptimizingProcessorPhase>)->Unit)? = null
+        private var mProgressHandler: ((IMultiPhaseProgress)->Unit)? = null
         private var mWorkDirectory: File? = null
 
         // endregion
@@ -229,7 +228,7 @@ class TrimOptimizer(
         /**
          * 進捗報告ハンドラを設定
          */
-        fun setProgressHandler(proc:(IMultiPhaseProgress<OptimizingProcessorPhase>)->Unit) = apply {
+        fun setProgressHandler(proc:(IMultiPhaseProgress)->Unit) = apply {
             mProgressHandler = proc
         }
 
@@ -383,7 +382,7 @@ class TrimOptimizer(
             .rotate(converterBuilder.properties.rotation)
             .apply {
                 if (progressCallback!=null) {
-                    progressCallback(progress.updatePhase(OptimizingProcessorPhase.CONVERTING))
+                    progressCallback(progress.updatePhase(OptimizingProcessorPhase.SPLITTING))
                     setProgressHandler { p->
                         progressCallback(progress.updateProgress(p))
                     }
