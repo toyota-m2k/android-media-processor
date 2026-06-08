@@ -11,6 +11,7 @@ import io.github.toyota32k.media.lib.strategy.IVideoStrategy
 import io.github.toyota32k.media.lib.internals.surface.InputSurface
 import io.github.toyota32k.media.lib.internals.surface.OutputSurface
 import io.github.toyota32k.media.lib.internals.surface.RenderOption
+import io.github.toyota32k.media.lib.misc.MediaConstants
 
 class EncodeVideoTrack(inPath:IInputMediaFile, inputMetaData: MetaData, maxDurationUs:Long, bufferSource: IBufferSource, report: Report, val strategy: IVideoStrategy, val renderOption: RenderOption)
     : AbstractEncodeTrack(inPath, inputMetaData, maxDurationUs, bufferSource, report, video=true) {
@@ -21,6 +22,16 @@ class EncodeVideoTrack(inPath:IInputMediaFile, inputMetaData: MetaData, maxDurat
         if (!isAvailable) return 0L
 
         logger.assertStrongly(mOutputSurface == null, "already opened")
+
+        // 入力の Rotation をリセットする。
+        // デコード、エンコードは、Rotation されていない状態（正位置）に対して実行し、Muxerで Rotationを設定する。
+        // そうしないと、回転した状態で再エンコードされ、Width/Heightが入れ替わって画像が歪んでしまう。
+        // （旧Converterでも、同様の実装があり、Processorへの移植漏れだった。）
+        if (inputTrackMediaFormat.containsKey(MediaConstants.KEY_ROTATION_DEGREES)) { // Decoded video is rotated automatically in Android 5.0 lollipop.
+            // Turn off here because we don't want to encode rotated one.
+            // refer: https://android.googlesource.com/platform/frameworks/av/+blame/lollipop-release/media/libstagefright/Utils.cpp
+            inputTrackMediaFormat.setInteger(MediaConstants.KEY_ROTATION_DEGREES, 0)
+        }
 
         // ハマりポイントｗｗｗ
         // 必ず、Encoder-->Decoder の順に初期化＆開始する。そうしないと、Decoder側の inputSurfaceの初期化に失敗する。

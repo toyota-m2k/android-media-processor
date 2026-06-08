@@ -13,7 +13,9 @@ import io.github.toyota32k.media.lib.format.frameRate
 import io.github.toyota32k.media.lib.format.height
 import io.github.toyota32k.media.lib.format.iFrameInterval
 import io.github.toyota32k.media.lib.format.maxBitRate
+import io.github.toyota32k.media.lib.format.rotation
 import io.github.toyota32k.media.lib.format.width
+import io.github.toyota32k.media.lib.types.Rotation
 import java.util.Locale
 
 data class VideoSummary(
@@ -29,6 +31,7 @@ data class VideoSummary(
     val iFrameInterval: Int,
     val colorFormat: ColorFormat?,
     val hdrInfo: HDR.Info?,
+    val rotation: Int,
     ) : IAttributes {
     constructor(org:VideoSummary?, format: MediaFormat?, metaData: MetaData?) : this(
         org?.codec ?: Codec.fromFormat(format),
@@ -43,7 +46,8 @@ data class VideoSummary(
         frameRate = format?.frameRate?: metaData?.frameRate ?: org?.frameRate ?: -1,
         iFrameInterval = format?.iFrameInterval?: org?.iFrameInterval ?: -1,
         colorFormat = ColorFormat.fromFormat(format) ?: org?.colorFormat,
-        hdrInfo = HDR.Info.fromFormat(format)
+        hdrInfo = HDR.Info.fromFormat(format),
+        rotation = format?.rotation ?: metaData?.rotation ?: 0
     )
 
 
@@ -89,6 +93,7 @@ data class VideoSummary(
             IAttributes.KeyValue("Frame Rate","${frameRate.format()} fps"),
             IAttributes.KeyValue("iFrame Interval", "${iFrameInterval.format()} sec"),
             IAttributes.KeyValue("Color Format", "${colorFormat?:"n/a"}"),
+            IAttributes.KeyValue("Rotation", "$rotation"),
         )
         return if (hdrInfo==null) {
             list

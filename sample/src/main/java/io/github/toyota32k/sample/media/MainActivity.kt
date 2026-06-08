@@ -66,6 +66,7 @@ import io.github.toyota32k.sample.media.databinding.ActivityMainBinding
 import io.github.toyota32k.sample.media.dialog.DetailMessageDialog
 import io.github.toyota32k.sample.media.dialog.MultilineTextDialog
 import io.github.toyota32k.sample.media.dialog.ProgressDialog
+import io.github.toyota32k.utils.lifecycle.DisposableFlowObserver
 import io.github.toyota32k.utils.lifecycle.disposableObserve
 import io.github.toyota32k.utils.use
 import kotlinx.coroutines.Dispatchers
@@ -299,10 +300,15 @@ class MainActivity : UtMortalActivity() {
 //            }
 //        }
 
+        private val observer = DisposableFlowObserver(playSource) { it->
+            updatePlayerSource()
+        }
+
 
         override fun onCleared() {
             logger.debug()
             super.onCleared()
+            observer.dispose()
             playerControllerModel.close()
         }
 
@@ -364,12 +370,7 @@ class MainActivity : UtMortalActivity() {
                         val subHeight = (videoSize.height*0.5).toInt()
                         val sx = videoSize.width-subWidth
                         val sy = videoSize.height-subHeight
-                        val crop = Rect(sx, sy, sx+subWidth, sy+subHeight)
-//                        val crop = Rect(
-//                            532,
-//                             203,
-//                             1663,
-//                             1052)
+//                        val crop = Rect(sx, sy, sx+subWidth, sy+subHeight)
 
                         sink.message = "Trimming Now"
                         val rotation = if (playerModel.rotation.value != 0) Rotation(playerModel.rotation.value, relative = true) else Rotation.nop
@@ -379,7 +380,7 @@ class MainActivity : UtMortalActivity() {
                                 .output(trimFile)
                                 .audioStrategy(namedAudioStrategy.value.strategy)
                                 .rotate(rotation)
-                                .crop(crop)
+//                                .crop(crop)
                                 .brightness(1.3f)
                                 .trimming {
                                     addRangesMs(ranges.map { RangeMs(it.start, it.end) })
@@ -405,7 +406,7 @@ class MainActivity : UtMortalActivity() {
                                 .audioStrategy(namedAudioStrategy.value.strategy)
 //                                .audioStrategy(PresetAudioStrategies.NoAudio)
                                 .rotate(rotation)
-                                .crop(crop)
+//                                .crop(crop)
 //                                .brightness(1.3f)
                                 .trimming {
                                     addRangesMs(ranges.map { RangeMs(it.start, it.end) })
@@ -666,9 +667,9 @@ class MainActivity : UtMortalActivity() {
                     }
                 }
             })
-            .observe(viewModel.playSource) {
-                viewModel.updatePlayerSource()
-            }
+//            .observe(viewModel.playSource) {
+//                viewModel.updatePlayerSource()
+//            }
             .checkBinding(controls.useSoftwareDecoder, viewModel.softwareDecode)
             .checkBinding(controls.useSoftwareEncoder, viewModel.softwareEncode)
             .checkBinding(controls.useProcessor, viewModel.useNewProcessor)

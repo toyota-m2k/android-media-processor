@@ -171,7 +171,8 @@ var MediaFormat.channelCount:Int?
     set(v) = setIntegerOrNull(MediaFormat.KEY_CHANNEL_COUNT, v)
 val MediaFormat.duration:Long?
     get() = safeGetLongOrNull(MediaFormat.KEY_DURATION) ?: safeGetIntegerOrNull(MediaFormat.KEY_DURATION)?.toLong()
-
+val MediaFormat.rotation:Int?
+    get() = safeGetIntegerOrNull(MediaFormat.KEY_ROTATION)
 
 fun MediaFormat.dump(logger: UtLog, message:String) {
     logger.info("### $message")
