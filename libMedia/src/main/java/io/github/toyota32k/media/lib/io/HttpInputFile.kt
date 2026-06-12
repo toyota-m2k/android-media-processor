@@ -18,6 +18,7 @@ interface IHttpStreamSource {
     val length:Long
     fun open(): InputStream
     fun close()
+    fun cancel()
 }
 
 /**
@@ -60,6 +61,11 @@ class HttpInputFile(context: Context, private val streamSource: IHttpStreamSourc
         override fun close() {
             inputStream?.close()    // このcloseが必要なのかどうか不明だが念のため。
             inputStream = null
+            connection?.disconnect()
+            connection = null
+        }
+
+        override fun cancel() {
             connection?.disconnect()
             connection = null
         }
