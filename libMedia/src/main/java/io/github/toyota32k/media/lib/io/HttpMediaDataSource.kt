@@ -11,6 +11,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import java.io.File
+import java.io.RandomAccessFile
 import kotlin.math.max
 import kotlin.math.min
 
@@ -52,13 +53,13 @@ class HttpMediaDataSource(context: Context, private val streamSource: IHttpStrea
     private data class WaitingEvent(val requiredLength:Long) {
         private val event = FlowableEvent()
         private var actualLength:Long = -1
-        suspend fun notify(length: Long, eos:Boolean) {
+        fun notify(length: Long, eos:Boolean) {
             if (length >= requiredLength||eos) {
                 actualLength = length
                 event.set()
             }
         }
-        suspend fun error() {
+        fun error() {
             event.set()
         }
         suspend fun wait():Long {
@@ -72,7 +73,7 @@ class HttpMediaDataSource(context: Context, private val streamSource: IHttpStrea
         startLoading()
     }
 
-    private suspend fun onError(e:Throwable) {
+    private fun onError(e:Throwable) {
         val events = synchronized(this) {
             error = e
             waitingEvents.toList()
@@ -86,7 +87,7 @@ class HttpMediaDataSource(context: Context, private val streamSource: IHttpStrea
      * Java の　InputStream の EOSは、0ではなく-1らしい
      * @param length    -1: EOS
      */
-    private suspend fun onReceived(length: Long) {
+    private fun onReceived(length: Long) {
         val total:Long
         val eos:Boolean
         val events = synchronized(this) {
@@ -117,6 +118,7 @@ class HttpMediaDataSource(context: Context, private val streamSource: IHttpStrea
                         var bytes = input.read(buffer)
                         while (bytes >= 0) {
                             output.write(buffer, 0, bytes)
+                            output.flush()
                             onReceived(bytes.toLong())
                             bytes = input.read(buffer)
                         }
@@ -125,7 +127,7 @@ class HttpMediaDataSource(context: Context, private val streamSource: IHttpStrea
                     }
                 }
             } catch (e: Throwable) {
-                logger.error(e)
+                logger.error(e, "error on loading data")
                 onError(e)
             } finally {
                 streamSource.close()
@@ -144,29 +146,27 @@ class HttpMediaDataSource(context: Context, private val streamSource: IHttpStrea
     }
 
     private fun waitFor(position:Long, size: Long) : Long {
-        val total = getSize()
-        val length = if (total < position+size) {
-            total
-        } else {
-            position+size
+        val total = getSize() // content-length
+        if (total <= position) {
+            return -1       // EOS
         }
+        val targetLength = (position + size).coerceAtMost(total)
         val awaiter = synchronized(this) {
             checkError()
-            if (receivedLength >= length) {
-//                    logger.debug("already received $receivedLength")
-                return max(0L, length - position)
+            if (targetLength <= receivedLength) {
+                return targetLength - position
             } else if (eos) {
                 logger.debug("already reached to eos")
-                return max(0L,receivedLength - position)
+                return receivedLength - position
             } else {
-                WaitingEvent(length).apply {
+                WaitingEvent(targetLength).apply {
                     waitingEvents.add(this)
                 }
             }
         }
         val actualLength = runBlocking { awaiter.wait() }
         checkError()
-        return max(0, actualLength - position)
+        return actualLength - position
     }
 
     override fun close() {
@@ -174,12 +174,15 @@ class HttpMediaDataSource(context: Context, private val streamSource: IHttpStrea
     }
 
     fun dispose() {
-        streamSource.close()
-        runBlocking { completed.waitOne() }
-        try {
-            tempFile.delete()
-        } catch (e: Throwable) {
-            logger.error(e)
+        CoroutineScope(Dispatchers.IO).launch {
+            try {
+                streamSource.cancel()
+                completed.waitOne()
+            } catch (e: Throwable) {
+                logger.error(e, "error on disposing.")
+            } finally {
+                runCatching { tempFile.delete() }
+            }
         }
     }
 
@@ -190,11 +193,11 @@ class HttpMediaDataSource(context: Context, private val streamSource: IHttpStrea
         checkError()
         if(length<=0) {
             logger.debug("no more data.")
-            return 0
+            return -1
         }
-        return tempFile.inputStream().use { input ->
-            input.skip(position)
-            input.read(buffer, offset, min(size,length.toInt()))
+        return RandomAccessFile(tempFile, "r").use { input ->
+            input.seek(position)
+            input.read(buffer, offset, min(size, length.toInt()))
         }
     }
 
@@ -210,7 +213,12 @@ class HttpMediaDataSource(context: Context, private val streamSource: IHttpStrea
                 }
             }
         }
-        runBlocking { awaiter.wait() }
+        runBlocking {
+            awaiter.wait()
+        }
+        synchronized(this) {
+            waitingEvents.remove(awaiter)
+        }
         checkError()
         return contentLength
     }

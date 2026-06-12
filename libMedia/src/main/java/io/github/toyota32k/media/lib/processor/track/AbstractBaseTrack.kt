@@ -82,6 +82,6 @@ abstract class AbstractBaseTrack(val inPath:IInputMediaFile, val inputMetaData: 
 
     override fun close() {
         logger.debug()
-        extractor.release()
+        rawExtractor.close()
     }
 }
