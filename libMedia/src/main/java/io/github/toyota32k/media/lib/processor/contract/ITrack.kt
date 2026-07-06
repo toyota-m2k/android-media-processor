@@ -33,6 +33,13 @@ interface ITrack : Closeable {
     fun setup(muxer: SyncMuxer)
 
     /**
+     * 出力PTSの開始オフセットを設定する。
+     * 複数ファイルの結合(concat)で、前のファイルの末尾PTSを引き継ぐために使用する。
+     * startRange() を呼び出す前に設定すること。
+     */
+    fun setBasePresentationTimeUs(baseUs: Long) {}
+
+    /**
      * 範囲の先頭位置までシークして、範囲読み込みを開始する。
      * @param seekToUs  シーク先 (us)
      * @return 実際にシークした位置 (us)

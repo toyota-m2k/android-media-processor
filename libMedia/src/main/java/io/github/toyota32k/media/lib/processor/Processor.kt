@@ -3,6 +3,7 @@ package io.github.toyota32k.media.lib.processor
 import io.github.toyota32k.logger.UtLog
 import io.github.toyota32k.media.lib.format.ContainerFormat
 import io.github.toyota32k.media.lib.internals.surface.RenderOption
+import io.github.toyota32k.media.lib.internals.surface.ScaleMatrixProvider
 import io.github.toyota32k.media.lib.io.IInputMediaFile
 import io.github.toyota32k.media.lib.io.IOutputMediaFile
 import io.github.toyota32k.media.lib.legacy.converter.Converter
@@ -19,6 +20,8 @@ import io.github.toyota32k.media.lib.processor.contract.ITrack
 import io.github.toyota32k.media.lib.processor.contract.format3digits
 import io.github.toyota32k.media.lib.processor.optimizer.Optimizer
 import io.github.toyota32k.media.lib.processor.optimizer.OptimizerOptions
+import io.github.toyota32k.media.lib.processor.track.EmptyTrack
+import io.github.toyota32k.media.lib.processor.track.SilentAudioTrack
 import io.github.toyota32k.media.lib.processor.track.SyncMuxer
 import io.github.toyota32k.media.lib.processor.track.TrackSelector
 import io.github.toyota32k.media.lib.report.Report
@@ -316,6 +319,143 @@ class Processor(
      */
     override fun process(options: IProcessorOptions): IConvertResult {
         return process(options.inPath, options.outPath, options.rangesUs, options.limitDurationUs, options.rotation, options.renderOption, options.videoStrategy, options.audioStrategy, options.onProgress)
+    }
+
+    /**
+     * 複数の動画ファイルを結合（concatenation）して1つのファイルに出力する。
+     *
+     * - 各入力の再生区間（トリミング）は ConcatOptions.Builder.addInput() で指定できる。
+     * - 画素数の異なる動画は、1番目の入力を基準サイズとして ScaleMode にしたがってスケーリングされる。
+     * - 入力の回転メタデータはレンダリング時に正規化され、出力に回転メタデータは設定されない。
+     * - 結合は再エンコード前提（videoStrategy/audioStrategy 必須）。
+     * - 音声はサンプルレート・チャネル数の異なるソースが混在してもよい（リサンプリング/リミックスされる）。
+     *   音声トラックを持たないソースが混在する場合、その区間には無音が挿入される。
+     *   音声を出力しない場合は PresetAudioStrategies.NoAudio を指定する。
+     *
+     * 制限:
+     * - すべての入力に映像トラックが必要（音声のみのファイルは結合できない）。
+     */
+    fun concat(options: ConcatOptions): IConvertResult {
+        progress = ProgressHandler(options.onProgress)
+        val report = Report().apply {
+            start()
+            updateVideoStrategyName(options.videoStrategy.name)
+            updateAudioStrategyName(options.audioStrategy.name)
+        }
+        isCancelled = false
+
+        // 解析・バリデーション・統一出力フォーマット(UnifiedOutputFormat)の決定
+        val plan = ConcatAnalyzer.analyze(options)
+        val unified = plan.unified
+
+        Closeables().use { closer ->
+            // Muxerの準備
+            // 回転はGLレンダリングで正規化するため orientation hint は設定しない。
+            // location は先頭ソースのものを引き継ぐ。
+            val muxer = SyncMuxer(options.outPath, containerFormat, hasVideo = true, hasAudio = unified.hasAudio).apply {
+                setup(plan.sourceInfos[0].metaData, rotation = null, applyRotation = false)
+                closer.add(this)
+            }
+
+            // Progress情報を初期化（いずれかのソースの長さが不明なら進捗報告は無効）
+            val sourceLengths = options.sources.mapIndexed { i, source ->
+                source.effectiveRangesUs.totalLengthUs(plan.sourceInfos[i].durationUs ?: Long.MAX_VALUE)
+            }
+            val totalUs = if (sourceLengths.any { it == Long.MAX_VALUE }) Long.MAX_VALUE else sourceLengths.sum()
+            progress.initialize(totalUs, video = true, audio = unified.hasAudio)
+
+            // ソースを順に処理して1つのMuxerに書き込む
+            var basePresentationTimeUs = 0L
+            options.sources.forEachIndexed { index, source ->
+                if (isCancelled) throw CancellationException()
+                val info = plan.sourceInfos[index]
+                logger.info("concat: source[$index] ${source.input} base=${basePresentationTimeUs}us")
+                report.beginInputSource("Input Stream #${index + 1}")
+                Closeables().use { sourceCloser ->
+                    val trackSelector = TrackSelector(source.input, 0L, report, bufferSize, options.videoStrategy, options.audioStrategy).apply { sourceCloser.add(this) }
+                    val renderOption = RenderOption(
+                        ScaleMatrixProvider(info.width, info.height, info.rotation, unified.width, unified.height, options.scaleMode),
+                        brightness = 1f)
+                    val videoTrack = trackSelector.openVideoTrack(renderOption, unified.videoFormat).apply { sourceCloser.add(this) }
+                    val audioTrack = when {
+                        !unified.hasAudio -> EmptyTrack
+                        info.audioSampleRate != null ->
+                            // 音声ありソース: 統一サンプルレート/チャネル数で再エンコード（必要ならリサンプリング）
+                            trackSelector.openAudioTrack(unified.audioSampleRate, unified.audioChannelCount).apply { sourceCloser.add(this) }
+                        else ->
+                            // 音声なしソース: 無音を挿入して A/V 同期を維持する
+                            SilentAudioTrack(options.audioStrategy, unified.audioSampleRate, unified.audioChannelCount, videoTrack, info.durationUs, report).apply { sourceCloser.add(this) }
+                    }
+                    if (!videoTrack.isAvailable) throw IllegalStateException("no video track available: ${source.input}")
+
+                    videoTrack.setup(muxer)
+                    audioTrack.setup(muxer)
+                    // 前のソースの末尾PTSを引き継ぐ
+                    videoTrack.setBasePresentationTimeUs(basePresentationTimeUs)
+                    audioTrack.setBasePresentationTimeUs(basePresentationTimeUs)
+
+                    val soughtMap = SoughtMap(info.durationUs ?: Long.MAX_VALUE, source.effectiveRangesUs)
+                    for (rangeUs in source.effectiveRangesUs) {
+                        if (isCancelled) throw CancellationException()
+                        extractRange(videoTrack, audioTrack, rangeUs, soughtMap)
+                    }
+                    videoTrack.finalize()
+                    audioTrack.finalize()
+
+                    // 次のソースの出力開始PTS:
+                    // 映像・音声とも共通の基準値を使うことで、ソース境界のA/Vずれを次ソースに持ち越さない
+                    basePresentationTimeUs = max(
+                        videoTrack.presentationTimeUs + unified.videoFrameIntervalUs,
+                        if (audioTrack.isAvailable) audioTrack.presentationTimeUs + unified.audioFrameIntervalUs else 0L
+                    )
+                }
+            }
+
+            // ファイナライズ
+            muxer.stop()
+            report.updateOutputFileInfo(options.outPath.getLength(), muxer.naturalDurationUs)
+            report.muxerDurationUs = muxer.naturalDurationUs
+            report.sourceDurationUs = totalUs
+            report.end()
+
+            return Result(options.sources.first().input, options.outPath, SoughtMap(muxer.naturalDurationUs, emptyList()), report)
+        }
+    }
+
+    /**
+     * Dispatchers.IO で concat()を実行
+     */
+    suspend fun executeConcat(options: ConcatOptions, deleteOutputOnError: Boolean = true): IConvertResult {
+        return withContext(Dispatchers.IO) {
+            try {
+                concat(options)
+            } catch (e: Throwable) {
+                if (deleteOutputOnError) {
+                    options.outPath.safeDelete()
+                }
+                ErrorResult(options.sources.firstOrNull()?.input, e)
+            }
+        }
+    }
+
+    /**
+     * concat()の後、fast start を実行
+     */
+    suspend fun executeConcat(options: ConcatOptions, optimizeOption: OptimizerOptions?, deleteOutputOnError: Boolean = true): IConvertResult {
+        if (optimizeOption == null) {
+            // 最適化しない
+            return executeConcat(options, deleteOutputOnError)
+        }
+        return withContext(Dispatchers.IO) {
+            try {
+                Optimizer.optimizeConcat(this@Processor, options, optimizeOption)
+            } catch (e: Throwable) {
+                if (deleteOutputOnError) {
+                    options.outPath.safeDelete()
+                }
+                ErrorResult(options.sources.firstOrNull()?.input, e)
+            }
+        }
     }
 
     /**

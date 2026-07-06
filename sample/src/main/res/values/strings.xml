@@ -20,11 +20,12 @@
     <string name="use_software_decoder">use software decoder</string>
     <string name="use_software_encoder">use software encoder</string>
     <string name="encode_qualities_prompt">Quality</string>
-    <string name="play_input">Source</string>
+    <string name="play_input">Input</string>
+    <string name="play_input_2">Input2</string>
     <string name="play_output">Output</string>
     <string name="play_output_2">Output2</string>
     <string name="label_play_selection">Play</string>
-    <string name="execute_convert">Convert</string>
+    <string name="execute_convert">Conv</string>
     <string name="show_detail">Detail</string>
     <string name="no_audio">No Audio</string>
     <string name="video_capability_info">Video Capabilities</string>
@@ -38,4 +39,5 @@
     <string name="label_execute">Execution</string>
     <string name="execute_chop">Chop</string>
     <string name="use_processor">Use Processor</string>
+    <string name="execute_concat">Concat</string>
 </resources>

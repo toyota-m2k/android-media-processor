@@ -13,7 +13,12 @@ import io.github.toyota32k.media.lib.internals.surface.OutputSurface
 import io.github.toyota32k.media.lib.internals.surface.RenderOption
 import io.github.toyota32k.media.lib.misc.MediaConstants
 
-class EncodeVideoTrack(inPath:IInputMediaFile, inputMetaData: MetaData, maxDurationUs:Long, bufferSource: IBufferSource, report: Report, val strategy: IVideoStrategy, val renderOption: RenderOption)
+class EncodeVideoTrack(inPath:IInputMediaFile, inputMetaData: MetaData, maxDurationUs:Long, bufferSource: IBufferSource, report: Report, val strategy: IVideoStrategy, val renderOption: RenderOption,
+                       /**
+                        * 出力フォーマットを固定する場合に指定（結合(concat)用）。
+                        * null なら従来通り、strategy.createOutputFormat() で入力フォーマットから導出する。
+                        */
+                       private val fixedOutputFormat: MediaFormat? = null)
     : AbstractEncodeTrack(inPath, inputMetaData, maxDurationUs, bufferSource, report, video=true) {
     private var mOutputSurface:OutputSurface? = null    // for Decoder （in/outがややこしいので注意... decoder/encoderの気持ちになって in/out）
     private var mInputSurface:InputSurface? = null      // for Encoder
@@ -36,7 +41,7 @@ class EncodeVideoTrack(inPath:IInputMediaFile, inputMetaData: MetaData, maxDurat
         // ハマりポイントｗｗｗ
         // 必ず、Encoder-->Decoder の順に初期化＆開始する。そうしないと、Decoder側の inputSurfaceの初期化に失敗する。
         mEncoder = strategy.createEncoder().apply {
-            outputTrackMediaFormat = strategy.createOutputFormat(inputTrackMediaFormat, inputMetaData, this, renderOption)
+            outputTrackMediaFormat = fixedOutputFormat ?: strategy.createOutputFormat(inputTrackMediaFormat, inputMetaData, this, renderOption)
             configure(outputTrackMediaFormat, null, null, MediaCodec.CONFIGURE_FLAG_ENCODE)
             mInputSurface = InputSurface(this.createInputSurface()).apply { makeCurrent() }
             start()

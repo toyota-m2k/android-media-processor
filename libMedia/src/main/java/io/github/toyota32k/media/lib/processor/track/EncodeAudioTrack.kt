@@ -13,14 +13,21 @@ import io.github.toyota32k.media.lib.processor.contract.IBufferSource
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
 
-class EncodeAudioTrack(inPath:IInputMediaFile, inputMetaData: MetaData, maxDurationUs:Long, bufferSource: IBufferSource, report: Report, val strategy: IAudioStrategy)
+class EncodeAudioTrack(inPath:IInputMediaFile, inputMetaData: MetaData, maxDurationUs:Long, bufferSource: IBufferSource, report: Report, val strategy: IAudioStrategy,
+                       /**
+                        * 出力サンプルレート/チャネル数を固定する場合に指定（結合(concat)用）。
+                        * null なら入力から決定する（従来動作）。
+                        * 入力と異なるサンプルレートが指定された場合は、AudioChannel がリサンプリングを行う。
+                        */
+                       private val fixedSampleRate: Int? = null,
+                       private val fixedChannelCount: Int? = null)
     : AbstractEncodeTrack(inPath, inputMetaData, maxDurationUs, bufferSource, report, video=false) {
     private lateinit var audioChannel : AudioChannel
     private var formatDetected = false  // INFO_OUTPUT_FORMAT_CHANGED を受け取るまで、encoderへの書き込みを抑制するためのフラグ
 
     override fun startRange(startFromUS: Long):Long {
         if (!isAvailable) return 0L
-        audioChannel = AudioChannel()
+        audioChannel = AudioChannel(fixedSampleRate, fixedChannelCount)
         mDecoder = MediaCodec.createDecoderByType(inputTrackMediaFormat.mime ?: extractor.getTrackFormat(trackIndex).mime!!)
             .apply {
                 // configure は不要？

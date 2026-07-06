@@ -1,6 +1,7 @@
 package io.github.toyota32k.media.lib.processor.track
 
 import android.media.MediaCodec
+import android.media.MediaFormat
 import io.github.toyota32k.media.lib.io.IInputMediaFile
 import io.github.toyota32k.media.lib.format.MetaData
 import io.github.toyota32k.media.lib.processor.contract.IBufferSource
@@ -33,22 +34,37 @@ class TrackSelector(private val inFile: IInputMediaFile, val limitDurationUs:Lon
 
     // endregion
 
-    fun openVideoTrack(renderOption: RenderOption): ITrack {
+    /**
+     * @param fixedOutputFormat 出力フォーマットを固定する場合に指定（結合(concat)用）。nullなら入力から導出（従来動作）。
+     */
+    fun openVideoTrack(renderOption: RenderOption, fixedOutputFormat: MediaFormat? = null): ITrack {
         return when (videoStrategy) {
             is PresetVideoStrategies.InvalidStrategy -> {
                 if (renderOption!=RenderOption.DEFAULT) {
                     throw IllegalArgumentException("renderOption is specified with InvalidStrategy")
                 }
+                if (fixedOutputFormat!=null) {
+                    throw IllegalArgumentException("fixedOutputFormat is specified with InvalidStrategy")
+                }
                 NoReEncodeTrack(inFile, inputMetaData, limitDurationUs, bufferSource = this, report, video=true)
             }
-            else -> EncodeVideoTrack(inFile, inputMetaData, limitDurationUs, bufferSource = this, report, videoStrategy, renderOption)
+            else -> EncodeVideoTrack(inFile, inputMetaData, limitDurationUs, bufferSource = this, report, videoStrategy, renderOption, fixedOutputFormat)
         }
     }
-    fun openAudioTrack(): ITrack {
+    /**
+     * @param fixedSampleRate   出力サンプルレートを固定する場合に指定（結合(concat)用）。nullなら入力から決定（従来動作）。
+     * @param fixedChannelCount 出力チャネル数を固定する場合に指定（結合(concat)用）。nullなら入力から決定（従来動作）。
+     */
+    fun openAudioTrack(fixedSampleRate: Int? = null, fixedChannelCount: Int? = null): ITrack {
         return when (audioStrategy) {
-            is PresetAudioStrategies.InvalidStrategy -> return NoReEncodeTrack(inFile, inputMetaData, limitDurationUs, bufferSource = this, report, video=false)
-            is PresetAudioStrategies.NoAudio -> return EmptyTrack
-            else -> EncodeAudioTrack(inFile, inputMetaData, limitDurationUs, bufferSource = this, report, audioStrategy)
+            is PresetAudioStrategies.InvalidStrategy -> {
+                if (fixedSampleRate != null || fixedChannelCount != null) {
+                    throw IllegalArgumentException("fixedSampleRate/fixedChannelCount is specified with InvalidStrategy")
+                }
+                NoReEncodeTrack(inFile, inputMetaData, limitDurationUs, bufferSource = this, report, video=false)
+            }
+            is PresetAudioStrategies.NoAudio -> EmptyTrack
+            else -> EncodeAudioTrack(inFile, inputMetaData, limitDurationUs, bufferSource = this, report, audioStrategy, fixedSampleRate, fixedChannelCount)
         }
     }
 

@@ -1,7 +1,6 @@
 package io.github.toyota32k.sample.media
 
 import android.app.Application
-import android.graphics.Rect
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
@@ -22,7 +21,6 @@ import io.github.toyota32k.binder.enableBinding
 import io.github.toyota32k.binder.materialRadioButtonGroupBinding
 import io.github.toyota32k.binder.multiEnableBinding
 import io.github.toyota32k.binder.multiVisibilityBinding
-import io.github.toyota32k.binder.observe
 import io.github.toyota32k.binder.spinnerBinding
 import io.github.toyota32k.binder.textBinding
 import io.github.toyota32k.dialog.broker.UtActivityBrokerStore
@@ -54,6 +52,8 @@ import io.github.toyota32k.media.lib.format.getHeight
 import io.github.toyota32k.media.lib.format.getWidth
 import io.github.toyota32k.media.lib.processor.Analyzer
 import io.github.toyota32k.media.lib.processor.CompatConverter
+import io.github.toyota32k.media.lib.processor.ConcatOptions
+import io.github.toyota32k.media.lib.processor.Processor
 import io.github.toyota32k.media.lib.processor.contract.IConvertResult
 import io.github.toyota32k.media.lib.strategy.DeviceCapabilities
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
@@ -187,23 +187,29 @@ class MainActivity : UtMortalActivity() {
         }
 
         val inputFile: MutableStateFlow<Uri?> = MutableStateFlow(null)
+        val inputFile2: MutableStateFlow<Uri?> = MutableStateFlow(null)
         val outputFile: MutableStateFlow<Uri?> = MutableStateFlow(null)
         val outputFile2: MutableStateFlow<Uri?> = MutableStateFlow(null)
 
         val inputFileAvailable = inputFile.map { it!=null }
+        val inputFile2Available = inputFile2.map { it!=null }
         val outputFileAvailable = outputFile.map { it!=null }
         val outputFile2Available = outputFile2.map { it!=null }
         val inputFileName = inputFile.map { it?.toAndroidFile(application)?.getFileName() ?: "select input file"}
+        val inputFile2Name = inputFile2.map { it?.toAndroidFile(application)?.getFileName() ?: "select input file"}
         val outputFileName = outputFile.map {it?.toAndroidFile(application)?.getFileName() ?: "select output file"}
         val outputFile2Name = outputFile2.map {it?.toAndroidFile(application)?.getFileName() ?: "select output file"}
         val readyToConvert = combine(inputFileAvailable, outputFileAvailable) {i,o-> i && o }
+        val readyToConcat = combine(inputFileAvailable, inputFile2Available, outputFileAvailable) {i,o,o2-> i && o && o2}
+        val readyToSplit = combine(inputFileAvailable, outputFileAvailable, outputFile2Available) {i,o,o2-> i && o && o2}
         val converted = MutableStateFlow(false)
-        val splitted = MutableStateFlow(false)
+        val split = MutableStateFlow(false)
 
         val softwareEncode: MutableStateFlow<Boolean> = MutableStateFlow(false)
         val softwareDecode: MutableStateFlow<Boolean> = MutableStateFlow(false)
         enum class SourceIndex {
             Input,
+            Input2,
             Output,
             Output2,
         }
@@ -218,11 +224,14 @@ class MainActivity : UtMortalActivity() {
                     // Inputを再生
                     inputFile.value?.toAndroidFile(getApplication())
                 }
+                SourceIndex.Input2 -> {
+                    inputFile2.value?.toAndroidFile(getApplication())
+                }
                 SourceIndex.Output -> {
-                    if (converted.value || splitted.value) outputFile.value?.toAndroidFile(getApplication()) else null
+                    if (converted.value || split.value) outputFile.value?.toAndroidFile(getApplication()) else null
                 }
                 SourceIndex.Output2 -> {
-                    if (splitted.value) outputFile2.value?.toAndroidFile(getApplication()) else null
+                    if (split.value) outputFile2.value?.toAndroidFile(getApplication()) else null
                 }
             }
             if(src!=null) {
@@ -242,7 +251,22 @@ class MainActivity : UtMortalActivity() {
                         inputFile.value = file
                         playSource.value = SourceIndex.Input
                         converted.value = false
-                        splitted.value = false
+                        split.value = false
+                        updatePlayerSource()
+                    }
+                }
+            }
+        }
+        val selectInputFile2Command = LiteUnitCommand {
+            UtImmortalTask.launchTask {
+                withOwner {
+                    val activity = it.asActivity() as MainActivity
+                    val file = activity.activityBrokers.openFilePicker.selectFile(arrayOf("video/*"))
+                    if (file!=null) {
+                        inputFile2.value = file
+                        playSource.value = SourceIndex.Input2
+                        converted.value = false
+                        split.value = false
                         updatePlayerSource()
                     }
                 }
@@ -259,8 +283,8 @@ class MainActivity : UtMortalActivity() {
                     if(file!=null) {
                         outputFile.value = file
                         converted.value = false
-                        splitted.value = false
-                        playSource.value = SourceIndex.Input
+                        split.value = false
+                        playSource.value = SourceIndex.Output
                         updatePlayerSource()
                     }
                 }
@@ -276,8 +300,8 @@ class MainActivity : UtMortalActivity() {
                     if(file!=null) {
                         outputFile2.value = file
                         converted.value = false
-                        splitted.value = false
-                        playSource.value = SourceIndex.Input
+                        split.value = false
+                        playSource.value = SourceIndex.Output2
                         updatePlayerSource()
                     }
                 }
@@ -359,7 +383,7 @@ class MainActivity : UtMortalActivity() {
             val ranges = chapterEditor.enabledRanges(Range.empty)
 
             UtImmortalTask.launchTask("trimming") {
-                splitted.value = false
+                split.value = false
                 converted.value = false
                 val result = ProgressDialog.withProgressDialog<IConvertResult> { sink ->
                     withContext(Dispatchers.IO) {
@@ -466,7 +490,7 @@ class MainActivity : UtMortalActivity() {
             }
         }
 
-        val commandTrimming = LiteUnitCommand() {
+        val commandTrimming = LiteUnitCommand {
             val srcFile = AndroidFile(inputFile.value ?: return@LiteUnitCommand, application)
             val optFile = AndroidFile(outputFile.value ?: return@LiteUnitCommand, application)
             val trimFile = AndroidFile( File(application.cacheDir ?: return@LiteUnitCommand, "trimming"))
@@ -474,7 +498,7 @@ class MainActivity : UtMortalActivity() {
             val ranges = chapterEditor.enabledRanges(Range.empty)
 
             UtImmortalTask.launchTask("trimming") {
-                splitted.value = false
+                split.value = false
                 converted.value = false
                 val result = ProgressDialog.withProgressDialog { sink ->
                     withContext(Dispatchers.IO) {
@@ -526,6 +550,55 @@ class MainActivity : UtMortalActivity() {
 
         }
 
+        val commandConcat = LiteUnitCommand {
+            val srcFile = AndroidFile(inputFile.value ?: return@LiteUnitCommand, application)
+            val srcFile2 = AndroidFile(inputFile2.value ?: return@LiteUnitCommand, application)
+            val outFile = AndroidFile(outputFile.value ?: return@LiteUnitCommand, application)
+
+            split.value = false
+            converted.value = false
+            UtImmortalTask.launchTask("concatenating") {
+                val result = ProgressDialog.withProgressDialog<IConvertResult> { sink ->
+                    withContext(Dispatchers.IO) {
+                        var options = ConcatOptions.Builder()
+                            .addInput(srcFile)
+                            .addInput(srcFile2)
+                            .output(outFile)
+                            .audioStrategy(PresetAudioStrategies.AACDefault)
+                            .videoStrategy(PresetVideoStrategies.AVC720LowProfile)
+                            .onProgress {
+                                sink.progress = it.percentage
+                                sink.progressText = it.format()
+                            }
+                            .build()
+                        var processor = Processor()
+                        sink.cancelled.disposableObserve {
+                            if (it==true) {
+                                processor.cancel()
+                            }
+                        }.use {
+                            try {
+                                processor.concat(options).apply {
+                                    if (succeeded) {
+                                        converted.value = true
+                                    }
+                                }
+                            } catch (e: Throwable) {
+                                ConvertResult.error(srcFile, e)
+                            }
+                        }
+                    }
+                }
+                if (result.succeeded) {
+                    // 変換成功
+                    val srcLen = srcFile.getLength() + srcFile2.getLength()
+                    val dstLen = outFile.getLength()
+                    DetailMessageDialog.showMessage("Completed.", "${stringInKb(srcLen)} → ${stringInKb(dstLen)}", result.report?.toString() ?: "no information")
+                } else if (!result.cancelled) {
+                    showConfirmMessageBox("Error.", result.errorMessage ?: result.exception?.message ?: "unknown")
+                }
+            }
+        }
         val commandChop = LiteUnitCommand() {
             val opt2File = outputFile2.value?.run { AndroidFile(this, application) } ?: return@LiteUnitCommand
             val srcFile = AndroidFile(inputFile.value ?: return@LiteUnitCommand, application)
@@ -535,7 +608,7 @@ class MainActivity : UtMortalActivity() {
 
             val position = playerControllerModel.playerModel.currentPosition
             UtImmortalTask.launchTask("chopping") {
-                splitted.value = false
+                split.value = false
                 converted.value = false
                 val result = ProgressDialog.withProgressDialog<IConvertResult> { sink ->
                     withContext(Dispatchers.IO) {
@@ -573,7 +646,7 @@ class MainActivity : UtMortalActivity() {
                                             // 変換不要
                                             opt2File.copyFrom(trim2File)
                                         }
-                                        splitted.value = true
+                                        split.value = true
                                     }
                                 }
                             } catch (e: Throwable) {
@@ -631,6 +704,7 @@ class MainActivity : UtMortalActivity() {
         binder
             .owner(this)
             .bindCommand(viewModel.selectInputFileCommand, controls.inputFileButton)
+            .bindCommand(viewModel.selectInputFile2Command, controls.input2FileButton)
             .bindCommand(viewModel.analyzeInputFileCommand, controls.inputAnalyzeButton)
             .bindCommand(viewModel.selectOutputFileCommand, controls.outputFileButton)
             .bindCommand(viewModel.analyzeOutputFileCommand, controls.outputAnalyzeButton)
@@ -645,10 +719,16 @@ class MainActivity : UtMortalActivity() {
             .bindCommand(viewModel.commandToggleSkip, controls.makeRegionSkip)
             .multiVisibilityBinding(arrayOf(controls.chapterButtons, controls.videoViewer), viewModel.inputFileAvailable, hiddenMode = VisibilityBinding.HiddenMode.HideByInvisible)
             .enableBinding(controls.inputAnalyzeButton, viewModel.inputFileAvailable)
+            .enableBinding(controls.inputAnalyze2Button, viewModel.inputFile2Available)
             .enableBinding(controls.outputAnalyzeButton, combine(viewModel.outputFileAvailable, viewModel.converted) {o,c->o&&c})
+            .enableBinding(controls.output2AnalyzeButton, combine(viewModel.outputFile2Available, viewModel.split) {o,c->o&&c})
             .enableBinding(controls.saveVideo, viewModel.readyToConvert)
+            .enableBinding(controls.concatVideo, viewModel.readyToConcat)
+            .enableBinding(controls.trimVideo, viewModel.readyToConvert)
+            .enableBinding(controls.chopVideo, viewModel.readyToSplit)
             .multiEnableBinding(arrayOf(controls.buttonOutput2,controls.output2AnalyzeButton, controls.chopVideo),  viewModel.outputFile2Available)
             .textBinding(controls.inputFileButton, viewModel.inputFileName)
+            .textBinding(controls.input2FileButton, viewModel.inputFile2Name)
             .textBinding(controls.outputFileButton, viewModel.outputFileName)
             .textBinding(controls.output2FileButton, viewModel.outputFile2Name)
             .materialRadioButtonGroupBinding(controls.playSelector, viewModel.playSource, object: IIDValueResolver<SourceIndex> {
@@ -656,6 +736,7 @@ class MainActivity : UtMortalActivity() {
                     return when(id) {
                         controls.buttonOutput.id -> SourceIndex.Output
                         controls.buttonOutput2.id -> SourceIndex.Output2
+                        controls.buttonInput2.id -> SourceIndex.Input2
                         else -> SourceIndex.Input
                     }
                 }
@@ -663,6 +744,7 @@ class MainActivity : UtMortalActivity() {
                     return when(v) {
                         SourceIndex.Output -> controls.buttonOutput.id
                         SourceIndex.Output2 -> controls.buttonOutput2.id
+                        SourceIndex.Input2 -> controls.buttonInput2.id
                         else -> controls.buttonInput.id
                     }
                 }
@@ -680,6 +762,7 @@ class MainActivity : UtMortalActivity() {
             .bindCommand(viewModel.commandConvert, controls.saveVideo)
             .bindCommand(viewModel.commandChop, controls.chopVideo)
             .bindCommand(viewModel.commandTrimming, controls.trimVideo)
+            .bindCommand(viewModel.commandConcat, controls.concatVideo)
 
         controls.videoViewer.bindViewModel(viewModel.playerControllerModel, binder)
 
