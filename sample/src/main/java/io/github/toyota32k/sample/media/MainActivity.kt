@@ -607,7 +607,7 @@ class MainActivity : UtMortalActivity() {
             val trim2File = AndroidFile( File(application.cacheDir ?: return@LiteUnitCommand, "chop2"))
 
             val position = playerControllerModel.playerModel.currentPosition
-            UtImmortalTask.launchTask("chopping") {
+            UtImmortalTask.launchTask("splitting") {
                 split.value = false
                 converted.value = false
                 val result = ProgressDialog.withProgressDialog<IConvertResult> { sink ->
