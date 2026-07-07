@@ -12,6 +12,7 @@ import io.github.toyota32k.media.lib.format.sampleRate
 import io.github.toyota32k.media.lib.format.width
 import io.github.toyota32k.media.lib.internals.surface.RenderOption
 import io.github.toyota32k.media.lib.misc.MediaConstants
+import io.github.toyota32k.media.lib.processor.contract.IConcatOptions
 import io.github.toyota32k.media.lib.strategy.PresetAudioStrategies
 import io.github.toyota32k.media.lib.strategy.PresetVideoStrategies
 import io.github.toyota32k.media.lib.strategy.VideoStrategy
@@ -54,7 +55,7 @@ internal class ConcatPlan(
  */
 internal object ConcatAnalyzer {
 
-    fun analyze(options: ConcatOptions): ConcatPlan {
+    fun analyze(options: IConcatOptions): ConcatPlan {
         val dropAudio = options.audioStrategy is PresetAudioStrategies.NoAudio
         if (options.videoStrategy is PresetVideoStrategies.InvalidStrategy) {
             throw IllegalArgumentException("concat requires re-encoding: InvalidStrategy is not acceptable as videoStrategy.")

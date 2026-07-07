@@ -3,26 +3,27 @@ package io.github.toyota32k.media.lib.processor
 import android.content.Context
 import android.graphics.Rect
 import android.net.Uri
+import io.github.toyota32k.media.lib.internals.surface.RenderOption
 import io.github.toyota32k.media.lib.io.AndroidFile
 import io.github.toyota32k.media.lib.io.HttpInputFile
 import io.github.toyota32k.media.lib.io.IHttpStreamSource
 import io.github.toyota32k.media.lib.io.IInputMediaFile
 import io.github.toyota32k.media.lib.io.IOutputMediaFile
-import io.github.toyota32k.media.lib.types.Rotation
-import io.github.toyota32k.media.lib.processor.contract.IProcessorOptions
-import io.github.toyota32k.media.lib.processor.contract.IProgress
+import io.github.toyota32k.media.lib.processor.Analyzer.analyze
+import io.github.toyota32k.media.lib.processor.contract.IConvertOptions
 import io.github.toyota32k.media.lib.processor.contract.IFormattable
-import io.github.toyota32k.media.lib.utils.RangeUsListBuilder
+import io.github.toyota32k.media.lib.processor.contract.IProgress
+import io.github.toyota32k.media.lib.processor.optimizer.OptimizerOptions
 import io.github.toyota32k.media.lib.report.Summary
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
 import io.github.toyota32k.media.lib.strategy.PresetAudioStrategies
 import io.github.toyota32k.media.lib.strategy.PresetVideoStrategies
-import io.github.toyota32k.media.lib.internals.surface.RenderOption
-import io.github.toyota32k.media.lib.processor.Analyzer.analyze
 import io.github.toyota32k.media.lib.types.RangeUs
 import io.github.toyota32k.media.lib.types.RangeUs.Companion.formatAsUs
 import io.github.toyota32k.media.lib.types.RangeUs.Companion.ms2us
+import io.github.toyota32k.media.lib.types.Rotation
+import io.github.toyota32k.media.lib.utils.RangeUsListBuilder
 import java.io.File
 import kotlin.time.Duration
 
@@ -30,7 +31,7 @@ import kotlin.time.Duration
  * Processor.process() に渡すパラメーターを１つのオブジェクトのまとめるクラス。
  * process()に個々のパラメータを指定してもよいが、通常は、BuilderパターンでProcessorOptionsを構築して利用する。
  */
-data class ProcessorOptions(
+data class ConvertOptions(
     override val inPath: IInputMediaFile,
     override val outPath: IOutputMediaFile,
     override val videoStrategy: IVideoStrategy,
@@ -39,8 +40,9 @@ data class ProcessorOptions(
     override val limitDurationUs: Long,
     override val rotation: Rotation?,
     override val renderOption: RenderOption?,
-    override val onProgress: ((IProgress)->Unit)?
-): IProcessorOptions, IFormattable {
+    override val optimizerOptions: OptimizerOptions?,
+    override val deleteOutputOnError: Boolean,
+): IConvertOptions, IFormattable {
     override fun toString() : String {
         return format().toString()
     }
@@ -71,13 +73,15 @@ data class ProcessorOptions(
         private var mBrightnessFactor = 1f
         private var mCropRect: Rect? = null
         private var mRotation: Rotation? = null
+        private var mDeleteOutputOnError:Boolean = true
+        private var mOptimizerOptions: OptimizerOptions? = null
 
         private val mTrimmingRangeListBuilder: RangeUsListBuilder = RangeUsListBuilder()
         private var mClipStartUs:Long = 0L
         private var mClipEndUs:Long = 0L
         private var mLimitDurationUs: Long = 0L
 
-        private var mOnProgress: ((IProgress)->Unit)? = null
+        var mOnProgress: ((IProgress)->Unit)? = null
 
         // region Computed Parameters
 
@@ -298,11 +302,21 @@ data class ProcessorOptions(
 
         // endregion
 
+        fun deleteOutputOnError(flag:Boolean) = apply {
+            mDeleteOutputOnError = flag
+        }
+        fun optimize(applicationContext:Context, removeFreeAtom:Boolean) = apply {
+            mOptimizerOptions = OptimizerOptions(applicationContext, removeFreeAtom)
+        }
+        fun optimize(optimizerOptions: OptimizerOptions?) = apply {
+            mOptimizerOptions = optimizerOptions
+        }
+
         /**
          * ProcessorOption を作成する
          */
-        fun build(): ProcessorOptions {
-            return ProcessorOptions(
+        fun build(): ConvertOptions {
+            return ConvertOptions(
                 inPath = mInPath ?: throw IllegalStateException("input file is not specified."),
                 outPath = mOutPath ?: throw IllegalStateException("output file is not specified."),
                 videoStrategy = StrategyAdjuster.fromOptionBuilder(this).adjust(mVideoStrategy),
@@ -311,25 +325,33 @@ data class ProcessorOptions(
                 limitDurationUs = mLimitDurationUs,
                 rotation = mRotation,
                 renderOption = renderOption,
-                onProgress = mOnProgress
+                optimizerOptions = mOptimizerOptions,
+                deleteOutputOnError = mDeleteOutputOnError
             )
         }
+    }
+
+    override fun derive(outPath: IOutputMediaFile, optimizerOptions: OptimizerOptions?): IConvertOptions {
+        return DerivedProcessorOptions(this, outPath, optimizerOptions=optimizerOptions)
+    }
+    fun derive(outPath: IOutputMediaFile, rangesUs: List<RangeUs>, limitDurationUs: Long): IConvertOptions {
+        return DerivedProcessorOptions(this, outPath, rangesUs, limitDurationUs)
     }
 }
 
 class DerivedProcessorOptions(
-    val src: IProcessorOptions,
+    val src: IConvertOptions,
     override var outPath: IOutputMediaFile = src.outPath,
     override var rangesUs: List<RangeUs> = src.rangesUs,
     override var limitDurationUs: Long = src.limitDurationUs,
-    override var onProgress: ((IProgress)->Unit)? = src.onProgress
-) : IProcessorOptions by src {
+    override var optimizerOptions: OptimizerOptions? = src.optimizerOptions,
+) : IConvertOptions by src {
     companion object {
-        fun IProcessorOptions.derive(
+        fun IConvertOptions.derive(
             outPath: IOutputMediaFile = this.outPath,
             rangesUs: List<RangeUs> = this.rangesUs,
             limitDurationUs: Long = this.limitDurationUs,
-            onProgress: ((IProgress)->Unit)? = this.onProgress
-        ) = DerivedProcessorOptions(this, outPath, rangesUs, limitDurationUs, onProgress)
+            optimizerOptions: OptimizerOptions? = this.optimizerOptions,
+        ) = DerivedProcessorOptions(this, outPath, rangesUs, limitDurationUs)
     }
 }

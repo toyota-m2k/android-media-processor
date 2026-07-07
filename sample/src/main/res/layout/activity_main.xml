@@ -181,6 +181,13 @@
                 android:layout_marginStart="50dp"
                 android:checked="false"
                 android:text="@string/use_software_encoder" />
+            <CheckBox
+                android:id="@+id/enable_optimize"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="50dp"
+                android:checked="false"
+                android:text="@string/optimize" />
             <!--    <CheckBox-->
             <!--        android:id="@+id/no_audio"-->
             <!--        android:layout_width="wrap_content"-->
@@ -245,26 +252,16 @@
                     android:layout_height="wrap_content"
                     android:minWidth="100dp"
                     android:text="@string/execute_convert" />
+                <Space
+                    android:layout_height="1dp"
+                    android:layout_width="10dp"
+                    />
                 <Button
                     android:id="@+id/concat_video"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:minWidth="100dp"
                     android:text="@string/execute_concat" />
-
-                <Button
-                    android:id="@+id/trim_video"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:minWidth="100dp"
-                    android:text="@string/execute_trimming" />
-
-                <Button
-                    android:id="@+id/chop_video"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:minWidth="100dp"
-                    android:text="@string/execute_chop" />
             </LinearLayout>
 
             <TextView

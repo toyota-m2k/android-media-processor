@@ -190,6 +190,14 @@
             <!--        android:text="@string/no_audio"-->
             <!--        android:checked="false"-->
             <!--        />-->
+            <CheckBox
+                android:id="@+id/enable_optimize"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="50dp"
+                android:checked="false"
+                android:text="@string/optimize" />
+
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -242,29 +250,18 @@
                     android:id="@+id/save_video"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:minWidth="50dp"
+                    android:minWidth="100dp"
                     android:text="@string/execute_convert" />
+                <Space
+                    android:layout_width="10dp"
+                    android:layout_height="1dp"/>
                 <Button
                     android:id="@+id/concat_video"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
-                    android:minWidth="50dp"
-                    android:paddingHorizontal="15dp"
+                    android:minWidth="100dp"
                     android:text="@string/execute_concat" />
 
-                <Button
-                    android:id="@+id/trim_video"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:minWidth="50dp"
-                    android:text="@string/execute_trimming" />
-
-                <Button
-                    android:id="@+id/chop_video"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:minWidth="50dp"
-                    android:text="@string/execute_split" />
             </LinearLayout>
 
             <TextView

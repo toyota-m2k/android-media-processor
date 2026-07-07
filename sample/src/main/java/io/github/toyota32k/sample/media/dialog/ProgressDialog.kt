@@ -2,7 +2,6 @@ package io.github.toyota32k.sample.media.dialog
 
 import android.os.Bundle
 import android.view.View
-import androidx.lifecycle.ViewModelProvider
 import io.github.toyota32k.binder.command.LiteUnitCommand
 import io.github.toyota32k.binder.command.ReliableCommand
 import io.github.toyota32k.binder.command.bindCommand
@@ -11,51 +10,25 @@ import io.github.toyota32k.binder.textBinding
 import io.github.toyota32k.dialog.UtDialogEx
 import io.github.toyota32k.dialog.task.UtDialogViewModel
 import io.github.toyota32k.dialog.task.UtImmortalTask
-import io.github.toyota32k.dialog.task.UtImmortalTaskManager
 import io.github.toyota32k.dialog.task.createViewModel
 import io.github.toyota32k.dialog.task.getViewModel
-import io.github.toyota32k.dialog.task.immortalTaskContext
+import io.github.toyota32k.media.lib.processor.contract.IConvertResult
+import io.github.toyota32k.media.lib.processor.contract.IMultiPhaseProgress
+import io.github.toyota32k.media.lib.processor.contract.IProcessor
+import io.github.toyota32k.media.lib.processor.contract.IProcessorOptions
 import io.github.toyota32k.sample.media.databinding.DialogProgressBinding
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 
-interface IProgressSetter {
-    var progress: Int   // percentage
-    var progressText: String
-    var message: String
-    val cancelled: Flow<Boolean>
-}
-
 class ProgressDialog : UtDialogEx() {
     class ProgressViewModel : UtDialogViewModel() {
+        lateinit var processor: IProcessor
         val progress = MutableStateFlow(0)
         val progressText = MutableStateFlow("")
         val message = MutableStateFlow("")
-        val cancelled = MutableStateFlow(false)
-        val cancelCommand = LiteUnitCommand { cancelled.value = true}
+        val cancelCommand = LiteUnitCommand { processor.cancel() }
         val closeCommand = ReliableCommand<Boolean>()
-
-        private inner class ProgressSetter : IProgressSetter {
-            override var progress: Int
-                get() = this@ProgressViewModel.progress.value
-                set(value) {
-                    this@ProgressViewModel.progress.value = value
-                }
-            override var progressText: String
-                get() = this@ProgressViewModel.progressText.value
-                set(value) {
-                    this@ProgressViewModel.progressText.value = value
-                }
-            override var message: String
-                get() = this@ProgressViewModel.message.value
-                set(value) {
-                    this@ProgressViewModel.message.value = value
-                }
-            override val cancelled: Flow<Boolean> = this@ProgressViewModel.cancelled
-        }
-        val progressSetter:IProgressSetter = ProgressSetter()
     }
 
     private val viewModel by lazy { getViewModel<ProgressViewModel>() }
@@ -83,20 +56,26 @@ class ProgressDialog : UtDialogEx() {
     }
 
     companion object {
-        suspend fun <T> withProgressDialog(taskName:String="withProgressDialog", block: suspend (IProgressSetter)->T):T {
+        suspend fun processWithProgressDialog(taskName:String="withProgressDialog",initialMessage:String, processor: IProcessor, options: IProcessorOptions): IConvertResult {
             val vmf = MutableStateFlow<ProgressViewModel?>(null)
             UtImmortalTask.launchTask(taskName) {
                 vmf.value = createViewModel<ProgressViewModel> {
+                    this.processor = processor
                     progress.value = 0
                     progressText.value = ""
-                    message.value = ""
-                    cancelled.value = false
+                    message.value = initialMessage
                 }
                 showDialog(taskName) { ProgressDialog() }.status.ok
             }
             return vmf.filterNotNull().first().let { vm ->
                 try {
-                    block(vm.progressSetter)
+                    processor.process(options) { progress ->
+                        vm.progress.value = progress.percentage
+                        vm.progressText.value = progress.format()
+                        if (progress is IMultiPhaseProgress) {
+                            vm.message.value = progress.phase.description
+                        }
+                    }
                 } finally {
                     vm.closeCommand.invoke(true)
                 }

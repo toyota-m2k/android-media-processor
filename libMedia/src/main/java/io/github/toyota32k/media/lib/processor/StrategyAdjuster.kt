@@ -25,7 +25,7 @@ class StrategyAdjuster(
     var keepProfile: Boolean,
 ) {
     companion object {
-        fun fromOptionBuilder(b:ProcessorOptions.Builder):StrategyAdjuster {
+        fun fromOptionBuilder(b:ConvertOptions.Builder):StrategyAdjuster {
             return StrategyAdjuster(b.inputSummary, b.crop, b.brightness, b.forceReEncodeDespiteOfNecessity, b.keepHDR, b.keepVideoProfile)
         }
     }

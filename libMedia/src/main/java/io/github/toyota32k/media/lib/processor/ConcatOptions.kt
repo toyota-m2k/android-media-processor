@@ -7,8 +7,11 @@ import io.github.toyota32k.media.lib.io.HttpInputFile
 import io.github.toyota32k.media.lib.io.IHttpStreamSource
 import io.github.toyota32k.media.lib.io.IInputMediaFile
 import io.github.toyota32k.media.lib.io.IOutputMediaFile
+import io.github.toyota32k.media.lib.processor.contract.IConcatOptions
 import io.github.toyota32k.media.lib.processor.contract.IFormattable
+import io.github.toyota32k.media.lib.processor.contract.IProcessorOptions
 import io.github.toyota32k.media.lib.processor.contract.IProgress
+import io.github.toyota32k.media.lib.processor.optimizer.OptimizerOptions
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
 import io.github.toyota32k.media.lib.strategy.PresetAudioStrategies
@@ -38,22 +41,23 @@ data class ConcatSource(
  * Builderパターンで構築して利用する。
  */
 class ConcatOptions private constructor(
-    val sources: List<ConcatSource>,
-    val outPath: IOutputMediaFile,
-    val videoStrategy: IVideoStrategy,
-    val audioStrategy: IAudioStrategy,
-    val scaleMode: ScaleMode,
-    val onProgress: ((IProgress) -> Unit)?,
-) : IFormattable {
+    override val sources: List<ConcatSource>,
+    override val outPath: IOutputMediaFile,
+    override val videoStrategy: IVideoStrategy,
+    override val audioStrategy: IAudioStrategy,
+    override val scaleMode: ScaleMode,
+    override val optimizerOptions: OptimizerOptions?,
+    override val deleteOutputOnError: Boolean
+) : IConcatOptions, IFormattable {
 
     /**
      * 出力先・進捗コールバックを差し替えた ConcatOptions を作成する（Optimizer/FastStart 用）。
      */
-    internal fun derive(
-        outPath: IOutputMediaFile = this.outPath,
-        onProgress: ((IProgress) -> Unit)? = this.onProgress,
+    override fun derive(
+        outPath: IOutputMediaFile,
+        optimizerOptions: OptimizerOptions?,
     ): ConcatOptions {
-        return ConcatOptions(sources, outPath, videoStrategy, audioStrategy, scaleMode, onProgress)
+        return ConcatOptions(sources, outPath, videoStrategy, audioStrategy, scaleMode, optimizerOptions, deleteOutputOnError)
     }
 
     override fun toString(): String {
@@ -79,7 +83,8 @@ class ConcatOptions private constructor(
         private var mVideoStrategy: IVideoStrategy = PresetVideoStrategies.InvalidStrategy
         private var mAudioStrategy: IAudioStrategy = PresetAudioStrategies.InvalidStrategy
         private var mScaleMode: ScaleMode = ScaleMode.FitInside
-        private var mOnProgress: ((IProgress) -> Unit)? = null
+        private var mDeleteOutputOnError: Boolean = true
+        private var mOptimizerOptions: OptimizerOptions? = null
 
         // region Input Sources
 
@@ -127,6 +132,12 @@ class ConcatOptions private constructor(
         // endregion
 
         // region Strategies / Options
+        fun optimize(applicationContext:Context, removeFreeAtom:Boolean) = apply {
+            mOptimizerOptions = OptimizerOptions(applicationContext, removeFreeAtom)
+        }
+        fun optimize(optimizerOptions: OptimizerOptions?) = apply {
+            mOptimizerOptions = optimizerOptions
+        }
 
         /**
          * 映像ストラテジー（必須）
@@ -151,10 +162,6 @@ class ConcatOptions private constructor(
             mScaleMode = mode
         }
 
-        fun onProgress(progress: ((IProgress) -> Unit)?) = apply {
-            mOnProgress = progress
-        }
-
         // endregion
 
         fun build(): ConcatOptions {
@@ -167,7 +174,8 @@ class ConcatOptions private constructor(
                 videoStrategy = mVideoStrategy,
                 audioStrategy = mAudioStrategy,
                 scaleMode = mScaleMode,
-                onProgress = mOnProgress,
+                optimizerOptions = mOptimizerOptions,
+                deleteOutputOnError = mDeleteOutputOnError
             )
         }
     }

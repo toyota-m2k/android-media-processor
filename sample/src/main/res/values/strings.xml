@@ -41,4 +41,5 @@
     <string name="use_processor">Use Processor</string>
     <string name="execute_concat">Concat</string>
     <string name="execute_split">Split</string>
+    <string name="optimize">Optimize</string>
 </resources>

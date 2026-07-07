@@ -1,14 +1,13 @@
 package io.github.toyota32k.media.lib.processor.optimizer
 
+import io.github.toyota32k.media.lib.format.ContainerFormat
 import io.github.toyota32k.media.lib.io.AndroidFile
 import io.github.toyota32k.media.lib.io.toAndroidFile
-import io.github.toyota32k.media.lib.processor.ConcatOptions
-import io.github.toyota32k.media.lib.processor.DerivedProcessorOptions.Companion.derive
-import io.github.toyota32k.media.lib.processor.contract.IProgress
 import io.github.toyota32k.media.lib.processor.Processor
+import io.github.toyota32k.media.lib.processor.contract.IConvertResult
 import io.github.toyota32k.media.lib.processor.contract.IMultiPhaseProgress
-import io.github.toyota32k.media.lib.processor.contract.IProcessor
 import io.github.toyota32k.media.lib.processor.contract.IProcessorOptions
+import io.github.toyota32k.media.lib.processor.contract.IProgress
 import io.github.toyota32k.media.lib.strategy.PresetVideoStrategies
 import kotlinx.coroutines.CancellationException
 import java.io.File
@@ -42,55 +41,38 @@ object Optimizer {
         }
     }
 
-    fun optimize(processor: IProcessor, processorOptions: IProcessorOptions, optimizeOptions: OptimizerOptions): Processor.Result {
+    fun process(processorOptions: IProcessorOptions, onProgress: ((IProgress) -> Unit)?, firstPhaseProcess:(IProcessorOptions)->IConvertResult): IConvertResult {
+        val optimizeOptions = processorOptions.optimizerOptions ?: return firstPhaseProcess(processorOptions)
         val outputFile: AndroidFile = processorOptions.outPath as? AndroidFile ?: throw IllegalStateException("output file must be AndroidFile.")
-        return withWorkFile(optimizeOptions, outputFile) { workFile, multiProgress, progressCallback ->
-            val derivedProcessorOptions = processorOptions.derive(workFile) {
-                 progressCallback?.invoke(multiProgress.updateProgress(it))
-            }
+        return processAndOptimize(optimizeOptions, outputFile, onProgress) { workFile, multiProgress ->
+            val derivedOptions = processorOptions.derive(workFile)
             // Convert
-            val firstPhase = if (derivedProcessorOptions.videoStrategy == PresetVideoStrategies.InvalidStrategy) OptimizingProcessorPhase.SPLITTING else OptimizingProcessorPhase.CONVERTING
-            progressCallback?.invoke(multiProgress.updatePhase(firstPhase))
-            processor.process(derivedProcessorOptions)
-        }
-    }
-
-    /**
-     * 結合(concat)を実行して、その出力に FastStart を適用する。
-     * 通常は Processor.executeConcat() 内で利用され、直接このメソッドを利用することはない。
-     */
-    fun optimizeConcat(processor: Processor, concatOptions: ConcatOptions, optimizeOptions: OptimizerOptions): Processor.Result {
-        val outputFile: AndroidFile = concatOptions.outPath as? AndroidFile ?: throw IllegalStateException("output file must be AndroidFile.")
-        return withWorkFile(optimizeOptions, outputFile) { workFile, multiProgress, progressCallback ->
-            val derivedOptions = concatOptions.derive(outPath = workFile) {
-                progressCallback?.invoke(multiProgress.updateProgress(it))
-            }
-            // Concat
-            progressCallback?.invoke(multiProgress.updatePhase(OptimizingProcessorPhase.CONVERTING))
-            processor.concat(derivedOptions)
+            val firstPhase = if (derivedOptions.videoStrategy == PresetVideoStrategies.InvalidStrategy) OptimizingProcessorPhase.SPLITTING else OptimizingProcessorPhase.CONVERTING
+            onProgress?.invoke(multiProgress.updatePhase(firstPhase))
+            firstPhaseProcess(derivedOptions)
         }
     }
 
     /**
      * 作業ファイルの管理と FastStart の適用（optimize / optimizeConcat の共通処理）
      */
-    private fun withWorkFile(
+    private fun processAndOptimize(
         optimizeOptions: OptimizerOptions,
         outputFile: AndroidFile,
-        convert: (workFile: AndroidFile, multiProgress: MultiPhaseProgress, progressCallback: ((IMultiPhaseProgress) -> Unit)?) -> Any
+        onProgress: ((IProgress) -> Unit)?,
+        convert: (workFile: AndroidFile, multiProgress: MultiPhaseProgress) -> Any
     ): Processor.Result {
         val workFile: AndroidFile = File.createTempFile("ame", ".tmp", optimizeOptions.applicationContext.cacheDir).toAndroidFile()
         try {
             val multiProgress = MultiPhaseProgress(2)
-            val progressCallback = optimizeOptions.onMultiPhaseProgress
 
             // Convert / Concat
-            val processorResult = convert(workFile, multiProgress, progressCallback)
+            val processorResult = convert(workFile, multiProgress)
 
             // Fast Start
-            progressCallback?.invoke(multiProgress.updatePhase(OptimizingProcessorPhase.OPTIMIZING))
-            val result = FastStart.process(workFile, outputFile, optimizeOptions.moveFreeAtom) { p: IProgress ->
-                progressCallback?.invoke(multiProgress.updateProgress(p))
+            onProgress?.invoke(multiProgress.updatePhase(OptimizingProcessorPhase.OPTIMIZING))
+            val result = FastStart.process(workFile, outputFile, optimizeOptions.removeFreeAtom) { p: IProgress ->
+                onProgress?.invoke(multiProgress.updateProgress(p))
             }
             if (!result) {
                 // Fast Start が処理しなかった（すでに最適化されている）場合は、作業ファイルをoutputにコピーする。
