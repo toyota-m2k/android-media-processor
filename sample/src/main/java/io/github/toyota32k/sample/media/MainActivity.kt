@@ -19,7 +19,6 @@ import io.github.toyota32k.binder.command.LiteUnitCommand
 import io.github.toyota32k.binder.command.bindCommand
 import io.github.toyota32k.binder.enableBinding
 import io.github.toyota32k.binder.materialRadioButtonGroupBinding
-import io.github.toyota32k.binder.multiEnableBinding
 import io.github.toyota32k.binder.multiVisibilityBinding
 import io.github.toyota32k.binder.spinnerBinding
 import io.github.toyota32k.binder.textBinding
@@ -66,7 +65,6 @@ import io.github.toyota32k.utils.lifecycle.DisposableFlowObserver
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
-import java.io.File
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicLong
 
@@ -154,11 +152,6 @@ class MainActivity : UtMortalActivity() {
             val summary = Analyzer.analyze(output.toAndroidFile(application))
             MultilineTextDialog.show("Output File", summary.toString())
         }
-        val analyzeOutputFile2Command = LiteUnitCommand {
-            val output = outputFile2.value ?: return@LiteUnitCommand
-            val summary = Analyzer.analyze(output.toAndroidFile(application))
-            MultilineTextDialog.show("Output File 2", summary.toString())
-        }
         val videoDeviceCapabilitiesCommand = LiteUnitCommand {
             val enc = DeviceCapabilities.availableCodecs(namedVideoStrategy.value.strategy.codec, true)
             val dec = DeviceCapabilities.availableCodecs(namedVideoStrategy.value.strategy.codec, false)
@@ -181,16 +174,13 @@ class MainActivity : UtMortalActivity() {
         val inputFile: MutableStateFlow<Uri?> = MutableStateFlow(null)
         val inputFile2: MutableStateFlow<Uri?> = MutableStateFlow(null)
         val outputFile: MutableStateFlow<Uri?> = MutableStateFlow(null)
-        val outputFile2: MutableStateFlow<Uri?> = MutableStateFlow(null)
 
         val inputFileAvailable = inputFile.map { it!=null }
         val inputFile2Available = inputFile2.map { it!=null }
         val outputFileAvailable = outputFile.map { it!=null }
-        val outputFile2Available = outputFile2.map { it!=null }
         val inputFileName = inputFile.map { it?.toAndroidFile(application)?.getFileName() ?: "select input file"}
         val inputFile2Name = inputFile2.map { it?.toAndroidFile(application)?.getFileName() ?: "select input file"}
         val outputFileName = outputFile.map {it?.toAndroidFile(application)?.getFileName() ?: "select output file"}
-        val outputFile2Name = outputFile2.map {it?.toAndroidFile(application)?.getFileName() ?: "select output file"}
         val enableOptimize = MutableStateFlow(true)
         val readyToConvert = combine(inputFileAvailable, outputFileAvailable) {i,o-> i && o }
         val readyToConcat = combine(inputFileAvailable, inputFile2Available, outputFileAvailable) {i,o,o2-> i && o && o2}
@@ -203,7 +193,6 @@ class MainActivity : UtMortalActivity() {
             Input,
             Input2,
             Output,
-            Output2,
         }
         val playSource: MutableStateFlow<SourceIndex> = MutableStateFlow(SourceIndex.Input)
 
@@ -221,9 +210,6 @@ class MainActivity : UtMortalActivity() {
                 }
                 SourceIndex.Output -> {
                     if (converted.value || split.value) outputFile.value?.toAndroidFile(getApplication()) else null
-                }
-                SourceIndex.Output2 -> {
-                    if (split.value) outputFile2.value?.toAndroidFile(getApplication()) else null
                 }
             }
             if(src!=null) {
@@ -282,25 +268,8 @@ class MainActivity : UtMortalActivity() {
                 }
             }
         }
-        val selectOutputFile2Command = LiteUnitCommand {
-            UtImmortalTask.launchTask {
-                withOwner {
-                    val activity = it.asActivity() as MainActivity
-                    val inFile = inputFile.value?.let { AndroidFile(it, application).getFileName() }
-                    val outFile = if(inFile.isNullOrBlank()) "output-2.mp4" else "output-2-$inFile"
-                    val file = activity.activityBrokers.createFilePicker.selectFile(outFile, "video/mp4")
-                    if(file!=null) {
-                        outputFile2.value = file
-                        converted.value = false
-                        split.value = false
-                        playSource.value = SourceIndex.Output2
-                        updatePlayerSource()
-                    }
-                }
-            }
-        }
 
-        private val observer = DisposableFlowObserver(playSource) { it->
+        private val observer = DisposableFlowObserver(playSource) {
             updatePlayerSource()
         }
 
@@ -348,8 +317,6 @@ class MainActivity : UtMortalActivity() {
         private fun stringInKb(size: Long): String {
             return String.format(Locale.US, "%,d KB", size / 1000L)
         }
-
-        val useNewProcessor = MutableStateFlow(true)
 
         val commandConvert = LiteUnitCommand() {
             val srcFile = AndroidFile(inputFile.value ?: return@LiteUnitCommand, application)
@@ -475,8 +442,6 @@ class MainActivity : UtMortalActivity() {
             .bindCommand(viewModel.analyzeInputFileCommand, controls.inputAnalyzeButton)
             .bindCommand(viewModel.selectOutputFileCommand, controls.outputFileButton)
             .bindCommand(viewModel.analyzeOutputFileCommand, controls.outputAnalyzeButton)
-            .bindCommand(viewModel.selectOutputFile2Command, controls.output2FileButton)
-            .bindCommand(viewModel.analyzeOutputFile2Command, controls.output2AnalyzeButton)
             .bindCommand(viewModel.commandAddChapter, controls.makeChapter)
             .bindCommand(viewModel.commandAddSkippingChapter, controls.makeChapterAndSkip)
             .bindCommand(viewModel.commandRemoveChapter, controls.removeNextChapter)
@@ -488,19 +453,15 @@ class MainActivity : UtMortalActivity() {
             .enableBinding(controls.inputAnalyzeButton, viewModel.inputFileAvailable)
             .enableBinding(controls.inputAnalyze2Button, viewModel.inputFile2Available)
             .enableBinding(controls.outputAnalyzeButton, combine(viewModel.outputFileAvailable, viewModel.converted) {o,c->o&&c})
-            .enableBinding(controls.output2AnalyzeButton, combine(viewModel.outputFile2Available, viewModel.split) {o,c->o&&c})
             .enableBinding(controls.saveVideo, viewModel.readyToConvert)
             .enableBinding(controls.concatVideo, viewModel.readyToConcat)
-            .multiEnableBinding(arrayOf(controls.buttonOutput2,controls.output2AnalyzeButton),  viewModel.outputFile2Available)
             .textBinding(controls.inputFileButton, viewModel.inputFileName)
             .textBinding(controls.input2FileButton, viewModel.inputFile2Name)
             .textBinding(controls.outputFileButton, viewModel.outputFileName)
-            .textBinding(controls.output2FileButton, viewModel.outputFile2Name)
             .materialRadioButtonGroupBinding(controls.playSelector, viewModel.playSource, object: IIDValueResolver<SourceIndex> {
                 override fun id2value(id: Int): SourceIndex {
                     return when(id) {
                         controls.buttonOutput.id -> SourceIndex.Output
-                        controls.buttonOutput2.id -> SourceIndex.Output2
                         controls.buttonInput2.id -> SourceIndex.Input2
                         else -> SourceIndex.Input
                     }
@@ -508,7 +469,6 @@ class MainActivity : UtMortalActivity() {
                 override fun value2id(v: SourceIndex): Int {
                     return when(v) {
                         SourceIndex.Output -> controls.buttonOutput.id
-                        SourceIndex.Output2 -> controls.buttonOutput2.id
                         SourceIndex.Input2 -> controls.buttonInput2.id
                         else -> controls.buttonInput.id
                     }
@@ -519,7 +479,6 @@ class MainActivity : UtMortalActivity() {
 //            }
             .checkBinding(controls.useSoftwareDecoder, viewModel.softwareDecode)
             .checkBinding(controls.useSoftwareEncoder, viewModel.softwareEncode)
-            .checkBinding(controls.useProcessor, viewModel.useNewProcessor)
             .checkBinding(controls.enableOptimize, viewModel.enableOptimize)
             .spinnerBinding(controls.videoStrategy, viewModel.namedVideoStrategy, videoStrategies)
             .spinnerBinding(controls.audioStrategy, viewModel.namedAudioStrategy, audioStrategies)

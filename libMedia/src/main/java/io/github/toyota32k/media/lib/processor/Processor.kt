@@ -408,13 +408,13 @@ class Processor(
     }
 
     /**
-     * concat()の後、fast start を実行
+     * 複数の動画ファイルを結合する。
      */
     suspend fun concat(options: IConcatOptions, onProgress: ((IProgress) -> Unit)?): IConvertResult {
         return withContext(Dispatchers.IO) {
             try {
-                Optimizer.process( options, onProgress) {
-                    concatCore(options, onProgress)
+                Optimizer.process( options, onProgress) { workerOptions->
+                    concatCore(workerOptions as IConcatOptions, onProgress)
                 }
             } catch (e: Throwable) {
                 if (options.deleteOutputOnError) {
@@ -426,13 +426,13 @@ class Processor(
     }
 
     /**
-     * Dispatchers.IO で process()を実行
+     * 動画ファイルの変換、トリミング（切り出し）
      */
     suspend fun convert(options: IConvertOptions, onProgress:((IProgress)->Unit)?): IConvertResult {
         return withContext(Dispatchers.IO) {
             try {
-                Optimizer.process( options, onProgress) {
-                    convertCore(options, onProgress)
+                Optimizer.process( options, onProgress) { workerOptions->
+                    convertCore(workerOptions as IConvertOptions, onProgress)
                 }
             } catch (e: Throwable) {
                 if (options.deleteOutputOnError) {

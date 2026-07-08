@@ -11,16 +11,22 @@ import io.github.toyota32k.media.lib.processor.optimizer.OptimizerOptions
 import io.github.toyota32k.media.lib.types.RangeUs
 import io.github.toyota32k.media.lib.types.ScaleMode
 
+/**
+ * 共通のオプション
+ */
 interface IProcessorOptions {
     val outPath: IOutputMediaFile
-    val optimizerOptions: OptimizerOptions?
-    val deleteOutputOnError:Boolean
     val videoStrategy: IVideoStrategy
     val audioStrategy: IAudioStrategy
+    val optimizerOptions: OptimizerOptions?
+    val deleteOutputOnError:Boolean
     // 出力ファイルを差し替える
     fun derive(outPath: IOutputMediaFile, optimizerOptions: OptimizerOptions?=null): IProcessorOptions
 }
 
+/**
+ * 動画変換、トリミング用オプション
+ */
 interface IConvertOptions : IProcessorOptions {
     val inPath: IInputMediaFile
     val rangesUs:List<RangeUs>
@@ -29,6 +35,9 @@ interface IConvertOptions : IProcessorOptions {
     val renderOption:RenderOption?
 }
 
+/**
+ * 動画結合用オプション
+ */
 interface IConcatOptions : IProcessorOptions {
     val sources: List<ConcatSource>
     val scaleMode: ScaleMode

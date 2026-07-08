@@ -43,33 +43,18 @@ object Optimizer {
 
     fun process(processorOptions: IProcessorOptions, onProgress: ((IProgress) -> Unit)?, firstPhaseProcess:(IProcessorOptions)->IConvertResult): IConvertResult {
         val optimizeOptions = processorOptions.optimizerOptions ?: return firstPhaseProcess(processorOptions)
-        val outputFile: AndroidFile = processorOptions.outPath as? AndroidFile ?: throw IllegalStateException("output file must be AndroidFile.")
-        return processAndOptimize(optimizeOptions, outputFile, onProgress) { workFile, multiProgress ->
-            val derivedOptions = processorOptions.derive(workFile)
-            // Convert
-            val firstPhase = if (derivedOptions.videoStrategy == PresetVideoStrategies.InvalidStrategy) OptimizingProcessorPhase.SPLITTING else OptimizingProcessorPhase.CONVERTING
-            onProgress?.invoke(multiProgress.updatePhase(firstPhase))
-            firstPhaseProcess(derivedOptions)
-        }
-    }
 
-    /**
-     * 作業ファイルの管理と FastStart の適用（optimize / optimizeConcat の共通処理）
-     */
-    private fun processAndOptimize(
-        optimizeOptions: OptimizerOptions,
-        outputFile: AndroidFile,
-        onProgress: ((IProgress) -> Unit)?,
-        convert: (workFile: AndroidFile, multiProgress: MultiPhaseProgress) -> Any
-    ): Processor.Result {
+        val outputFile: AndroidFile = processorOptions.outPath as? AndroidFile ?: throw IllegalStateException("output file must be AndroidFile.")
         val workFile: AndroidFile = File.createTempFile("ame", ".tmp", optimizeOptions.applicationContext.cacheDir).toAndroidFile()
         try {
+            val derivedOptions = processorOptions.derive(workFile)
             val multiProgress = MultiPhaseProgress(2)
-
-            // Convert / Concat
-            val processorResult = convert(workFile, multiProgress)
-
-            // Fast Start
+            val firstPhase = if (derivedOptions.videoStrategy == PresetVideoStrategies.InvalidStrategy) OptimizingProcessorPhase.SPLITTING else OptimizingProcessorPhase.CONVERTING
+            onProgress?.invoke(multiProgress.updatePhase(firstPhase))
+            val firstResult = firstPhaseProcess(derivedOptions)
+            if (!firstResult.succeeded) {
+                return firstResult
+            }
             onProgress?.invoke(multiProgress.updatePhase(OptimizingProcessorPhase.OPTIMIZING))
             val result = FastStart.process(workFile, outputFile, optimizeOptions.removeFreeAtom) { p: IProgress ->
                 onProgress?.invoke(multiProgress.updateProgress(p))
@@ -78,12 +63,7 @@ object Optimizer {
                 // Fast Start が処理しなかった（すでに最適化されている）場合は、作業ファイルをoutputにコピーする。
                 outputFile.copyFrom(workFile)
             }
-            return Processor.Result(processorResult as Processor.Result, outputFile = outputFile)
-        } catch(e:Throwable) {
-            if (e !is CancellationException) {
-                logger.error(e)
-            }
-            throw e
+            return Processor.Result(firstResult as Processor.Result, outputFile = outputFile)
         } finally {
             workFile.safeDelete()
         }
