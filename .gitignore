@@ -32,3 +32,4 @@ app/build
 .idea/markdown.xml
 .idea/compiler.xml
 .idea/compiler.xml
+doc/design-concat-ja.md

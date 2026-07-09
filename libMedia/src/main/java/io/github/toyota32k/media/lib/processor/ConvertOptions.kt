@@ -15,6 +15,7 @@ import io.github.toyota32k.media.lib.processor.contract.IFormattable
 import io.github.toyota32k.media.lib.processor.contract.IProgress
 import io.github.toyota32k.media.lib.processor.optimizer.OptimizerOptions
 import io.github.toyota32k.media.lib.report.Summary
+import io.github.toyota32k.media.lib.report.VideoSummary
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
 import io.github.toyota32k.media.lib.strategy.PresetAudioStrategies
@@ -31,7 +32,7 @@ import kotlin.time.Duration
  * Processor.process() に渡すパラメーターを１つのオブジェクトのまとめるクラス。
  * process()に個々のパラメータを指定してもよいが、通常は、BuilderパターンでProcessorOptionsを構築して利用する。
  */
-data class ConvertOptions(
+data class ConvertOptions (
     override val inPath: IInputMediaFile,
     override val outPath: IOutputMediaFile,
     override val videoStrategy: IVideoStrategy,
@@ -42,6 +43,7 @@ data class ConvertOptions(
     override val renderOption: RenderOption?,
     override val optimizerOptions: OptimizerOptions?,
     override val deleteOutputOnError: Boolean,
+    val inputSummary: Summary = Analyzer.analyze(inPath ?: throw IllegalStateException("input file is not specified."))
 ): IConvertOptions, IFormattable {
     override fun toString() : String {
         return format().toString()
@@ -81,22 +83,18 @@ data class ConvertOptions(
         private var mClipEndUs:Long = 0L
         private var mLimitDurationUs: Long = 0L
 
-        var mOnProgress: ((IProgress)->Unit)? = null
-
         // region Computed Parameters
 
-        val renderOption: RenderOption
-            get() = if (mCropRect != null) {
-                val summary = inputSummary.videoSummary ?: throw IllegalStateException("no video information, cannot crop.")
+        fun getRenderOption(summary:VideoSummary?): RenderOption {
+            return if(summary==null) {
+                RenderOption.DEFAULT    // maybe no video stream
+            } else if (mCropRect != null) {
                 RenderOption.create(summary.width, summary.height, mCropRect!!, mBrightnessFactor)
             } else if (mBrightnessFactor != 1f) {
                 RenderOption.create(mBrightnessFactor)
             } else {
                 RenderOption.DEFAULT
             }
-
-        val inputSummary: Summary by lazy {
-            analyze(mInPath ?: throw IllegalStateException("input file is not specified."))
         }
 
         // endregion
@@ -104,7 +102,6 @@ data class ConvertOptions(
         // region I/O files
 
         val input: IInputMediaFile? get() = mInPath
-
 
         /**
          * 入力ファイルを設定（必須）
@@ -214,11 +211,6 @@ data class ConvertOptions(
         }
         val forceReEncodeDespiteOfNecessity:Boolean get() = mForceReEncodeDespiteOfNecessity
 
-        fun onProgress(progress:((IProgress)->Unit)?) = apply {
-            mOnProgress = progress
-        }
-        val onProgress:((IProgress)->Unit)? get() = mOnProgress
-
         // endregion
 
         // region Trimming
@@ -316,15 +308,18 @@ data class ConvertOptions(
          * ProcessorOption を作成する
          */
         fun build(): ConvertOptions {
+            val inPath = mInPath ?: throw IllegalStateException("input file is not specified.")
+            val inputSummary = Analyzer.analyze(inPath)
+            val adjustedStrategy = StrategyAdjuster(inputSummary, mCropRect, mBrightnessFactor, mForceReEncodeDespiteOfNecessity, mKeepHDR, mKeepProfile).adjust(mVideoStrategy)
             return ConvertOptions(
-                inPath = mInPath ?: throw IllegalStateException("input file is not specified."),
+                inPath = inPath,
                 outPath = mOutPath ?: throw IllegalStateException("output file is not specified."),
-                videoStrategy = StrategyAdjuster.fromOptionBuilder(this).adjust(mVideoStrategy),
+                videoStrategy = adjustedStrategy,
                 audioStrategy = mAudioStrategy,
                 rangesUs = mTrimmingRangeListBuilder.toRangeUsListWithClipUs(mClipStartUs, mClipEndUs),
                 limitDurationUs = mLimitDurationUs,
                 rotation = mRotation,
-                renderOption = renderOption,
+                renderOption = getRenderOption(inputSummary.videoSummary),
                 optimizerOptions = mOptimizerOptions,
                 deleteOutputOnError = mDeleteOutputOnError
             )

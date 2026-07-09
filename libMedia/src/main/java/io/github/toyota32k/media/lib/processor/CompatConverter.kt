@@ -210,9 +210,9 @@ class CompatConverter(
         /**
          * 進捗報告ハンドラを設定
          */
+        var mOnProgress: ((IProgress)->Unit)? = null
         fun setProgressHandler(proc:(IProgress)->Unit) = apply {
-            // processorBuilder.onProgress(proc)
-            optionBuilder.onProgress(proc)
+            mOnProgress = proc
         }
 
         /**
@@ -260,7 +260,7 @@ class CompatConverter(
                 val options = optionBuilder.build()
                 logger.dump(options)
                 logger.dump(processor)
-                return CompatConverter(processor, options, optionBuilder.mOnProgress)
+                return CompatConverter(processor, options, mOnProgress)
             } catch(e:Throwable) {
                 logger.error(e)
                 if (mDeleteOutputOnError) {
