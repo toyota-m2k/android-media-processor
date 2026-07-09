@@ -63,14 +63,20 @@ class SyncMuxer(val outFile: IOutputMediaFile, containerFormat: ContainerFormat,
         }
     }
 
-    fun setup(metaData: MetaData, rotation: Rotation?) {
-        val metaRotation = metaData.rotation
-        if (metaRotation != null) {
-            val r = rotation?.rotate(metaRotation) ?: metaRotation
-            muxer.setOrientationHint(r)
-            Processor.logger.info("metadata: rotation=$metaRotation --> $r")
-        } else if(rotation!=null){
-            muxer.setOrientationHint(rotation.rotate(0))
+    /**
+     * @param applyRotation 回転メタデータ(orientation hint)を出力に設定するなら true（デフォルト）。
+     *                      結合(concat)では回転をGLレンダリングで正規化するため false を指定する。
+     */
+    fun setup(metaData: MetaData, rotation: Rotation?, applyRotation: Boolean = true) {
+        if (applyRotation) {
+            val metaRotation = metaData.rotation
+            if (metaRotation != null) {
+                val r = rotation?.rotate(metaRotation) ?: metaRotation
+                muxer.setOrientationHint(r)
+                Processor.logger.info("metadata: rotation=$metaRotation --> $r")
+            } else if (rotation != null) {
+                muxer.setOrientationHint(rotation.rotate(0))
+            }
         }
         val locationString = metaData.location
         if (locationString != null) {

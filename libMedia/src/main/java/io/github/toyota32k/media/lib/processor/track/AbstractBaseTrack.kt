@@ -25,7 +25,7 @@ abstract class AbstractBaseTrack(val inPath:IInputMediaFile, val inputMetaData: 
     protected val bufferInfo get() = bufferSource.bufferInfo
     val extractor = rawExtractor.obj
     val trackIndex:Int = findTrackIdx(video)
-    val inputTrackMediaFormat: MediaFormat = extractor.getTrackFormat(trackIndex)
+    val inputTrackMediaFormat: MediaFormat = if (trackIndex>=0) extractor.getTrackFormat(trackIndex) else MediaFormat() // ダミー
     open val outputTrackMediaFormat: MediaFormat = inputTrackMediaFormat
 
     override val isAvailable: Boolean get() = trackIndex>=0
@@ -58,6 +58,17 @@ abstract class AbstractBaseTrack(val inPath:IInputMediaFile, val inputMetaData: 
         }
     }
 
+    /**
+     * 出力PTSの開始オフセットを設定する（結合用）。
+     * startRange() が currentRangeStartPresentationTimeUs = presentationTimeUs とすることで、
+     * 以降の出力PTSは baseUs から連続する。
+     */
+    override fun setBasePresentationTimeUs(baseUs: Long) {
+        logger.info("base presentation time = ${baseUs.formatAsUs()}")
+        presentationTimeUs = baseUs
+        currentRangeStartPresentationTimeUs = baseUs
+    }
+
     override fun startRange(startFromUS:Long):Long {
         return if (isAvailable) {
             logger.info("Seek To ${startFromUS.formatAsUs()}")
@@ -75,9 +86,11 @@ abstract class AbstractBaseTrack(val inPath:IInputMediaFile, val inputMetaData: 
     }
 
     override fun finalize() {
-        report.updateInputSummary(inputTrackMediaFormat, inputMetaData)
-        report.updateOutputSummary(outputTrackMediaFormat)
-        report.updateInputFileInfo(inPath.getLength(), inputMetaData.duration?:-1)
+        if (isAvailable) {
+            report.updateInputSummary(inputTrackMediaFormat, inputMetaData)
+            report.updateOutputSummary(outputTrackMediaFormat)
+            report.updateInputFileInfo(inPath.getLength(), inputMetaData.duration ?: -1)
+        }
     }
 
     override fun close() {

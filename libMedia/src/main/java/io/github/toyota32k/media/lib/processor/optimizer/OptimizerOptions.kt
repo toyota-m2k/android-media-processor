@@ -1,6 +1,5 @@
 package io.github.toyota32k.media.lib.processor.optimizer
 
-import android.app.Application
 import android.content.Context
 import io.github.toyota32k.media.lib.processor.contract.IMultiPhaseProgress
 import io.github.toyota32k.media.lib.processor.contract.IProgress
@@ -16,8 +15,7 @@ data class OptimizingProcessorPhase(override val description:String, override va
 
 data class OptimizerOptions(
     val applicationContext: Context,       // 一時ファイルを作るため、コンテキストが必要
-    val moveFreeAtom:Boolean,
-    val onMultiPhaseProgress:((IMultiPhaseProgress)->Unit)?,
+    val removeFreeAtom:Boolean,
 ) {
-    constructor(applicationContext: Context, onProgress:(IMultiPhaseProgress)->Unit):this(applicationContext, true,onProgress)
+    constructor(applicationContext: Context):this(applicationContext, true)
 }

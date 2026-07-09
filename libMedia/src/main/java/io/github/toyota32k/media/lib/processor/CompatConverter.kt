@@ -9,19 +9,18 @@ import io.github.toyota32k.media.lib.io.HttpInputFile
 import io.github.toyota32k.media.lib.io.IHttpStreamSource
 import io.github.toyota32k.media.lib.io.IInputMediaFile
 import io.github.toyota32k.media.lib.io.IOutputMediaFile
-import io.github.toyota32k.media.lib.processor.contract.IProgress
-import io.github.toyota32k.media.lib.types.Rotation
-import io.github.toyota32k.media.lib.format.ContainerFormat
+import io.github.toyota32k.media.lib.legacy.converter.ConvertResult
 import io.github.toyota32k.media.lib.processor.contract.IConvertResult
 import io.github.toyota32k.media.lib.processor.contract.IExecutor
 import io.github.toyota32k.media.lib.processor.contract.IFormattable.Companion.dump
-import io.github.toyota32k.media.lib.utils.RangeUsListBuilder
+import io.github.toyota32k.media.lib.processor.contract.IProgress
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
-import io.github.toyota32k.media.lib.legacy.converter.ConvertResult
 import io.github.toyota32k.media.lib.types.RangeUs
 import io.github.toyota32k.media.lib.types.RangeUs.Companion.ms2us
+import io.github.toyota32k.media.lib.types.Rotation
+import io.github.toyota32k.media.lib.utils.RangeUsListBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -32,7 +31,8 @@ import kotlin.time.Duration
  */
 class CompatConverter(
     val processor: Processor,
-    val options: ProcessorOptions,
+    val options: ConvertOptions,
+    val onProgress: ((IProgress)->Unit)?,
     val deleteOutputOnError: Boolean = true
 ) : IExecutor {
     companion object {
@@ -42,7 +42,7 @@ class CompatConverter(
     override suspend fun execute(): IConvertResult {
         return withContext(Dispatchers.IO) {
             try {
-                processor.process(options)
+                processor.process(options, onProgress)
             } catch(e:Throwable) {
                 logger.error(e)
                 if (deleteOutputOnError) {
@@ -58,8 +58,7 @@ class CompatConverter(
     }
 
     class Builder(
-        val processorBuilder:Processor.Builder = Processor.Builder(),
-        val optionBuilder: ProcessorOptions.Builder = ProcessorOptions.Builder(),) {
+        val optionBuilder: ConvertOptions.Builder = ConvertOptions.Builder(),) {
         private var mDeleteOutputOnError = true
 
         /**
@@ -209,26 +208,11 @@ class CompatConverter(
         // region Processor Properties
 
         /**
-         * コンテナフォーマットを指定
-         * MPEG_4 以外はテストしていません。
-         */
-        fun containerFormat(containerFormat: ContainerFormat) = apply {
-            processorBuilder.containerFormat(containerFormat)
-        }
-
-        /**
-         * 作業バッファサイズ（NoReEncodeの場合にのみ使用）
-         */
-        fun bufferSize(sizeInBytes:Int) = apply {
-            processorBuilder.bufferSize(sizeInBytes)
-        }
-
-        /**
          * 進捗報告ハンドラを設定
          */
+        var mOnProgress: ((IProgress)->Unit)? = null
         fun setProgressHandler(proc:(IProgress)->Unit) = apply {
-            // processorBuilder.onProgress(proc)
-            optionBuilder.onProgress(proc)
+            mOnProgress = proc
         }
 
         /**
@@ -272,11 +256,11 @@ class CompatConverter(
 
         fun build(): CompatConverter {
             try {
-                val processor = processorBuilder.build()
+                val processor = Processor()
                 val options = optionBuilder.build()
                 logger.dump(options)
                 logger.dump(processor)
-                return CompatConverter(processor, options)
+                return CompatConverter(processor, options, mOnProgress)
             } catch(e:Throwable) {
                 logger.error(e)
                 if (mDeleteOutputOnError) {

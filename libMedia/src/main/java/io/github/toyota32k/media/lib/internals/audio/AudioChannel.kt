@@ -11,8 +11,21 @@ import java.nio.ByteOrder
 import java.nio.ShortBuffer
 import java.util.ArrayDeque
 import java.util.Queue
+import kotlin.math.min
 
-class AudioChannel {
+/**
+ * デコーダー出力（PCM）をチャネル変換（remix）・サンプルレート変換（resample）してエンコーダーに供給するクラス。
+ *
+ * @param fixedOutputSampleRate   出力サンプルレートを固定する場合に指定（結合(concat)用）。
+ *                                null なら入力と同じサンプルレートで出力（従来動作）。
+ *                                入力と異なるレートが指定された場合はリサンプラーを挿入する。
+ * @param fixedOutputChannelCount 出力チャネル数を固定する場合に指定（結合(concat)用）。
+ *                                null なら AudioStrategy から決定（従来動作）。
+ */
+class AudioChannel(
+    private val fixedOutputSampleRate: Int? = null,
+    private val fixedOutputChannelCount: Int? = null,
+) {
     companion object {
         const val BUFFER_INDEX_END_OF_STREAM = -1
         val logger = UtLog("AC", Converter.logger)
@@ -38,6 +51,11 @@ class AudioChannel {
 
     private lateinit var mRemixer: AudioRemixer
 
+    // リサンプリング（サンプルレート変換）
+    private var mResampler: IAudioResampler? = null
+    private var mRemixScratchBuffer: ShortBuffer? = null    // remix（チャネル変換）結果の作業バッファ
+    private var mResampleScratchBuffer: ShortBuffer? = null // resample 結果の作業バッファ
+
     private val mOverflowBuffer = AudioBuffer()
 
     private lateinit var mActualDecodedFormat: MediaFormat
@@ -53,17 +71,14 @@ class AudioChannel {
     fun setActualDecodedFormat(actualFormat: MediaFormat, presetFormat: MediaFormat, audioStrategy: IAudioStrategy) {
         mActualDecodedFormat = actualFormat
         mInputSampleRate = actualFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE)
-        val encodingSampleRate = presetFormat.getInteger(MediaFormat.KEY_SAMPLE_RATE)
-        if (mInputSampleRate != encodingSampleRate) {
-            // throw UnsupportedOperationException("Audio sample rate conversion not supported yet.")
-            logger.info("Sample Rate: input=$mInputSampleRate, output=$encodingSampleRate")
-            logger.info("Audio sample rate conversion not supported yet.")
-        }
-        outputSampleRate = mInputSampleRate
+        // 出力サンプルレート:
+        // - fixedOutputSampleRate 指定時（結合(concat)用）: その値に固定し、必要ならリサンプラーを挿入する
+        // - 未指定時: 入力と同じサンプルレートで出力（従来動作）
+        outputSampleRate = fixedOutputSampleRate ?: mInputSampleRate
         // 実際の入力チャネル数
         mInputChannelCount = actualFormat.getInteger(MediaFormat.KEY_CHANNEL_COUNT)
-        // 出力チャネル数： 実際の入力チャネル数＋AudioStrategy によって出力チャネル数を決定する
-        outputChannelCount = audioStrategy.resolveOutputChannelCount(actualFormat)
+        // 出力チャネル数： fixedOutputChannelCount 指定時はその値、未指定なら入力チャネル数＋AudioStrategy によって決定する
+        outputChannelCount = fixedOutputChannelCount ?: audioStrategy.resolveOutputChannelCount(actualFormat)
         if (mInputChannelCount != 1 && mInputChannelCount != 2) {
             throw UnsupportedOperationException("Input channel count ($mInputChannelCount) not supported.")
         }
@@ -82,6 +97,10 @@ class AudioChannel {
             logger.debug("pass through")
             AudioRemixer.PASSTHROUGH
         }
+        mResampler = if (outputSampleRate != mInputSampleRate) {
+            logger.info("resample: $mInputSampleRate Hz --> $outputSampleRate Hz")
+            LinearResampler(mInputSampleRate, outputSampleRate, outputChannelCount)
+        } else null
         mOverflowBuffer.presentationTimeUs = 0
     }
 
@@ -101,15 +120,28 @@ class AudioChannel {
         buffer.data = data?.asShortBuffer()
 
         if (mOverflowBuffer.data == null && data!=null) {
-            mOverflowBuffer.data = ByteBuffer
-                .allocateDirect(data.capacity())
-                .order(ByteOrder.nativeOrder())
-                .asShortBuffer()
-                .apply {
-                    clear().flip()
-                }
+            // 作業バッファの確保
+            // - remix(チャネル変換)の最悪ケース(UPMIX)で入力の2倍
+            // - resample(レート変換)がある場合は、さらにレート比で増加
+            val inputShorts = data.capacity() / BYTES_PER_SHORT
+            val remixedShorts = inputShorts * 2
+            val resampledShorts = mResampler?.estimateOutputSampleCount(remixedShorts) ?: remixedShorts
+            mOverflowBuffer.data = allocateShortBuffer(resampledShorts).apply {
+                clear().flip()
+            }
+            if (mResampler != null) {
+                mRemixScratchBuffer = allocateShortBuffer(remixedShorts)
+                mResampleScratchBuffer = allocateShortBuffer(resampledShorts)
+            }
         }
         mFilledBuffers.add(buffer)
+    }
+
+    private fun allocateShortBuffer(sizeInShorts: Int): ShortBuffer {
+        return ByteBuffer
+            .allocateDirect(sizeInShorts * BYTES_PER_SHORT)
+            .order(ByteOrder.nativeOrder())
+            .asShortBuffer()
     }
 
     /**
@@ -179,26 +211,95 @@ class AudioChannel {
     }
 
     private fun sampleCountToDurationUs(sampleCount: Int, sampleRate: Int, channelCount: Int): Long {
-        return sampleCount / (sampleRate * MICROSECS_PER_SEC) / channelCount
+        // 旧実装 sampleCount / (sampleRate * MICROSECS_PER_SEC) / channelCount は
+        // 整数除算により常にほぼ0を返すバグがあったため修正。
+        if (sampleRate <= 0 || channelCount <= 0) return 0L
+        return sampleCount.toLong() * MICROSECS_PER_SEC / sampleRate / channelCount
     }
 
     private fun drainOverflow(outBuff: ShortBuffer): Long {
         val overflowBuff = mOverflowBuffer.data ?: return 0L
         val overflowLimit = overflowBuff.limit()
-        val overflowSize = overflowBuff.remaining()
-        val beginPresentationTimeUs = mOverflowBuffer.presentationTimeUs + sampleCountToDurationUs(overflowBuff.position(), mInputSampleRate, outputChannelCount)
-        outBuff.clear() // Limit overflowBuff to outBuff's capacity
-        overflowBuff.limit(outBuff.capacity()) // Load overflowBuff onto outBuff
+        // overflowバッファの内容は出力フォーマット(出力レート・出力チャネル数)のPCM
+        val beginPresentationTimeUs = mOverflowBuffer.presentationTimeUs + sampleCountToDurationUs(overflowBuff.position(), outputSampleRate, outputChannelCount)
+        outBuff.clear()
+        // outBuff の容量に収まる分だけコピーする。
+        // 旧実装は overflowBuff.limit(outBuff.capacity()) としていたが、これは
+        // 残量が outBuff.capacity() と一致しない場合に limit を引き上げて
+        // 未初期化領域をコピーしてしまうため修正。
+        val copyCount = min(overflowBuff.remaining(), outBuff.capacity())
+        overflowBuff.limit(overflowBuff.position() + copyCount)
         outBuff.put(overflowBuff)
-        if (overflowSize >= outBuff.capacity()) { // Overflow fully consumed - Reset
+        overflowBuff.limit(overflowLimit)
+        if (!overflowBuff.hasRemaining()) { // Overflow fully consumed - Reset
             overflowBuff.clear().limit(0)
-        } else { // Only partially consumed - Keep position & restore previous limit
-            overflowBuff.limit(overflowLimit)
         }
         return beginPresentationTimeUs
     }
 
     private fun remixAndMaybeFillOverflow(input: AudioBuffer, outBuff: ShortBuffer): Long {
+        val resampler = mResampler
+        return if (resampler != null) {
+            remixResampleAndMaybeFillOverflow(input, outBuff, resampler)
+        } else {
+            remixDirectAndMaybeFillOverflow(input, outBuff)
+        }
+    }
+
+    /**
+     * リサンプリングあり:
+     * decoder出力 → remix(チャネル変換) → resample(レート変換) → encoder入力バッファ
+     * encoder入力バッファに入り切らない分は overflow バッファに退避する。
+     *
+     * サンプルレート変換は再生時間を変えないため、PTSは入力バッファの値をそのまま使用できる。
+     */
+    private fun remixResampleAndMaybeFillOverflow(input: AudioBuffer, outBuff: ShortBuffer, resampler: IAudioResampler): Long {
+        val inBuff = input.data ?: return 0L
+        val remixBuff = mRemixScratchBuffer ?: return 0L
+        val resampledBuff = mResampleScratchBuffer ?: return 0L
+        outBuff.clear()
+
+        // Reset position to 0, and set limit to capacity (Since MediaCodec doesn't do that for us)
+        inBuff.clear()
+
+        // 1. remix (チャネル変換) → 作業バッファ（入力全量が必ず収まるサイズを確保済み）
+        remixBuff.clear()
+        mRemixer.remix(inBuff, remixBuff)
+        remixBuff.flip()
+
+        // 2. resample (レート変換) → 作業バッファ（同上）
+        resampledBuff.clear()
+        resampler.resample(remixBuff, resampledBuff)
+        resampledBuff.flip()
+
+        // 3. encoder入力バッファへ書き込み。入り切らない分は overflow へ。
+        if (resampledBuff.remaining() > outBuff.remaining()) {
+            val writeCount = outBuff.remaining()
+            val savedLimit = resampledBuff.limit()
+            resampledBuff.limit(resampledBuff.position() + writeCount)
+            outBuff.put(resampledBuff)
+            resampledBuff.limit(savedLimit)
+
+            // NOTE: We should only reach this point when overflow buffer is empty
+            val overflowBuff = mOverflowBuffer.data
+            if (overflowBuff != null) {
+                overflowBuff.clear()
+                overflowBuff.put(resampledBuff)
+                overflowBuff.flip()
+            }
+            mOverflowBuffer.presentationTimeUs =
+                input.presentationTimeUs + sampleCountToDurationUs(writeCount, outputSampleRate, outputChannelCount)
+        } else {
+            outBuff.put(resampledBuff)
+        }
+        return input.presentationTimeUs
+    }
+
+    /**
+     * リサンプリングなし（従来動作）:
+     * decoder出力 → remix(チャネル変換) → encoder入力バッファ
+     */
+    private fun remixDirectAndMaybeFillOverflow(input: AudioBuffer, outBuff: ShortBuffer): Long {
         val inBuff = input.data ?: return 0L
         val overflowBuff = mOverflowBuffer.data
         outBuff.clear()

@@ -1,7 +1,6 @@
 package io.github.toyota32k.sample.media
 
 import android.app.Application
-import android.graphics.Rect
 import android.net.Uri
 import android.os.Bundle
 import android.util.Log
@@ -20,9 +19,7 @@ import io.github.toyota32k.binder.command.LiteUnitCommand
 import io.github.toyota32k.binder.command.bindCommand
 import io.github.toyota32k.binder.enableBinding
 import io.github.toyota32k.binder.materialRadioButtonGroupBinding
-import io.github.toyota32k.binder.multiEnableBinding
 import io.github.toyota32k.binder.multiVisibilityBinding
-import io.github.toyota32k.binder.observe
 import io.github.toyota32k.binder.spinnerBinding
 import io.github.toyota32k.binder.textBinding
 import io.github.toyota32k.dialog.broker.UtActivityBrokerStore
@@ -41,40 +38,33 @@ import io.github.toyota32k.lib.player.model.chapter.MutableChapterList
 import io.github.toyota32k.lib.player.model.skipChapter
 import io.github.toyota32k.logger.UtLog
 import io.github.toyota32k.logger.UtLogConfig
-import io.github.toyota32k.media.lib.io.AndroidFile
-import io.github.toyota32k.media.lib.legacy.converter.ConvertResult
-import io.github.toyota32k.media.lib.legacy.converter.Converter
-import io.github.toyota32k.media.lib.processor.optimizer.FastStart
-import io.github.toyota32k.media.lib.types.RangeMs
-import io.github.toyota32k.media.lib.types.Rotation
-import io.github.toyota32k.media.lib.legacy.converter.Splitter
-import io.github.toyota32k.media.lib.io.toAndroidFile
 import io.github.toyota32k.media.lib.format.Codec
 import io.github.toyota32k.media.lib.format.getHeight
 import io.github.toyota32k.media.lib.format.getWidth
+import io.github.toyota32k.media.lib.io.AndroidFile
+import io.github.toyota32k.media.lib.io.toAndroidFile
 import io.github.toyota32k.media.lib.processor.Analyzer
-import io.github.toyota32k.media.lib.processor.CompatConverter
-import io.github.toyota32k.media.lib.processor.contract.IConvertResult
+import io.github.toyota32k.media.lib.processor.ConcatOptions
+import io.github.toyota32k.media.lib.processor.ConvertOptions
+import io.github.toyota32k.media.lib.processor.Processor
+import io.github.toyota32k.media.lib.processor.optimizer.OptimizerOptions
 import io.github.toyota32k.media.lib.strategy.DeviceCapabilities
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
 import io.github.toyota32k.media.lib.strategy.PresetAudioStrategies
 import io.github.toyota32k.media.lib.strategy.PresetVideoStrategies
 import io.github.toyota32k.media.lib.strategy.VideoStrategy
+import io.github.toyota32k.media.lib.types.RangeMs
+import io.github.toyota32k.media.lib.types.Rotation
 import io.github.toyota32k.sample.media.MainActivity.MainViewModel.SourceIndex
 import io.github.toyota32k.sample.media.databinding.ActivityMainBinding
 import io.github.toyota32k.sample.media.dialog.DetailMessageDialog
 import io.github.toyota32k.sample.media.dialog.MultilineTextDialog
 import io.github.toyota32k.sample.media.dialog.ProgressDialog
 import io.github.toyota32k.utils.lifecycle.DisposableFlowObserver
-import io.github.toyota32k.utils.lifecycle.disposableObserve
-import io.github.toyota32k.utils.use
-import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.withContext
-import java.io.File
 import java.util.Locale
 import java.util.concurrent.atomic.AtomicLong
 
@@ -162,11 +152,6 @@ class MainActivity : UtMortalActivity() {
             val summary = Analyzer.analyze(output.toAndroidFile(application))
             MultilineTextDialog.show("Output File", summary.toString())
         }
-        val analyzeOutputFile2Command = LiteUnitCommand {
-            val output = outputFile2.value ?: return@LiteUnitCommand
-            val summary = Analyzer.analyze(output.toAndroidFile(application))
-            MultilineTextDialog.show("Output File 2", summary.toString())
-        }
         val videoDeviceCapabilitiesCommand = LiteUnitCommand {
             val enc = DeviceCapabilities.availableCodecs(namedVideoStrategy.value.strategy.codec, true)
             val dec = DeviceCapabilities.availableCodecs(namedVideoStrategy.value.strategy.codec, false)
@@ -187,25 +172,27 @@ class MainActivity : UtMortalActivity() {
         }
 
         val inputFile: MutableStateFlow<Uri?> = MutableStateFlow(null)
+        val inputFile2: MutableStateFlow<Uri?> = MutableStateFlow(null)
         val outputFile: MutableStateFlow<Uri?> = MutableStateFlow(null)
-        val outputFile2: MutableStateFlow<Uri?> = MutableStateFlow(null)
 
         val inputFileAvailable = inputFile.map { it!=null }
+        val inputFile2Available = inputFile2.map { it!=null }
         val outputFileAvailable = outputFile.map { it!=null }
-        val outputFile2Available = outputFile2.map { it!=null }
         val inputFileName = inputFile.map { it?.toAndroidFile(application)?.getFileName() ?: "select input file"}
+        val inputFile2Name = inputFile2.map { it?.toAndroidFile(application)?.getFileName() ?: "select input file"}
         val outputFileName = outputFile.map {it?.toAndroidFile(application)?.getFileName() ?: "select output file"}
-        val outputFile2Name = outputFile2.map {it?.toAndroidFile(application)?.getFileName() ?: "select output file"}
+        val enableOptimize = MutableStateFlow(true)
         val readyToConvert = combine(inputFileAvailable, outputFileAvailable) {i,o-> i && o }
+        val readyToConcat = combine(inputFileAvailable, inputFile2Available, outputFileAvailable) {i,o,o2-> i && o && o2}
         val converted = MutableStateFlow(false)
-        val splitted = MutableStateFlow(false)
+        val split = MutableStateFlow(false)
 
         val softwareEncode: MutableStateFlow<Boolean> = MutableStateFlow(false)
         val softwareDecode: MutableStateFlow<Boolean> = MutableStateFlow(false)
         enum class SourceIndex {
             Input,
+            Input2,
             Output,
-            Output2,
         }
         val playSource: MutableStateFlow<SourceIndex> = MutableStateFlow(SourceIndex.Input)
 
@@ -218,11 +205,11 @@ class MainActivity : UtMortalActivity() {
                     // Inputを再生
                     inputFile.value?.toAndroidFile(getApplication())
                 }
-                SourceIndex.Output -> {
-                    if (converted.value || splitted.value) outputFile.value?.toAndroidFile(getApplication()) else null
+                SourceIndex.Input2 -> {
+                    inputFile2.value?.toAndroidFile(getApplication())
                 }
-                SourceIndex.Output2 -> {
-                    if (splitted.value) outputFile2.value?.toAndroidFile(getApplication()) else null
+                SourceIndex.Output -> {
+                    if (converted.value || split.value) outputFile.value?.toAndroidFile(getApplication()) else null
                 }
             }
             if(src!=null) {
@@ -242,7 +229,22 @@ class MainActivity : UtMortalActivity() {
                         inputFile.value = file
                         playSource.value = SourceIndex.Input
                         converted.value = false
-                        splitted.value = false
+                        split.value = false
+                        updatePlayerSource()
+                    }
+                }
+            }
+        }
+        val selectInputFile2Command = LiteUnitCommand {
+            UtImmortalTask.launchTask {
+                withOwner {
+                    val activity = it.asActivity() as MainActivity
+                    val file = activity.activityBrokers.openFilePicker.selectFile(arrayOf("video/*"))
+                    if (file!=null) {
+                        inputFile2.value = file
+                        playSource.value = SourceIndex.Input2
+                        converted.value = false
+                        split.value = false
                         updatePlayerSource()
                     }
                 }
@@ -259,48 +261,15 @@ class MainActivity : UtMortalActivity() {
                     if(file!=null) {
                         outputFile.value = file
                         converted.value = false
-                        splitted.value = false
-                        playSource.value = SourceIndex.Input
-                        updatePlayerSource()
-                    }
-                }
-            }
-        }
-        val selectOutputFile2Command = LiteUnitCommand {
-            UtImmortalTask.launchTask {
-                withOwner {
-                    val activity = it.asActivity() as MainActivity
-                    val inFile = inputFile.value?.let { AndroidFile(it, application).getFileName() }
-                    val outFile = if(inFile.isNullOrBlank()) "output-2.mp4" else "output-2-$inFile"
-                    val file = activity.activityBrokers.createFilePicker.selectFile(outFile, "video/mp4")
-                    if(file!=null) {
-                        outputFile2.value = file
-                        converted.value = false
-                        splitted.value = false
-                        playSource.value = SourceIndex.Input
+                        split.value = false
+                        playSource.value = SourceIndex.Output
                         updatePlayerSource()
                     }
                 }
             }
         }
 
-//        val outputPlayCommand = LiteUnitCommand {
-//            if(!converted.value) return@LiteUnitCommand
-//            val uri = outputFile.value ?: return@LiteUnitCommand
-//            UtImmortalSimpleTask.run {
-//                withOwner {
-//                    val activity = it.asActivity() ?: return@withOwner false
-//                    val intent = Intent(Intent.ACTION_VIEW)
-//                    intent.setDataAndType(uri, "video/mp4")
-////                    if (intent.resolveActivity(activity.packageManager) != null) {
-//                        activity.startActivity(intent)
-////                    }
-//                    true
-//                }
-//            }
-//        }
-
-        private val observer = DisposableFlowObserver(playSource) { it->
+        private val observer = DisposableFlowObserver(playSource) {
             updatePlayerSource()
         }
 
@@ -349,252 +318,90 @@ class MainActivity : UtMortalActivity() {
             return String.format(Locale.US, "%,d KB", size / 1000L)
         }
 
-        val useNewProcessor = MutableStateFlow(true)
-
         val commandConvert = LiteUnitCommand() {
             val srcFile = AndroidFile(inputFile.value ?: return@LiteUnitCommand, application)
-            val optFile = AndroidFile(outputFile.value ?: return@LiteUnitCommand, application)
-            val trimFile = AndroidFile( File(application.cacheDir ?: return@LiteUnitCommand, "trimming"))
+            val outFile = AndroidFile(outputFile.value ?: return@LiteUnitCommand, application)
 
             val ranges = chapterEditor.enabledRanges(Range.empty)
 
-            UtImmortalTask.launchTask("trimming") {
-                splitted.value = false
-                converted.value = false
-                val result = ProgressDialog.withProgressDialog<IConvertResult> { sink ->
-                    withContext(Dispatchers.IO) {
-                        val videoSize = srcFile.openMetadataRetriever().use {
-                            Size(it.obj.getWidth()?:0, it.obj.getHeight()?:0)
-                        }
-                        val subWidth = (videoSize.width*0.5).toInt()
-                        val subHeight = (videoSize.height*0.5).toInt()
-                        val sx = videoSize.width-subWidth
-                        val sy = videoSize.height-subHeight
+            split.value = false
+            converted.value = false
+            val processor = Processor()
+            val videoSize = srcFile.openMetadataRetriever().use { Size(it.obj.getWidth()?:0, it.obj.getHeight()?:0) }
+            val subWidth = (videoSize.width*0.5).toInt()
+            val subHeight = (videoSize.height*0.5).toInt()
+//                val sx = videoSize.width-subWidth
+//                val sy = videoSize.height-subHeight
 //                        val crop = Rect(sx, sy, sx+subWidth, sy+subHeight)
-
-                        sink.message = "Trimming Now"
-                        val rotation = if (playerModel.rotation.value != 0) Rotation(playerModel.rotation.value, relative = true) else Rotation.nop
-                        val converter = if (!useNewProcessor.value) {
-                            Converter.Builder()
-                                .input(srcFile)
-                                .output(trimFile)
-                                .audioStrategy(namedAudioStrategy.value.strategy)
-                                .rotate(rotation)
-//                                .crop(crop)
-                                .brightness(1.3f)
-                                .trimming {
-                                    addRangesMs(ranges.map { RangeMs(it.start, it.end) })
-                                }
-                                .setProgressHandler {
-                                    sink.progress = it.percentage
-                                    sink.progressText = it.format()
-                                }
-                                .preferSoftwareDecoder(softwareDecode.value)
-                                .apply {
-                                    val s = namedVideoStrategy.value.strategy as VideoStrategy
-                                    if (softwareEncode.value) {
-                                        videoStrategy(s.preferSoftwareEncoder())
-                                    } else {
-                                        videoStrategy(s)
-                                    }
-                                }
-                                .build()
-                        } else {
-                            CompatConverter.Builder()
-                                .input(srcFile)
-                                .output(trimFile)
-                                .audioStrategy(namedAudioStrategy.value.strategy)
-//                                .audioStrategy(PresetAudioStrategies.NoAudio)
-                                .rotate(rotation)
+            val rotation = if (playerModel.rotation.value != 0) Rotation(playerModel.rotation.value, relative = true) else Rotation.nop
+            val options = ConvertOptions.Builder()
+                .input(srcFile)
+                .output(outFile)
+                .audioStrategy(namedAudioStrategy.value.strategy)
+//              .audioStrategy(PresetAudioStrategies.NoAudio)
+                .rotate(rotation)
 //                                .crop(crop)
 //                                .brightness(1.3f)
-                                .trimming {
-                                    addRangesMs(ranges.map { RangeMs(it.start, it.end) })
-                                }
-                                .setProgressHandler {
-                                    sink.progress = it.percentage
-                                    sink.progressText = it.format()
-                                }
-                                .preferSoftwareDecoder(softwareDecode.value)
-                                .apply {
-                                    val s = namedVideoStrategy.value.strategy as VideoStrategy
-                                    if (softwareEncode.value) {
-                                        videoStrategy(s.preferSoftwareEncoder())
-                                    } else {
-                                        videoStrategy(s)
-                                    }
-                                }
-                                .build()
-                        }
-
-                        sink.cancelled.disposableObserve { cancelled ->
-                            if (cancelled) {
-                                converter.cancel()
-                            }
-                        }.use {
-                            try {
-                                converter.execute().also { convertResult ->
-                                    if (convertResult.succeeded) {
-                                        logger.debug(convertResult.toString())
-                                        sink.message = "Optimizing Now..."
-                                        if (!FastStart.process(inFile = trimFile, outFile = optFile, removeFree=true) {
-                                                sink.progress = it.percentage
-                                                sink.progressText = it.format()
-                                            }) {
-                                            // 変換不要
-                                            optFile.copyFrom(trimFile)
-                                        }
-                                        converted.value = true
-                                    }
-                                }
-                            } catch (e: Throwable) {
-                                ConvertResult.error(srcFile, e)
-                            } finally {
-                                trimFile.safeDelete()
-                            }
-                        }
+                .trimming {
+                    addRangesMs(ranges.map { RangeMs(it.start, it.end) })
+                }
+                .preferSoftwareDecoder(softwareDecode.value)
+                .optimize(if(enableOptimize.value) OptimizerOptions(application, true) else null)
+                .apply {
+                    val s = namedVideoStrategy.value.strategy as VideoStrategy
+                    if (softwareEncode.value) {
+                        videoStrategy(s.preferSoftwareEncoder())
+                    } else {
+                        videoStrategy(s)
                     }
                 }
+                .build()
+
+            UtImmortalTask.launchTask("convert") {
+                val result = ProgressDialog.processWithProgressDialog("convertCore", "Trimming...", processor, options)
                 if (result.succeeded) {
                     // 変換成功
                     val srcLen = srcFile.getLength()
-                    val dstLen = optFile.getLength()
+                    val dstLen = outFile.getLength()
                     DetailMessageDialog.showMessage("Completed.", "${stringInKb(srcLen)} → ${stringInKb(dstLen)}", result.report?.toString() ?: "no information")
+                    converted.value = true
                 } else if (!result.cancelled) {
                     showConfirmMessageBox("Error.", result.errorMessage ?: result.exception?.message ?: "unknown")
                 }
             }
         }
 
-        val commandTrimming = LiteUnitCommand() {
+        val commandConcat = LiteUnitCommand {
             val srcFile = AndroidFile(inputFile.value ?: return@LiteUnitCommand, application)
-            val optFile = AndroidFile(outputFile.value ?: return@LiteUnitCommand, application)
-            val trimFile = AndroidFile( File(application.cacheDir ?: return@LiteUnitCommand, "trimming"))
+            val srcFile2 = AndroidFile(inputFile2.value ?: return@LiteUnitCommand, application)
+            val outFile = AndroidFile(outputFile.value ?: return@LiteUnitCommand, application)
 
-            val ranges = chapterEditor.enabledRanges(Range.empty)
+            split.value = false
+            converted.value = false
 
-            UtImmortalTask.launchTask("trimming") {
-                splitted.value = false
-                converted.value = false
-                val result = ProgressDialog.withProgressDialog { sink ->
-                    withContext(Dispatchers.IO) {
-                        sink.message = "Trimming Now"
-                        val rotation = if (playerModel.rotation.value != 0) Rotation(playerModel.rotation.value, relative = true) else Rotation.nop
-                        val splitter = Splitter.Builder()
-                            .rotate(rotation)
-                            .setProgressHandler {
-                                sink.progress = it.percentage
-                                sink.progressText = it.format()
-                            }
-                            .build()
-                        sink.cancelled.disposableObserve { cancelled ->
-                            if (cancelled) {
-                                splitter.cancel()
-                            }
-                        }.use {
-                            try {
-                                splitter.trim(srcFile,trimFile, ranges.map { RangeMs(it.start, it.end) }).also { result ->
-                                    if (result.succeeded) {
-                                        sink.message = "Optimizing Now..."
-                                        if (!FastStart.process(inFile = trimFile, outFile = optFile, removeFree=true) {
-                                                sink.progress = it.percentage
-                                                sink.progressText = it.format()
-                                            }) {
-                                            // 変換不要
-                                            optFile.copyFrom(trimFile)
-                                        }
-                                        converted.value = true
-                                    }
-                                }
-                            } catch (e: Throwable) {
-                                Splitter.Result.error(srcFile, e)
-                            } finally {
-                                trimFile.safeDelete()
-                            }
-                        }
-                    }
-                }
+            val processor = Processor()
+            val options = ConcatOptions.Builder()
+                .addInput(srcFile)
+                .addInput(srcFile2)
+                .output(outFile)
+                .audioStrategy(PresetAudioStrategies.AACDefault)
+                .videoStrategy(PresetVideoStrategies.AVC720LowProfile)
+                .optimize(if(enableOptimize.value) OptimizerOptions(application, true) else null)
+                .build()
+
+            UtImmortalTask.launchTask("concatenating") {
+                val result = ProgressDialog.processWithProgressDialog("concatCore", "Concatenating...", processor, options)
                 if (result.succeeded) {
                     // 変換成功
-                    val srcLen = srcFile.getLength()
-                    val dstLen = optFile.getLength()
-                    showConfirmMessageBox("Trimming without ReEncoding", "Completed")
+                    val srcLen = srcFile.getLength() + srcFile2.getLength()
+                    val dstLen = outFile.getLength()
+                    DetailMessageDialog.showMessage("Completed.", "${stringInKb(srcLen)} → ${stringInKb(dstLen)}", result.report?.toString() ?: "no information")
+                    converted.value = true
                 } else if (!result.cancelled) {
-                    showConfirmMessageBox("Error.", result.exception?.message ?: "unknown")
-                }
-            }
-
-        }
-
-        val commandChop = LiteUnitCommand() {
-            val opt2File = outputFile2.value?.run { AndroidFile(this, application) } ?: return@LiteUnitCommand
-            val srcFile = AndroidFile(inputFile.value ?: return@LiteUnitCommand, application)
-            val opt1File = AndroidFile(outputFile.value ?: return@LiteUnitCommand, application)
-            val trim1File = AndroidFile( File(application.cacheDir ?: return@LiteUnitCommand, "chop1"))
-            val trim2File = AndroidFile( File(application.cacheDir ?: return@LiteUnitCommand, "chop2"))
-
-            val position = playerControllerModel.playerModel.currentPosition
-            UtImmortalTask.launchTask("chopping") {
-                splitted.value = false
-                converted.value = false
-                val result = ProgressDialog.withProgressDialog<IConvertResult> { sink ->
-                    withContext(Dispatchers.IO) {
-                        sink.message = "Splitting Now"
-                        val rotation = if (playerModel.rotation.value != 0) Rotation(playerModel.rotation.value, relative = true) else Rotation.nop
-                        val splitter = Splitter.Builder()
-                            .rotate(rotation)
-                            .setProgressHandler {
-                                sink.progress = it.percentage
-                                sink.progressText = it.format()
-                            }
-                            .build()
-                        sink.cancelled.disposableObserve { cancelled ->
-                            if (cancelled) {
-                                splitter.cancel()
-                            }
-                        }.use {
-                            try {
-                                splitter.chop(srcFile, trim1File, trim2File, position)[0].also { result ->
-                                    if (result.succeeded) {
-                                        sink.message = "Optimizing First File..."
-                                        if (!FastStart.process(inFile = trim1File, outFile = opt1File, removeFree=true) {
-                                                sink.progress = it.percentage
-                                                sink.progressText = it.format()
-                                            }) {
-                                            // 変換不要
-                                            opt1File.copyFrom(trim1File)
-                                        }
-
-                                        sink.message = "Optimizing Last File..."
-                                        if (!FastStart.process(inFile = trim2File, outFile = opt2File, removeFree=true) {
-                                                sink.progress = it.percentage
-                                                sink.progressText = it.format()
-                                            }) {
-                                            // 変換不要
-                                            opt2File.copyFrom(trim2File)
-                                        }
-                                        splitted.value = true
-                                    }
-                                }
-                            } catch (e: Throwable) {
-                                Splitter.Result.error(srcFile, e)
-                            } finally {
-                                trim1File.safeDelete()
-                                trim2File.safeDelete()
-                            }
-                        }
-                    }
-                }
-                if (result.succeeded) {
-                    // 変換成功
-                    showConfirmMessageBox("Split media file", "Completed.")
-                } else if (!result.cancelled) {
-                    showConfirmMessageBox("Error.", result.exception?.message ?: "unknown")
+                    showConfirmMessageBox("Error.", result.errorMessage ?: result.exception?.message ?: "unknown")
                 }
             }
         }
-
-
 
         private fun setSource(file:AndroidFile) {
             val videoSource = VideoSource(file)
@@ -631,11 +438,10 @@ class MainActivity : UtMortalActivity() {
         binder
             .owner(this)
             .bindCommand(viewModel.selectInputFileCommand, controls.inputFileButton)
+            .bindCommand(viewModel.selectInputFile2Command, controls.input2FileButton)
             .bindCommand(viewModel.analyzeInputFileCommand, controls.inputAnalyzeButton)
             .bindCommand(viewModel.selectOutputFileCommand, controls.outputFileButton)
             .bindCommand(viewModel.analyzeOutputFileCommand, controls.outputAnalyzeButton)
-            .bindCommand(viewModel.selectOutputFile2Command, controls.output2FileButton)
-            .bindCommand(viewModel.analyzeOutputFile2Command, controls.output2AnalyzeButton)
             .bindCommand(viewModel.commandAddChapter, controls.makeChapter)
             .bindCommand(viewModel.commandAddSkippingChapter, controls.makeChapterAndSkip)
             .bindCommand(viewModel.commandRemoveChapter, controls.removeNextChapter)
@@ -645,24 +451,25 @@ class MainActivity : UtMortalActivity() {
             .bindCommand(viewModel.commandToggleSkip, controls.makeRegionSkip)
             .multiVisibilityBinding(arrayOf(controls.chapterButtons, controls.videoViewer), viewModel.inputFileAvailable, hiddenMode = VisibilityBinding.HiddenMode.HideByInvisible)
             .enableBinding(controls.inputAnalyzeButton, viewModel.inputFileAvailable)
+            .enableBinding(controls.inputAnalyze2Button, viewModel.inputFile2Available)
             .enableBinding(controls.outputAnalyzeButton, combine(viewModel.outputFileAvailable, viewModel.converted) {o,c->o&&c})
             .enableBinding(controls.saveVideo, viewModel.readyToConvert)
-            .multiEnableBinding(arrayOf(controls.buttonOutput2,controls.output2AnalyzeButton, controls.chopVideo),  viewModel.outputFile2Available)
+            .enableBinding(controls.concatVideo, viewModel.readyToConcat)
             .textBinding(controls.inputFileButton, viewModel.inputFileName)
+            .textBinding(controls.input2FileButton, viewModel.inputFile2Name)
             .textBinding(controls.outputFileButton, viewModel.outputFileName)
-            .textBinding(controls.output2FileButton, viewModel.outputFile2Name)
             .materialRadioButtonGroupBinding(controls.playSelector, viewModel.playSource, object: IIDValueResolver<SourceIndex> {
                 override fun id2value(id: Int): SourceIndex {
                     return when(id) {
                         controls.buttonOutput.id -> SourceIndex.Output
-                        controls.buttonOutput2.id -> SourceIndex.Output2
+                        controls.buttonInput2.id -> SourceIndex.Input2
                         else -> SourceIndex.Input
                     }
                 }
                 override fun value2id(v: SourceIndex): Int {
                     return when(v) {
                         SourceIndex.Output -> controls.buttonOutput.id
-                        SourceIndex.Output2 -> controls.buttonOutput2.id
+                        SourceIndex.Input2 -> controls.buttonInput2.id
                         else -> controls.buttonInput.id
                     }
                 }
@@ -672,14 +479,13 @@ class MainActivity : UtMortalActivity() {
 //            }
             .checkBinding(controls.useSoftwareDecoder, viewModel.softwareDecode)
             .checkBinding(controls.useSoftwareEncoder, viewModel.softwareEncode)
-            .checkBinding(controls.useProcessor, viewModel.useNewProcessor)
+            .checkBinding(controls.enableOptimize, viewModel.enableOptimize)
             .spinnerBinding(controls.videoStrategy, viewModel.namedVideoStrategy, videoStrategies)
             .spinnerBinding(controls.audioStrategy, viewModel.namedAudioStrategy, audioStrategies)
             .bindCommand(viewModel.videoDeviceCapabilitiesCommand, controls.videoCapabilityButton)
             .bindCommand(viewModel.audioDeviceCapabilitiesCommand, controls.audioCapabilityButton)
             .bindCommand(viewModel.commandConvert, controls.saveVideo)
-            .bindCommand(viewModel.commandChop, controls.chopVideo)
-            .bindCommand(viewModel.commandTrimming, controls.trimVideo)
+            .bindCommand(viewModel.commandConcat, controls.concatVideo)
 
         controls.videoViewer.bindViewModel(viewModel.playerControllerModel, binder)
 

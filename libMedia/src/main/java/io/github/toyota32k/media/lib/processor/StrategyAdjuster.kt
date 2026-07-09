@@ -24,14 +24,9 @@ class StrategyAdjuster(
     var keepHDR: Boolean,
     var keepProfile: Boolean,
 ) {
-    companion object {
-        fun fromOptionBuilder(b:ProcessorOptions.Builder):StrategyAdjuster {
-            return StrategyAdjuster(b.inputSummary, b.crop, b.brightness, b.forceReEncodeDespiteOfNecessity, b.keepHDR, b.keepVideoProfile)
-        }
-    }
     /**
      * 入力ファイルの情報(inputSummary)と各パラメータに基づき、再エンコードが必要かどうかをチェックし、
-     * IVideoStrategyを調整する。
+     * 不要なら、InvalidStrategy を返す
      * @return 調整後のIVideoStrategy
      */
     private fun adjustWithReEncodingNecessity(specifiedVideoStrategy: IVideoStrategy) : IVideoStrategy {
@@ -53,6 +48,8 @@ class StrategyAdjuster(
                     MinDefault(1, summary.iFrameInterval.takeIf { it > 0 } ?: 30),
                     null,
                     null,)
+            } else {
+                return specifiedVideoStrategy
             }
         }
         if (specifiedVideoStrategy == PresetVideoStrategies.InvalidStrategy) {

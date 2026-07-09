@@ -23,6 +23,31 @@ class Report : IAttributes {
     val input = Summary().apply { title = "Input Stream"}
     val output = Summary().apply { title = "Output Stream"}
 
+    // region Multi-source (concat) support
+
+    /** 結合(concat)時の入力ソース毎のサマリー */
+    val inputSources = mutableListOf<Summary>()
+
+    // updateInputSummary / updateInputFileInfo の記録先。
+    // beginInputSource() を呼ばない限り input を指す（従来動作）。
+    private var mCurrentInput: Summary = input
+
+    /**
+     * 結合(concat)用: 新しい入力ソースのサマリー記録を開始する。
+     * 以降の updateInputSummary / updateInputFileInfo は、このソースのサマリーに記録される。
+     */
+    fun beginInputSource(name: String? = null) {
+        val summary = Summary().apply { title = name ?: "Input Stream #${inputSources.size + 1}" }
+        inputSources.add(summary)
+        mCurrentInput = summary
+    }
+
+    /** 入力ファイルサイズ（結合時は全ソースの合計） */
+    val totalInputSize: Long
+        get() = if (inputSources.isEmpty()) input.size else inputSources.sumOf { it.size }
+
+    // endregion
+
     fun start() {
         startTick = System.currentTimeMillis()
     }
@@ -47,7 +72,7 @@ class Report : IAttributes {
     }
 
     fun updateInputSummary(format: MediaFormat, metaData: MetaData?) {
-        updateSummary(input, format, metaData)
+        updateSummary(mCurrentInput, format, metaData)
     }
     fun updateOutputSummary(format: MediaFormat) {
         updateSummary(output, format)
@@ -65,8 +90,8 @@ class Report : IAttributes {
         audioEncoderName = encoder.name
     }
     fun updateInputFileInfo(size:Long, duration:Long) {
-        input.size = size
-        input.duration = duration
+        mCurrentInput.size = size
+        mCurrentInput.duration = duration
     }
     fun updateOutputFileInfo(size:Long, duration:Long) {
         output.size = size
@@ -91,11 +116,11 @@ class Report : IAttributes {
 
     override var title: String = "Conversion Results"
     override val subAttributes: List<IAttributes?>
-        get() = listOf(input, output)
+        get() = if (inputSources.isEmpty()) listOf(input, output) else inputSources + listOf(output)
 
     override fun toList(): List<IAttributes.KeyValue> {
         val speed = if (endTick > startTick) {
-            (input.size.toDouble() / (endTick-startTick).toDouble()).roundToLong()
+            (totalInputSize.toDouble() / (endTick-startTick).toDouble()).roundToLong()
         } else 0L
         val speedText = if (speed > 0) {
             "${DecimalFormat("#,###").format(speed)} bytes/sec"
