@@ -6,12 +6,12 @@ plugins {
 
 configure<ApplicationExtension> {
     namespace = "io.github.toyota32k.sample.media"
-    compileSdk = 36
+    compileSdk = 37
 
     defaultConfig {
         applicationId = "io.github.toyota32k.sample.media"
         minSdk = 28
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 1
         versionName = "1.0"
 
@@ -25,12 +25,16 @@ configure<ApplicationExtension> {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
     buildFeatures {
         viewBinding = true
     }
+}
+
+kotlin {
+    jvmToolchain(21)
 }
 
 dependencies {
