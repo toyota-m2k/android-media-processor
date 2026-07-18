@@ -12,10 +12,10 @@ import io.github.toyota32k.dialog.task.UtDialogViewModel
 import io.github.toyota32k.dialog.task.UtImmortalTask
 import io.github.toyota32k.dialog.task.createViewModel
 import io.github.toyota32k.dialog.task.getViewModel
-import io.github.toyota32k.media.lib.processor.contract.IConvertResult
 import io.github.toyota32k.media.lib.processor.contract.IMultiPhaseProgress
 import io.github.toyota32k.media.lib.processor.contract.IProcessor
 import io.github.toyota32k.media.lib.processor.contract.IProcessorOptions
+import io.github.toyota32k.media.lib.processor.contract.IProcessorResult
 import io.github.toyota32k.sample.media.databinding.DialogProgressBinding
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.filterNotNull
@@ -56,7 +56,7 @@ class ProgressDialog : UtDialogEx() {
     }
 
     companion object {
-        suspend fun processWithProgressDialog(taskName:String="withProgressDialog",initialMessage:String, processor: IProcessor, options: IProcessorOptions): IConvertResult {
+        suspend fun processWithProgressDialog(taskName:String="withProgressDialog", initialMessage:String, processor: IProcessor, options: IProcessorOptions): IProcessorResult {
             val vmf = MutableStateFlow<ProgressViewModel?>(null)
             UtImmortalTask.launchTask(taskName) {
                 vmf.value = createViewModel<ProgressViewModel> {

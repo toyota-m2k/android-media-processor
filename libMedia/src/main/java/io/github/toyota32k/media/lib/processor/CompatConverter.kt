@@ -42,7 +42,7 @@ class CompatConverter(
     override suspend fun execute(): IConvertResult {
         return withContext(Dispatchers.IO) {
             try {
-                processor.process(options, onProgress)
+                processor.convert(options, onProgress)
             } catch(e:Throwable) {
                 logger.error(e)
                 if (deleteOutputOnError) {

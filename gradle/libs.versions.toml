@@ -12,11 +12,11 @@ espressoCore = "3.7.0"
 coreKtx = "1.19.0"
 activityKtx = "1.13.0"
 constraintLayout = "2.2.1"
-androidUtilities = "4.16.0"
-#androidUtilities = "LOCAL"
-androidBinding = "1.15.0"    # for sample only
-androidDialog = "7.2.0"     # for sample only
-androidPlayer = "4.8.0"     # for sample only
+androidLogger = "2.2.3"
+androidUtilities = "4.16.3"
+androidBinding = "1.15.3"    # for sample only
+androidDialog = "7.2.1"     # for sample only
+androidPlayer = "4.8.1"     # for sample only
 documentfile = "1.1.0"     # for sample only
 
 [libraries]
@@ -30,7 +30,7 @@ coreKtx = { module = "androidx.core:core-ktx", version.ref = "coreKtx" }
 activityKtx = { module = "androidx.activity:activity-ktx", version.ref = "activityKtx" }
 constraintLayout = { module = "androidx.constraintlayout:constraintlayout", version.ref = "constraintLayout" }
 android-utilities = { module = "com.github.toyota-m2k:android-utilities", version.ref = "androidUtilities" }
-#android-logger = { module = "com.github.toyota-m2k:android-logger", version.ref = "androidLogger" }
+android-logger = { module = "com.github.toyota-m2k:android-logger", version.ref = "androidLogger" }
 android-binding = { module = "com.github.toyota-m2k:android-binding", version.ref = "androidBinding" }
 android-dialog = { module = "com.github.toyota-m2k:android-dialog", version.ref = "androidDialog" }
 android-player = { module = "com.github.toyota-m2k:android-media-player", version.ref = "androidPlayer" }
