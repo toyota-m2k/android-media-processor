@@ -7,18 +7,19 @@ import io.github.toyota32k.media.lib.internals.surface.ScaleMatrixProvider
 import io.github.toyota32k.media.lib.io.IInputMediaFile
 import io.github.toyota32k.media.lib.io.IOutputMediaFile
 import io.github.toyota32k.media.lib.legacy.converter.Converter
-import io.github.toyota32k.media.lib.legacy.converter.dump
-import io.github.toyota32k.media.lib.processor.contract.IActualSoughtMap
 import io.github.toyota32k.media.lib.processor.contract.ICancellable
 import io.github.toyota32k.media.lib.processor.contract.IConcatOptions
+import io.github.toyota32k.media.lib.processor.contract.IConcatResult
 import io.github.toyota32k.media.lib.processor.contract.IConvertOptions
 import io.github.toyota32k.media.lib.processor.contract.IConvertResult
 import io.github.toyota32k.media.lib.processor.contract.IFormattable
 import io.github.toyota32k.media.lib.processor.contract.IProcessor
 import io.github.toyota32k.media.lib.processor.contract.IProcessorOptions
 import io.github.toyota32k.media.lib.processor.contract.IProgress
+import io.github.toyota32k.media.lib.processor.contract.IProcessorResult
 import io.github.toyota32k.media.lib.processor.contract.ISoughtMap
 import io.github.toyota32k.media.lib.processor.contract.ITrack
+import io.github.toyota32k.media.lib.processor.contract.dump
 import io.github.toyota32k.media.lib.processor.contract.format3digits
 import io.github.toyota32k.media.lib.processor.optimizer.Optimizer
 import io.github.toyota32k.media.lib.processor.track.EmptyTrack
@@ -204,42 +205,35 @@ class Processor(
     /**
      * IProcessorResult の実装クラス
      */
-    data class Result(
-        override val inputFile: IInputMediaFile,
-        override val outputFile: IOutputMediaFile,
-        override val soughtMap: ISoughtMap,
-        override val report: Report,
+    data class ConvertResult(
+        override val inputFile: IInputMediaFile?,
+        override val outputFile: IOutputMediaFile?,
+        override val soughtMap: ISoughtMap?,
+        override val report: Report?,
+        override val succeeded: Boolean,
+        override val exception: Throwable?,
+        override val errorMessage: String?,
     ) : IConvertResult {
-        constructor(src:Result,
-            inputFile: IInputMediaFile = src.inputFile,
-            outputFile: IOutputMediaFile = src.outputFile,
-            soughtMap: ISoughtMap = src.soughtMap,
-            report: Report = src.report) : this(inputFile, outputFile, soughtMap, report)
-
-//        override val requestedRangeMs: RangeMs
-//            get() = requestedRangeUs.toRangeMs()
-        @Deprecated("use soughtMap")
-        override val actualSoughtMap: IActualSoughtMap? = null
-
         // Resultクラスはコンバート成功の場合にしか使わない
-        override val succeeded: Boolean = true
-        override val exception: Throwable? = null
-        override val errorMessage: String? = null
+        override fun derive(output: IOutputMediaFile?): IProcessorResult {
+            return copy(outputFile = output ?: this.outputFile)
+        }
 
         override fun toString(): String {
             return dump()
         }
-    }
-    data class ErrorResult(
-        override val inputFile: IInputMediaFile?,
-        override val exception: Throwable?,
-        override val errorMessage: String? = null) : IConvertResult {
-        override val outputFile: IOutputMediaFile? = null
-        override val soughtMap: ISoughtMap? = null
-        @Deprecated("use soughtMap")
-        override val actualSoughtMap: IActualSoughtMap? = null
-        override val report: Report? = null
-        override val succeeded: Boolean = false
+        companion object {
+            fun error(exception: Throwable, errorMessage: String? = null, inputFile: IInputMediaFile? = null): IConvertResult {
+                return ConvertResult(inputFile, null, null, null, false, exception, errorMessage)
+            }
+            @Suppress("unused")
+            fun cancelled(inputFile: IInputMediaFile? = null): IConvertResult {
+                return ConvertResult(inputFile, null, null, null, false, null, null)
+            }
+            fun succeeded(inputFile: IInputMediaFile?, outputFile: IOutputMediaFile?, soughtMap: ISoughtMap?, report: Report?): IConvertResult {
+                return ConvertResult(inputFile, outputFile, soughtMap, report, true, null, null)
+            }
+        }
     }
 
     // endregion
@@ -302,7 +296,50 @@ class Processor(
             report.sourceDurationUs = totalUs
             report.end()
 
-            return Result(inPath, outPath, soughtMap, report)
+            return ConvertResult.succeeded(inPath, outPath, soughtMap, report)
+        }
+    }
+
+    data class ConcatResult(
+        override val outputFile: IOutputMediaFile?,
+        override var succeeded:Boolean = false,
+        override var report:Report? = null,
+        override val subResults: List<IConcatResult.ISubResult> = mutableListOf(),
+        override var errorMessage:String? = null,
+        override var exception:Throwable? = null
+        ) : IConcatResult {
+        override fun derive(output: IOutputMediaFile?): IProcessorResult {
+            return copy(outputFile = output)
+        }
+
+
+        fun succeeded(report: Report?): ConcatResult {
+            this.succeeded = true
+            this.report = report
+            this.errorMessage = null
+            this.exception = null
+            return this
+        }
+//        fun cancelled(): ConcatResult {
+//            this.succeeded = false
+//            this.errorMessage = null
+//            this.exception = null
+//            return this
+//        }
+        fun failed(exception:Throwable, errorMessage:String?=null): ConcatResult {
+            this.succeeded = false
+            this.errorMessage = errorMessage
+            this.exception = exception
+            return this
+        }
+
+        class SubResult(
+            override val inputFile: IInputMediaFile,
+            override val soughtMap: ISoughtMap?
+        ): IConcatResult.ISubResult
+
+        fun addSubResult(inputFile: IInputMediaFile, soughtMap: ISoughtMap?) {
+            (subResults as MutableList).add(SubResult(inputFile, soughtMap))
         }
     }
 
@@ -320,7 +357,7 @@ class Processor(
      * 制限:
      * - すべての入力に映像トラックが必要（音声のみのファイルは結合できない）。
      */
-    private fun concatCore(options: IConcatOptions, onProgress: ((IProgress) -> Unit)?): IConvertResult {
+    private fun concatCore(options: IConcatOptions, onProgress: ((IProgress) -> Unit)?): IConcatResult {
         progress = ProgressHandler(onProgress)
         val report = Report().apply {
             start()
@@ -328,6 +365,7 @@ class Processor(
             updateAudioStrategyName(options.audioStrategy.name)
         }
         isCancelled = false
+        val result = ConcatResult(options.outPath)
 
         // 解析・バリデーション・統一出力フォーマット(UnifiedOutputFormat)の決定
         val plan = ConcatAnalyzer.analyze(options)
@@ -386,6 +424,7 @@ class Processor(
                     }
                     videoTrack.finalize()
                     audioTrack.finalize()
+                    result.addSubResult(source.input, soughtMap)
 
                     // 次のソースの出力開始PTS:
                     // 映像・音声とも共通の基準値を使うことで、ソース境界のA/Vずれを次ソースに持ち越さない
@@ -403,24 +442,24 @@ class Processor(
             report.sourceDurationUs = totalUs
             report.end()
 
-            return Result(options.sources.first().input, options.outPath, SoughtMap(muxer.naturalDurationUs, emptyList()), report)
+            return result.succeeded(report)
         }
     }
 
     /**
      * 複数の動画ファイルを結合する。
      */
-    suspend fun concat(options: IConcatOptions, onProgress: ((IProgress) -> Unit)?): IConvertResult {
+    suspend fun concat(options: IConcatOptions, onProgress: ((IProgress) -> Unit)?): IConcatResult {
         return withContext(Dispatchers.IO) {
             try {
                 Optimizer.process( options, onProgress) { workerOptions->
                     concatCore(workerOptions as IConcatOptions, onProgress)
-                }
+                } as IConcatResult
             } catch (e: Throwable) {
                 if (options.deleteOutputOnError) {
                     options.outPath.safeDelete()
                 }
-                ErrorResult(options.sources.firstOrNull()?.input, e)
+                ConcatResult(null).failed(e, e.message)
             }
         }
     }
@@ -433,12 +472,12 @@ class Processor(
             try {
                 Optimizer.process( options, onProgress) { workerOptions->
                     convertCore(workerOptions as IConvertOptions, onProgress)
-                }
+                } as IConvertResult
             } catch (e: Throwable) {
                 if (options.deleteOutputOnError) {
                     options.outPath.safeDelete()
                 }
-                ErrorResult(options.inPath, e)
+                ConvertResult.error(e, e.message)
             }
         }
     }
@@ -446,7 +485,7 @@ class Processor(
     /**
      * optionsにしたがって変換を実行
      */
-    override suspend fun process(options: IProcessorOptions, onProgress:((IProgress)->Unit)?): IConvertResult {
+    override suspend fun process(options: IProcessorOptions, onProgress:((IProgress)->Unit)?): IProcessorResult {
         return when (options) {
             is IConvertOptions -> convert(options, onProgress)
             is IConcatOptions -> concat(options, onProgress)

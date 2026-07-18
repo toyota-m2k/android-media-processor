@@ -9,6 +9,7 @@ data class OptimizingProcessorPhase(override val description:String, override va
         val INITIAL: IMultiPhaseProgress.IPhase = OptimizingProcessorPhase("Preparing", IProgress.ValueUnit.BYTES)
         val SPLITTING: IMultiPhaseProgress.IPhase = OptimizingProcessorPhase("Splitting", IProgress.ValueUnit.US)
         val CONVERTING: IMultiPhaseProgress.IPhase = OptimizingProcessorPhase("Converting", IProgress.ValueUnit.US)
+        val MERGING: IMultiPhaseProgress.IPhase = OptimizingProcessorPhase("Merging", IProgress.ValueUnit.US)
         val OPTIMIZING: IMultiPhaseProgress.IPhase = OptimizingProcessorPhase("Optimizing", IProgress.ValueUnit.BYTES)
     }
 }

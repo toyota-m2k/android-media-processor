@@ -2,14 +2,14 @@ package io.github.toyota32k.media.lib.legacy.converter
 
 import io.github.toyota32k.media.lib.io.IInputMediaFile
 import io.github.toyota32k.media.lib.io.IOutputMediaFile
-import io.github.toyota32k.media.lib.processor.contract.IActualSoughtMap
 import io.github.toyota32k.media.lib.processor.contract.IConvertResult
+import io.github.toyota32k.media.lib.processor.contract.IProcessorResult
 import io.github.toyota32k.media.lib.processor.contract.ISoughtMap
+import io.github.toyota32k.media.lib.processor.contract.dump
 import io.github.toyota32k.media.lib.report.Report
 import io.github.toyota32k.media.lib.types.RangeMs
 import io.github.toyota32k.media.lib.types.RangeUs
 import kotlinx.coroutines.CancellationException
-import kotlin.text.appendLine
 
 /**
  * Converterの結果（成功/失敗/キャンセル）を返すためのデータクラス
@@ -31,14 +31,11 @@ data class ConvertResult(
             return ConvertResult(true, inputFile, outputFile, requestedRangeMs, adjustedTrimmingRangeList, report, false, null, null)
         }
         fun cancelled(inputFile: IInputMediaFile?):ConvertResult =
-            ConvertResult(false, inputFile, null, RangeMs.Companion.empty, null, null,true, null, null)
+            ConvertResult(false, inputFile, null, RangeMs.empty, null, null,true, null, null)
         fun error(inputFile: IInputMediaFile?, exception:Throwable, errorMessage:String?=null):ConvertResult {
-            return if(exception is CancellationException) cancelled(inputFile) else ConvertResult(false, inputFile, null, RangeMs.Companion.empty, null, null, false, errorMessage ?: exception.message, exception)
+            return if(exception is CancellationException) cancelled(inputFile) else ConvertResult(false, inputFile, null, RangeMs.empty, null, null, false, errorMessage ?: exception.message, exception)
         }
     }
-    @Deprecated("use soughtMap")
-    override val actualSoughtMap : IActualSoughtMap?
-        get() = adjustedTrimmingRangeList as? IActualSoughtMap
 
     val requestedRangeUs: RangeUs
         get() = RangeUs.Companion.fromMs(requestedRangeMs)
@@ -49,34 +46,9 @@ data class ConvertResult(
     override fun toString(): String {
         return dump()
     }
+
+    override fun derive(output: IOutputMediaFile?): IProcessorResult {
+        throw UnsupportedOperationException("not implemented")
+    }
 }
 
-// for debug log
-fun IConvertResult.dump(): String {
-    return StringBuilder().apply {
-        append("Convert Result: ")
-        when {
-            succeeded -> {
-                appendLine("Succeeded")
-                if (report != null) {
-                    appendLine(report.toString())
-                }
-            }
-            cancelled -> {
-                appendLine("Cancelled")
-            }
-            exception != null -> {
-                appendLine("Failed")
-                appendLine(exception.toString())
-            }
-            errorMessage != null -> {
-                appendLine("Failed")
-                appendLine(errorMessage)
-            }
-            else -> {
-                appendLine("Failed")
-                appendLine("Unknown Error")
-            }
-        }
-    }.toString()
-}

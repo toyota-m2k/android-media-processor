@@ -1,8 +1,12 @@
 package io.github.toyota32k.media.lib.processor
 
 import android.graphics.Rect
+import io.github.toyota32k.media.lib.format.Codec
+import io.github.toyota32k.media.lib.format.Profile
 import io.github.toyota32k.media.lib.format.isHDR
 import io.github.toyota32k.media.lib.report.Summary
+import io.github.toyota32k.media.lib.strategy.AudioStrategy
+import io.github.toyota32k.media.lib.strategy.IAudioStrategy
 import io.github.toyota32k.media.lib.strategy.IHDRSupport
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
 import io.github.toyota32k.media.lib.strategy.MaxDefault
@@ -24,6 +28,23 @@ class StrategyAdjuster(
     var keepHDR: Boolean,
     var keepProfile: Boolean,
 ) {
+    companion object {
+        fun nearestVideoStrategy(inputSummary: Summary): IVideoStrategy {
+            val summary = inputSummary.videoSummary ?: throw IllegalStateException("video summary is not available.")
+            return VideoStrategy(
+                summary.codec ?: throw IllegalStateException("unknown video codec."),
+                summary.profile ?: throw IllegalStateException("unknown video codec profile"),
+                summary.level,
+                null,
+                VideoStrategy.SizeCriteria(Int.MAX_VALUE, Int.MAX_VALUE),
+                MaxDefault(Int.MAX_VALUE,max(summary.bitRate, 768*1000)),
+                MaxDefault(30, max(summary.frameRate, 24)),
+                MinDefault(1, summary.iFrameInterval.takeIf { it > 0 } ?: 30),
+                null,
+                null,)
+        }
+    }
+
     /**
      * 入力ファイルの情報(inputSummary)と各パラメータに基づき、再エンコードが必要かどうかをチェックし、
      * 不要なら、InvalidStrategy を返す

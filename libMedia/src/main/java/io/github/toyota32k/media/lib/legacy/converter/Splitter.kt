@@ -17,6 +17,7 @@ import io.github.toyota32k.media.lib.misc.ISO6709LocationParser
 import io.github.toyota32k.media.lib.processor.contract.IActualSoughtMap
 import io.github.toyota32k.media.lib.processor.contract.ICancellable
 import io.github.toyota32k.media.lib.processor.contract.IConvertResult
+import io.github.toyota32k.media.lib.processor.contract.IProcessorResult
 import io.github.toyota32k.media.lib.processor.contract.IProgress
 import io.github.toyota32k.media.lib.processor.contract.IResultBase
 import io.github.toyota32k.media.lib.processor.contract.ISoughtMap
@@ -375,12 +376,16 @@ class Splitter private constructor(
     /**
      * 分割結果（１ファイル）
      */
-    data class Result(override val succeeded:Boolean, override val inputFile: IInputMediaFile?, override val outputFile: IOutputMediaFile?, @Deprecated("use soughtMap") override val actualSoughtMap: IActualSoughtMap?, override val exception:Throwable?, override val errorMessage: String?, override val report: Report?=null): IConvertResult {
+    data class Result(override val succeeded:Boolean, override val inputFile: IInputMediaFile?, override val outputFile: IOutputMediaFile?, override val exception:Throwable?, override val errorMessage: String?, override val report: Report?=null): IConvertResult {
         override val soughtMap: ISoughtMap? = null
+        override fun derive(output: IOutputMediaFile?): IProcessorResult {
+            TODO("Not yet implemented")
+        }
+
         companion object {
-            fun cancelled(inputFile: IInputMediaFile?) = Result(false, inputFile, null, null,CancellationException(), null)
-            fun success(inputFile: IInputMediaFile?, outputFile: IOutputMediaFile, actualSoughtMap: IActualSoughtMap, report:Report) = Result(true, inputFile,  outputFile,  actualSoughtMap, null, null, report)
-            fun error(inputFile: IInputMediaFile?, e:Throwable, msg:String?=null) = Result(false, inputFile,null, null, e, msg)
+            fun cancelled(inputFile: IInputMediaFile?) = Result(false, inputFile, null, CancellationException(), null)
+            fun success(inputFile: IInputMediaFile?, outputFile: IOutputMediaFile, report:Report) = Result(true, inputFile,  outputFile,  null, null, report)
+            fun error(inputFile: IInputMediaFile?, e:Throwable, msg:String?=null) = Result(false, inputFile,null, e, msg)
         }
     }
 
@@ -450,7 +455,7 @@ class Splitter private constructor(
                 progress.setTotalMs(if (actualEndMs==Long.MAX_VALUE) -1L else actualEndMs-startMs)
                 val report = Report().apply { start() }
                 extractRangesToFile(inPath, metaData, outPath, listOf(RangeUs.fromMs(startMs, actualEndMs)), report, actualSoughtMap)
-                Result.success(inPath,outPath, actualSoughtMap, report.apply { end() })
+                Result.success(inPath,outPath, report.apply { end() })
             } catch (e:Throwable) {
                 if (e !is CancellationException) {
                     logger.error(e)
@@ -488,7 +493,7 @@ class Splitter private constructor(
             try {
                 val report = Report().apply { start() }
                 extractRangesToFile(inPath, metaData, outPath, ranges.map { RangeUs.fromMs(it) }, report, actualSoughtMap)
-                Result.success(inPath,outPath, actualSoughtMap, report.apply { end() })
+                Result.success(inPath,outPath, report.apply { end() })
             } catch (e:Throwable) {
                 if (e !is CancellationException) {
                     logger.error(e)
@@ -527,8 +532,8 @@ class Splitter private constructor(
                 val actualSoughtMap2 = ActualSoughtMapImpl(metaData.durationUs?:Long.MAX_VALUE, RangeUs.fromMs(atTimeMs, metaData.duration ?: Long.MAX_VALUE))
                 extractRangesToFile(inPath, metaData, out2Path, listOf(RangeUs.fromMs(atTimeMs, Long.MAX_VALUE)), report2, actualSoughtMap2)
                 listOf(
-                    Result.success(inPath,out1Path, actualSoughtMap1, report1),
-                    Result.success(inPath,out2Path, actualSoughtMap2, report2))
+                    Result.success(inPath,out1Path, report1),
+                    Result.success(inPath,out2Path, report2))
             } catch (e:Throwable) {
                 if (e !is CancellationException) {
                     logger.error(e)
@@ -611,7 +616,7 @@ class Splitter private constructor(
                         val actualSoughtMap = ActualSoughtMapImpl(metaData.durationUs ?: Long.MAX_VALUE, RangeUs.fromMs(fromTimeMs, toTimeMs))
                         val report = Report().apply { start() }
                         extractRangesToFile(inputFile,metaData, outPath, listOf(RangeUs.fromMs(fromTimeMs, toTimeMs)), report, actualSoughtMap)
-                        results.add(Result.success(inputFile,outPath,  actualSoughtMap, report.apply { end()}))
+                        results.add(Result.success(inputFile,outPath,   report.apply { end()}))
                     } catch (e: Throwable) {
                         if (deleteOutputOnError) {
                             outPath.safeDelete()

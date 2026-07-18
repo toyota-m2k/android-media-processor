@@ -10,7 +10,10 @@ version="1.0"
 
 configure<LibraryExtension> {
     namespace = "io.github.toyota32k.media.lib"
-    compileSdk = 37
+    compileSdk {
+        version = release(37)
+        compileSdkMinor = 1
+    }
 
     defaultConfig {
         minSdk = 26
@@ -48,7 +51,8 @@ dependencies {
     implementation(libs.appcompat)
     implementation(libs.coroutinesCore)
     implementation(libs.documentfile)
-    api(libs.android.utilities)
+    implementation(libs.android.logger)
+    implementation(libs.android.utilities)
     testImplementation(libs.junit)
     androidTestImplementation(libs.junitExt)
     androidTestImplementation(libs.espressoCore)
@@ -66,6 +70,7 @@ publishing {
 
             afterEvaluate {
                 from(components["release"])
+                artifact(tasks.named("sourceReleaseJar"))
             }
         }
     }
