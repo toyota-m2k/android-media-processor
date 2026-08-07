@@ -39,7 +39,7 @@ class StrategyAdjuster(
                 VideoStrategy.SizeCriteria(Int.MAX_VALUE, Int.MAX_VALUE),
                 MaxDefault(Int.MAX_VALUE,max(summary.bitRate, 768*1000)),
                 MaxDefault(30, max(summary.frameRate, 24)),
-                MinDefault(1, summary.iFrameInterval.takeIf { it > 0 } ?: 30),
+                MinDefault(1, summary.iFrameInterval.takeIf { it > 0 } ?: 1),
                 null,
                 null,)
         }
@@ -66,7 +66,7 @@ class StrategyAdjuster(
                     VideoStrategy.SizeCriteria(Int.MAX_VALUE, Int.MAX_VALUE),
                     MaxDefault(Int.MAX_VALUE,max(summary.bitRate, 768*1000)),
                     MaxDefault(30, max(summary.frameRate, 24)),
-                    MinDefault(1, summary.iFrameInterval.takeIf { it > 0 } ?: 30),
+                    MinDefault(1, summary.iFrameInterval.takeIf { it > 0 } ?: 1),
                     null,
                     null,)
             } else {
