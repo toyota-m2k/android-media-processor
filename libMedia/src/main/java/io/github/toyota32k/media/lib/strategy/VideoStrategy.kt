@@ -122,7 +122,9 @@ open class VideoStrategy(
             this.bitRate.value(br)
         }
         val frameRate = this.frameRate.value(inputFormat.frameRate, metaData.frameRate)
-        val iFrameInterval = this.iFrameInterval.value(inputFormat.iFrameInterval)
+        // iFrameIntervalは常に１secとする。
+        // もともとソースからこの情報は取得できないし、仮にできたとして、大きい値にするとシークが遅くなり、0（全フレームがキーフレームになる）だとサイズがえらいことになる。
+        val iFrameInterval = 1 // this.iFrameInterval.value(inputFormat.iFrameInterval)
         val bitRateMode = this.bitRateMode
         var outputWidth = inputFormat.width ?: metaData.width ?: throw IllegalArgumentException("inputFormat have no size params.")
         var outputHeight = inputFormat.height ?: metaData.height ?: throw IllegalArgumentException("inputFormat have no size params.")
