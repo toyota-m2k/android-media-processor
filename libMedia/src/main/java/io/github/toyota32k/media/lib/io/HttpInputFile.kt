@@ -6,6 +6,7 @@ import android.media.MediaMetadataRetriever
 import io.github.toyota32k.logger.UtLog
 import io.github.toyota32k.media.lib.legacy.converter.Converter
 import io.github.toyota32k.utils.GenericCloseable
+import io.github.toyota32k.utils.UtLib
 import java.io.InputStream
 import java.net.HttpURLConnection
 import java.net.URL
@@ -26,14 +27,15 @@ interface IHttpStreamSource {
  */
 class HttpInputFile(context: Context, private val streamSource: IHttpStreamSource) : IInputMediaFile {
     constructor(context: Context, url:String) : this(context, HttpStreamSource(url))
-
+    constructor(url: String) : this(UtLib.applicationContext, url)
+    constructor(source: IHttpStreamSource) : this(UtLib.applicationContext, source)
     companion object {
         /**
          * 一時ファイルの全クリア
          * 強制終了したりすると、一時ファイルがゴミとして残ることがあるので、ときどき呼ぶとよいかも。
          */
         @Suppress("unused")
-        fun deleteAllTempFile(context:Context) {
+        fun deleteAllTempFile(context:Context = UtLib.applicationContext) {
             HttpMediaDataSource.deleteAllTempFile(context)
         }
     }

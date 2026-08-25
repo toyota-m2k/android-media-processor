@@ -1,9 +1,9 @@
 [versions]
 #plugins
-agp = "9.3.1"
+agp = "9.3.2"
 
 #libraries
-appcompat = "1.7.1"
+appcompat = "1.8.0"
 material = "1.14.0"
 coroutinesCore = "1.11.0"
 junit = "4.13.2"
@@ -12,11 +12,11 @@ espressoCore = "3.7.0"
 coreKtx = "1.19.0"
 activityKtx = "1.13.0"
 constraintLayout = "2.2.2"
-androidLogger = "2.2.4"
-androidUtilities = "4.16.4"
-androidBinding = "1.16.0"    # for sample only
-androidDialog = "7.2.2"     # for sample only
-androidPlayer = "4.10.0"     # for sample only
+androidLogger = "2.3.2"
+androidUtilities = "4.17.1"
+androidBinding = "1.16.1"    # for sample only
+androidDialog = "7.3.0"     # for sample only
+androidPlayer = "4.11.0"     # for sample only
 documentfile = "1.1.0"     # for sample only
 
 [libraries]

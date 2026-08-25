@@ -34,7 +34,10 @@ object FastStart {
      * @return true: 必要 / false: 不要
      */
     fun check(inUri: Uri, context: Context):CheckResult
-        = check(AndroidFile(inUri, context))
+            = check(AndroidFile(inUri, context))
+
+    fun check(inUri: Uri):CheckResult
+            = check(AndroidFile(inUri))
 
     fun check(inFile: AndroidFile):CheckResult {
         return try {
@@ -56,6 +59,9 @@ object FastStart {
      */
     fun process(inUri: Uri, outUri: Uri, context: Context, removeFree:Boolean, progressCallback: ((IProgress) -> Unit)?):Boolean {
         return process(AndroidFile(inUri, context), AndroidFile(outUri, context), removeFree, progressCallback)
+    }
+    fun process(inUri: Uri, outUri: Uri, removeFree:Boolean, progressCallback: ((IProgress) -> Unit)?):Boolean {
+        return process(AndroidFile(inUri), AndroidFile(outUri), removeFree, progressCallback)
     }
 
     fun process(inFile: AndroidFile, outFile: AndroidFile, removeFree:Boolean, progressCallback: ((IProgress) -> Unit)?):Boolean {
