@@ -1,7 +1,6 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import com.android.build.api.dsl.LibraryExtension
 
 plugins {
-    alias(libs.plugins.jetbrains.kotlin.android)
     alias(libs.plugins.android.library)
     id("maven-publish")
 }
@@ -9,9 +8,12 @@ plugins {
 group = "com.github.toyota-m2k"
 version="1.0"
 
-android {
+configure<LibraryExtension> {
     namespace = "io.github.toyota32k.media.lib"
-    compileSdk = 36
+    compileSdk {
+        version = release(37)
+        compileSdkMinor = 1
+    }
 
     defaultConfig {
         minSdk = 26
@@ -27,8 +29,8 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
     testOptions {
         unitTests.isIncludeAndroidResources = true
@@ -41,16 +43,15 @@ android {
 }
 
 kotlin {
-    compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_17)
-    }
+    jvmToolchain(21)
 }
 
 dependencies {
     implementation(libs.appcompat)
     implementation(libs.coroutinesCore)
     implementation(libs.documentfile)
-    api(libs.android.utilities)
+    implementation(libs.android.logger)
+    implementation(libs.android.utilities)
     testImplementation(libs.junit)
     androidTestImplementation(libs.junitExt)
     androidTestImplementation(libs.espressoCore)
@@ -60,14 +61,16 @@ dependencies {
 publishing {
     publications {
         // Creates a Maven publication called "release".
+        // Creates a Maven publication called "release".
         register<MavenPublication>("release") {
             // You can then customize attributes of the publication as shown below.
             groupId = "com.github.toyota-m2k"
             artifactId = "android-media-processor"
-            version = project.findProperty("githubReleaseTag") as String? ?: "LOCAL"
+            version = project.findProperty("githubReleaseTag") as String? ?: "LOCALv2"
 
             afterEvaluate {
                 from(components["release"])
+                artifact(tasks.named("sourceReleaseJar"))
             }
         }
     }

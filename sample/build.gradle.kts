@@ -1,18 +1,20 @@
-import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import com.android.build.api.dsl.ApplicationExtension
 
 plugins {
-    alias(libs.plugins.jetbrains.kotlin.android)
     alias(libs.plugins.android.application)
 }
 
-android {
+configure<ApplicationExtension> {
     namespace = "io.github.toyota32k.sample.media"
-    compileSdk = 36
+    compileSdk {
+        version = release(37)
+        compileSdkMinor = 1
+    }
 
     defaultConfig {
         applicationId = "io.github.toyota32k.sample.media"
         minSdk = 28
-        targetSdk = 36
+        targetSdk = 37
         versionCode = 1
         versionName = "1.0"
 
@@ -26,8 +28,8 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_17
-        targetCompatibility = JavaVersion.VERSION_17
+        sourceCompatibility = JavaVersion.VERSION_21
+        targetCompatibility = JavaVersion.VERSION_21
     }
     buildFeatures {
         viewBinding = true
@@ -35,9 +37,7 @@ android {
 }
 
 kotlin {
-    compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_17)
-    }
+    jvmToolchain(21)
 }
 
 dependencies {
@@ -46,6 +46,8 @@ dependencies {
     implementation(libs.material)
     implementation(libs.activityKtx)
     implementation(libs.constraintLayout)
+    implementation(libs.android.logger)
+    implementation(libs.android.utilities)
     implementation(libs.android.binding)
     implementation(libs.android.dialog)
     implementation(libs.android.player)
