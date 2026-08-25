@@ -3,6 +3,7 @@ package io.github.toyota32k.media.lib.processor.optimizer
 import android.content.Context
 import io.github.toyota32k.media.lib.processor.contract.IMultiPhaseProgress
 import io.github.toyota32k.media.lib.processor.contract.IProgress
+import io.github.toyota32k.utils.UtLib
 
 data class OptimizingProcessorPhase(override val description:String, override val valueUnit: IProgress.ValueUnit) : IMultiPhaseProgress.IPhase {
     companion object {
@@ -19,4 +20,6 @@ data class OptimizerOptions(
     val removeFreeAtom:Boolean,
 ) {
     constructor(applicationContext: Context):this(applicationContext, true)
+    constructor(removeFreeAtom:Boolean):this(UtLib.applicationContext, removeFreeAtom)
+    constructor():this(UtLib.applicationContext, true)
 }

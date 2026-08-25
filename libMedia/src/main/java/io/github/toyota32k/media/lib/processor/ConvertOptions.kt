@@ -25,6 +25,7 @@ import io.github.toyota32k.media.lib.types.RangeUs.Companion.formatAsUs
 import io.github.toyota32k.media.lib.types.RangeUs.Companion.ms2us
 import io.github.toyota32k.media.lib.types.Rotation
 import io.github.toyota32k.media.lib.utils.RangeUsListBuilder
+import io.github.toyota32k.utils.UtLib
 import java.io.File
 import kotlin.time.Duration
 
@@ -106,7 +107,7 @@ data class ConvertOptions (
         /**
          * 入力ファイルを設定（必須）
          * 通常は、適当な型の引数をとるバリエーションを利用する。
-         * @param IInputMediaFile
+         * @param src   IInputMediaFile
          */
         fun input(src: IInputMediaFile) = apply {
             mInPath = src
@@ -114,40 +115,43 @@ data class ConvertOptions (
 
         /**
          * 入力ファイルを設定
-         * @param File
+         * @param path  File
          */
         fun input(path: File) = input(AndroidFile(path))
 
         /**
          * 入力ファイルを設定
-         * @param Uri
-         * @param Context
+         * @param uri Uri
+         * @param context Context
          */
         fun input(uri: Uri, context: Context) = input(AndroidFile(uri, context))
+        fun input(uri: Uri) = input(AndroidFile(uri))
 
         /**
          * 入力ファイルを設定
-         * @param String URL (http/https)
-         * @param Context
+         * @param url String URL (http/https)
+         * @param url Context
          */
         fun input(url: String, context: Context) = apply {
             if (!url.startsWith("http")) throw IllegalArgumentException("url must be http or https")
             input(HttpInputFile(context, url))
         }
+        fun input(url: String) = input(url, UtLib.applicationContext)
 
         /**
          * 入力ファイルを設定
-         * @param IHttpStreamSource
-         * @param Context
+         * @param source IHttpStreamSource
+         * @param context Context
          */
         fun input(source: IHttpStreamSource, context: Context) = input(HttpInputFile(context, source))
+        fun input(source: IHttpStreamSource) = input(HttpInputFile(source))
 
         val output: IOutputMediaFile? get() = mOutPath
         /**
          * 出力ファイルを設定（必須）
          * 通常は、適当な型の引数をとるバリエーションを利用する。
          * ただし、inputと異なり、HttpFileは利用不可
-         * @param IOutputMediaFile
+         * @param dst IOutputMediaFile
          */
         fun output(dst: IOutputMediaFile) = apply {
             mOutPath = dst
@@ -155,16 +159,17 @@ data class ConvertOptions (
 
         /**
          * 出力ファイルを設定
-         * @param File
+         * @param path File
          */
         fun output(path: File) = output(AndroidFile(path))
 
         /**
          * 出力ファイルを設定
-         * @param Uri
-         * @param Context
+         * @param uri Uri
+         * @param context Context
          */
         fun output(uri: Uri, context: Context) = output(AndroidFile(uri, context))
+        fun output(uri: Uri) = output(AndroidFile(uri))
 
         // endregion
 
@@ -297,8 +302,11 @@ data class ConvertOptions (
         fun deleteOutputOnError(flag:Boolean) = apply {
             mDeleteOutputOnError = flag
         }
-        fun optimize(applicationContext:Context, removeFreeAtom:Boolean) = apply {
+        fun optimize(applicationContext:Context, removeFreeAtom:Boolean=true) = apply {
             mOptimizerOptions = OptimizerOptions(applicationContext, removeFreeAtom)
+        }
+        fun optimize(removeFreeAtom:Boolean) = apply {
+            mOptimizerOptions = OptimizerOptions(removeFreeAtom)
         }
         fun optimize(optimizerOptions: OptimizerOptions?) = apply {
             mOptimizerOptions = optimizerOptions

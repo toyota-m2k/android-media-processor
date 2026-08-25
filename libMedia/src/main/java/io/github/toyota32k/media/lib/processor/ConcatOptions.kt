@@ -19,6 +19,7 @@ import io.github.toyota32k.media.lib.strategy.PresetVideoStrategies
 import io.github.toyota32k.media.lib.types.RangeUs
 import io.github.toyota32k.media.lib.types.ScaleMode
 import io.github.toyota32k.media.lib.utils.RangeUsListBuilder
+import io.github.toyota32k.utils.UtLib
 import java.io.File
 
 /**
@@ -108,14 +109,21 @@ class ConcatOptions private constructor(
 
         fun addInput(uri: Uri, context: Context, trimming: (RangeUsListBuilder.() -> Unit)? = null) =
             addInput(AndroidFile(uri, context), trimming)
+        fun addInput(uri: Uri, trimming: (RangeUsListBuilder.() -> Unit)? = null) =
+            addInput(AndroidFile(uri), trimming)
 
         fun addInput(url: String, context: Context, trimming: (RangeUsListBuilder.() -> Unit)? = null) = apply {
             if (!url.startsWith("http")) throw IllegalArgumentException("url must be http or https")
             addInput(HttpInputFile(context, url), trimming)
         }
+        fun addInput(url: String, trimming: (RangeUsListBuilder.() -> Unit)? = null) =
+            addInput(url, UtLib.applicationContext, trimming)
 
         fun addInput(source: IHttpStreamSource, context: Context, trimming: (RangeUsListBuilder.() -> Unit)? = null) =
             addInput(HttpInputFile(context, source), trimming)
+        fun addInput(source: IHttpStreamSource, trimming: (RangeUsListBuilder.() -> Unit)? = null) =
+            addInput(HttpInputFile(source), trimming)
+
 
         // endregion
 
@@ -128,6 +136,7 @@ class ConcatOptions private constructor(
         fun output(path: File) = output(AndroidFile(path))
 
         fun output(uri: Uri, context: Context) = output(AndroidFile(uri, context))
+        fun output(uri: Uri) = output(AndroidFile(uri))
 
         // endregion
 

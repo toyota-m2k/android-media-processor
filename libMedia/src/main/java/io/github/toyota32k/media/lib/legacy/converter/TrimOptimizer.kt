@@ -20,6 +20,7 @@ import io.github.toyota32k.media.lib.processor.contract.IProgress
 import io.github.toyota32k.media.lib.processor.optimizer.OptimizingProcessorPhase
 import io.github.toyota32k.media.lib.strategy.IAudioStrategy
 import io.github.toyota32k.media.lib.strategy.IVideoStrategy
+import io.github.toyota32k.utils.UtLib
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import java.io.File
@@ -63,7 +64,7 @@ class TrimOptimizer(
         }
     }
 
-    class Builder(val applicationContext:Context) {
+    class Builder() {
         // region Builder Parameters
 
         private val mConverterBuilder: Converter.Builder = Converter.builder
@@ -72,10 +73,19 @@ class TrimOptimizer(
         private var mForceConvert = false
         private var mProgressHandler: ((IMultiPhaseProgress)->Unit)? = null
         private var mWorkDirectory: File? = null
+        private var mApplicationContext: Context? = null
+
+        private val applicationContext: Context
+            get() = mApplicationContext ?: UtLib.applicationContext
 
         // endregion
 
         // region Optimizer specific instruction
+
+        fun applicationContext(context: Context) = apply {
+            mApplicationContext = context.applicationContext
+        }
+
 
         fun fastStart(flag:Boolean) = apply {
             mFastStart = flag
@@ -108,16 +118,18 @@ class TrimOptimizer(
          * @param File
          */
         fun input(path: File)
-                = input(AndroidFile(path))
+           = input(AndroidFile(path))
 
         /**
          * 入力ファイルを設定
-         * @param Uri
-         * @param Context
+         * @param uri   Uri
+         * @param uri Context
          */
         fun input(uri: Uri, context: Context)
-                = input(AndroidFile(uri, context))
+            = input(AndroidFile(uri, context))
 
+        fun input(uri: Uri)
+            = input(AndroidFile(uri, applicationContext))
         /**
          * 入力ファイルを設定
          * @param String URL (http/https)
@@ -127,6 +139,9 @@ class TrimOptimizer(
             if(!url.startsWith("http")) throw IllegalArgumentException("url must be http or https")
             input (HttpInputFile(context, url))
         }
+        fun input(url: String)
+            = input(url, applicationContext)
+
 
         /**
          * 入力ファイルを設定
@@ -135,6 +150,8 @@ class TrimOptimizer(
          */
         fun input(source: IHttpStreamSource, context: Context)
                 = input(HttpInputFile(context, source))
+        fun input(source: IHttpStreamSource)
+                = input(HttpInputFile(applicationContext, source))
 
         /**
          * 出力ファイルを設定（必須）
@@ -160,6 +177,8 @@ class TrimOptimizer(
          */
         fun output(uri: Uri, context: Context)
                 = output(AndroidFile(uri, context))
+        fun output(uri: Uri)
+                = output(AndroidFile(uri, applicationContext))
 
         // endregion
 

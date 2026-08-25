@@ -6,6 +6,7 @@ import android.media.MediaMetadataRetriever
 import android.media.MediaMuxer
 import android.net.Uri
 import io.github.toyota32k.media.lib.format.ContainerFormat
+import io.github.toyota32k.utils.UtLib
 import io.github.toyota32k.utils.android.IUtFileEx
 import io.github.toyota32k.utils.android.UtFile
 import io.github.toyota32k.utils.android.toUtFile
@@ -21,6 +22,7 @@ import java.io.File
  */
 class AndroidFile(val utFile:UtFile) : IInputMediaFile, IOutputMediaFile, IUtFileEx by utFile {
     constructor(file:File) : this(file.toUtFile())
+    constructor(uri:Uri) : this(uri.toUtFile())
     constructor(uri:Uri, context:Context) : this(uri.toUtFile(context))
 
     val hasPath:Boolean get() = utFile.safeUri.scheme == "file"
@@ -55,6 +57,9 @@ fun Uri.toAndroidFile(context:Context):AndroidFile {
         return AndroidFile(File(path).toUtFile())
     }
 }
+
+fun Uri.toAndroidFile() : AndroidFile
+    = AndroidFile(this, UtLib.applicationContext)
 
 @Suppress("unused")
 fun File.toAndroidFile():AndroidFile {

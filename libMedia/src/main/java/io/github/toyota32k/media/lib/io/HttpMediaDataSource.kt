@@ -6,6 +6,7 @@ import androidx.annotation.WorkerThread
 import io.github.toyota32k.logger.UtLog
 import io.github.toyota32k.media.lib.legacy.converter.Converter
 import io.github.toyota32k.utils.FlowableEvent
+import io.github.toyota32k.utils.UtLib
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -19,6 +20,8 @@ import kotlin.math.min
  * IHttpStreamSourceを入力とする HTTPベースの MediaDataSource の実装クラス
  */
 class HttpMediaDataSource(context: Context, private val streamSource: IHttpStreamSource) : MediaDataSource() {
+    constructor(streamSource: IHttpStreamSource) : this(UtLib.applicationContext, streamSource)
+
     companion object {
         private const val TEMP_FILE_PREFIX = "amp_"
         private const val TEMP_FILE_SUFFIX = ".tmp"
@@ -26,7 +29,7 @@ class HttpMediaDataSource(context: Context, private val streamSource: IHttpStrea
         /**
          * 一時ファイルを全クリア
          */
-        fun deleteAllTempFile(context:Context) {
+        fun deleteAllTempFile(context:Context = UtLib.applicationContext) {
             val tempFiles = context.cacheDir.listFiles()?.filter { it.name.startsWith(TEMP_FILE_PREFIX) && it.name.endsWith(TEMP_FILE_SUFFIX) } ?: return
             Converter.logger.info("deleting ${tempFiles.size} temp files.")
             tempFiles.forEach {
