@@ -18,4 +18,6 @@ dependencyResolutionManagement {
 
 rootProject.name = "Android Media Processor"
 include(":libMedia")
-include(":sample")
+if (System.getenv("JITPACK") == null) {
+    include(":sample")
+}
