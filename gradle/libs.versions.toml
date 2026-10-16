@@ -1,6 +1,6 @@
 [versions]
 #plugins
-agp = "9.4.0"
+agp = "9.4.1"
 
 #libraries
 appcompat = "1.8.0"
